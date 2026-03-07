@@ -278,22 +278,28 @@ async def websocket_chat(ws: WebSocket):
                 else:
                     # Default handler uses OpenClaw streaming when available
                     bridge: OpenClawBridge = _state.get("openclaw_bridge")
-                    if bridge and _state.get("openclaw_available"):
-                        try:
-                            # Build history from payload
-                            raw_history = payload.get("history", [])
-                            history = [
-                                {"role": h.get("role", "user"), "content": h.get("content", "")}
-                                for h in raw_history
-                                if h.get("role") in ("user", "assistant") and h.get("content")
-                            ]
-                            await ws.send_json({"type": "stream_start"})
-                            async for chunk in bridge.chat_stream(user_message, history):
-                                await ws.send_json({"type": "stream_chunk", "content": chunk})
-                            await ws.send_json({"type": "stream_end"})
-                            continue
-                        except Exception as exc:
-                            logger.warning("OpenClaw streaming failed, using fallback: %s", exc)
+                    if bridge:
+                        # Always do a fresh detect — gateway may have started after backend
+                        openclaw_status = bridge.detect()
+                        _state["openclaw_available"] = openclaw_status["available"]
+                        if openclaw_status["available"]:
+                            try:
+                                # Build history from payload
+                                raw_history = payload.get("history", [])
+                                history = [
+                                    {"role": h.get("role", "user"), "content": h.get("content", "")}
+                                    for h in raw_history
+                                    if h.get("role") in ("user", "assistant") and h.get("content")
+                                ]
+                                await ws.send_json({"type": "stream_start"})
+                                async for chunk in bridge.chat_stream(user_message, history):
+                                    await ws.send_json({"type": "stream_chunk", "content": chunk})
+                                await ws.send_json({"type": "stream_end"})
+                                # Update frontend status
+                                await ws.send_json({"type": "status", "openclaw": True})
+                                continue
+                            except Exception as exc:
+                                logger.warning("OpenClaw streaming failed, using fallback: %s", exc)
                     result = _handle_default_chat(user_message)
 
                 # Stream the response in chunks
