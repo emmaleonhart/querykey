@@ -52,7 +52,13 @@
       "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && gh run watch 22802494079 2>&1)",
       "Bash(\"C:/Users/Immanuelle/AppData/Local/Programs/Python/Python313/python.exe\":*)",
       "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && gh run watch --exit-status 2>&1)",
-      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && gh run watch 22802610108 --exit-status 2>&1)"
+      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && gh run watch 22802610108 --exit-status 2>&1)",
+      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && npx tsc -p tsconfig.json --noEmit 2>&1)",
+      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && npx tsc -p tsconfig.renderer.json --noEmit 2>&1)",
+      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && node scripts/build.js 2>&1)",
+      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && node scripts/build.js && npx vitest run 2>&1)",
+      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && git add \\\\\n  .gitignore \\\\\n  README.md \\\\\n  package.json \\\\\n  package-lock.json \\\\\n  tsconfig.json \\\\\n  tsconfig.renderer.json \\\\\n  vitest.config.ts \\\\\n  scripts/build.js \\\\\n  electron/src/ \\\\\n  tests/frontend/ && git rm electron/main.js electron/preload.js electron/renderer/app.js 2>&1)",
+      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && git rm electron/main.js electron/preload.js && git rm --cached electron/renderer/app.js 2>&1)"
     ]
   }
 }
