@@ -34,7 +34,12 @@
       "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && npm run package 2>&1)",
       "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && git add .gitignore package.json src/renderer/app.js src/renderer/index.html && git commit -m \"$\\(cat <<'EOF'\nfeat: .exe installer + UI improvements for demo\n\n- electron-builder config for one-click Windows NSIS installer\n- Copy images to dist/ for packaged app\n- Replace Settings button with Briefing quick action\n- Make connection badge clickable to open settings\n- Fix mascot image path for packaged app\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\" 2>&1)",
       "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && git add todo.md && git commit -m \"$\\(cat <<'EOF'\ndocs: update todo.md — mark OpenClaw integration + installer as done\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push 2>&1)",
-      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && git add runclaude.bat && git commit -m \"$\\(cat <<'EOF'\nadd: runclaude.bat — double-click to launch Claude Code in the repo\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push 2>&1)"
+      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && git add runclaude.bat && git commit -m \"$\\(cat <<'EOF'\nadd: runclaude.bat — double-click to launch Claude Code in the repo\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push 2>&1)",
+      "Bash(pip install:*)",
+      "Bash(tail:*)",
+      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && python -m pytest tests/backend/test_file_organizer.py -v 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\Immanuelle\\\\Documents\\\\Github\\\\tojo-assistant\" && python -m pytest tests/backend/test_data_processor.py -v 2>&1)",
+      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && \"C:\\\\Users\\\\Immanuelle\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python313\\\\python.exe\" -m pytest tests/ -v --tb=short 2>&1)"
     ]
   }
 }
