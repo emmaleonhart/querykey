@@ -7,7 +7,7 @@
 - **Update README.md regularly.** It should always reflect the current state of the project for human readers.
 
 ## Project Description
-Tojo Assistant is a Kirumi Tojo-themed business data assistant for the Girls in Tech Hackathon 2026 at UBC Okanagan. It wraps OpenClaw (an LLM-agnostic CLI that works with any LLM including local models) in an Electron desktop GUI with business-specific capabilities: file organization, Excel/Sheets error checking, data processing, Salesforce/Google Suite/database integrations, API discovery, data pipeline building, and competitor analysis with Blue Ocean Strategy.
+Sakuya Assistant is an Izayoi Sakuya-themed business data assistant for the Girls in Tech Hackathon 2026 at UBC Okanagan. It wraps OpenClaw (an LLM-agnostic CLI that works with any LLM including local models) in an Electron desktop GUI with business-specific capabilities: file organization, Excel/Sheets error checking, data processing, Salesforce/Google Suite/database integrations, API discovery, data pipeline building, and competitor analysis with Blue Ocean Strategy.
 
 ## Architecture and Conventions
 - **Backend**: Python 3.13 + FastAPI (`backend/` directory)
@@ -17,7 +17,7 @@ Tojo Assistant is a Kirumi Tojo-themed business data assistant for the Girls in 
   - `backend/pipeline/` - Data pipeline builder
   - `backend/openclaw/` - OpenClaw bridge + WSL manager
 - **Frontend**: Electron 28+ with vanilla HTML/CSS/JS (`electron/` directory)
-  - Dark theme with gold accents (Kirumi Tojo color palette)
+  - Dark theme with silver-blue accents (Izayoi Sakuya color palette)
   - Chat-based interface with sidebar navigation
 - **Tests**: pytest (`tests/backend/`)
 - **CI**: GitHub Actions (`.github/workflows/ci.yml`)

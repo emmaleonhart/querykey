@@ -1,5 +1,5 @@
 """
-Tojo Assistant - FastAPI Backend Server
+Sakuya Assistant - FastAPI Backend Server
 
 Main server module providing:
 - WebSocket endpoint for streaming chat interactions
@@ -54,7 +54,7 @@ _state: dict[str, Any] = {}
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle for the FastAPI application."""
-    logger.info("Tojo Assistant backend starting up...")
+    logger.info("Sakuya Assistant backend starting up...")
     _state["start_time"] = datetime.utcnow().isoformat()
     _state["data_processor"] = DataProcessor()
     _state["pipeline_builder"] = PipelineBuilder()
@@ -72,7 +72,7 @@ async def lifespan(app: FastAPI):
         logger.warning("OpenClaw gateway not available: %s", openclaw_status.get("error", "unknown"))
     logger.info("Backend ready.")
     yield
-    logger.info("Tojo Assistant backend shutting down...")
+    logger.info("Sakuya Assistant backend shutting down...")
     # Close any active WebSocket connections
     for ws in list(_state.get("active_websockets", set())):
         try:
@@ -87,7 +87,7 @@ async def lifespan(app: FastAPI):
 # Application
 # ---------------------------------------------------------------------------
 app = FastAPI(
-    title="Tojo Assistant",
+    title="Sakuya Assistant",
     description="Business data assistant backend",
     version="0.1.0",
     lifespan=lifespan,
@@ -334,7 +334,7 @@ def _handle_default_chat(message: str) -> str:
     """
     Fallback chat handler when OpenClaw is not available.
 
-    Returns capability hints so the user knows what Tojo can do.
+    Returns capability hints so the user knows what Sakuya can do.
     """
     capabilities = [
         "file organization (scan, categorize, deduplicate)",

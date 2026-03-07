@@ -1,4 +1,4 @@
-# Tojo Assistant - TODO
+# Sakuya Assistant - TODO
 
 ## Completed
 - [x] Project architecture and directory structure
@@ -8,7 +8,7 @@
 - [x] Pipeline builder
 - [x] OpenClaw bridge with Gateway HTTP API (SSE streaming)
 - [x] FastAPI server with 35 REST + 1 WebSocket endpoint
-- [x] Electron desktop app with Kirumi Tojo theme (TypeScript)
+- [x] Electron desktop app with Izayoi Sakuya theme (TypeScript)
 - [x] TypeScript migration (6 renderer modules + shared types)
 - [x] Full test suite (9 backend + 6 frontend files)
 - [x] GitHub Actions CI workflow (lint → test → build)

@@ -8,7 +8,7 @@ Connects to the OpenClaw Gateway via its OpenAI-compatible HTTP API:
 
 OpenClaw is LLM-agnostic and can work with any LLM backend
 (cloud APIs, local models, etc.). The gateway is the control plane;
-Tojo Assistant is just another client.
+Sakuya Assistant is just another client.
 
 Also includes WSL path translation utilities.
 """
@@ -154,7 +154,7 @@ class OpenClawBridge:
     Bridge to the OpenClaw Gateway via its OpenAI-compatible HTTP API.
 
     The gateway exposes POST /v1/chat/completions which accepts standard
-    OpenAI Chat Completions format. Tojo Assistant sends user messages
+    OpenAI Chat Completions format. Sakuya Assistant sends user messages
     through this endpoint and receives LLM responses.
 
     This is much more reliable than subprocess management — the gateway

@@ -77,7 +77,7 @@ export function createAssistantBubble(text: string): HTMLElement {
   const avatar = document.createElement('img');
   avatar.classList.add('message-avatar');
   avatar.src = AVATAR_SRC;
-  avatar.alt = 'Tojo';
+  avatar.alt = 'Sakuya';
 
   const bubble = document.createElement('div');
   bubble.classList.add('message-bubble');
@@ -136,8 +136,8 @@ export function clearChat(onQuickActionsBound: () => void): void {
 
   chatArea.innerHTML = `
     <div class="welcome-card">
-      <img src="${AVATAR_SRC}" alt="Kirumi Tojo" class="welcome-avatar" />
-      <h2>Welcome. I am Tojo Assistant.</h2>
+      <img src="${AVATAR_SRC}" alt="Izayoi Sakuya" class="welcome-avatar" />
+      <h2>Welcome. I am Sakuya Assistant.</h2>
       <p>I shall handle everything. Please tell me what you need, and I will attend to it promptly and precisely.</p>
       <div class="quick-actions">
         <button class="quick-action-btn" data-action="organize-files">Organize my files</button>

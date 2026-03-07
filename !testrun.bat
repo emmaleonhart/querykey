@@ -1,7 +1,7 @@
 @echo off
-title Tojo Assistant - Test Run
+title Sakuya Assistant - Test Run
 echo ========================================
-echo   Tojo Assistant - Test Run
+echo   Sakuya Assistant - Test Run
 echo   "I shall handle everything."
 echo ========================================
 echo.
@@ -59,13 +59,13 @@ if errorlevel 1 (
 )
 
 REM --- Launch the Electron app (which starts the Python backend automatically) ---
-echo [3/3] Starting Tojo Assistant...
+echo [3/3] Starting Sakuya Assistant...
 echo.
 echo   The Electron app will start the Python backend automatically.
-echo   Close the Tojo Assistant window to stop everything.
+echo   Close the Sakuya Assistant window to stop everything.
 echo.
 npx electron .
 
 echo.
-echo Tojo Assistant closed.
+echo Sakuya Assistant closed.
 pause

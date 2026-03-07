@@ -1,5 +1,5 @@
 /**
- * Tojo Assistant - Frontend entry point.
+ * Sakuya Assistant - Frontend entry point.
  * Wires together all modules and sets up event listeners.
  */
 
