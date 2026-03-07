@@ -35,6 +35,9 @@ yarn-error.log*
 # Electron
 out/
 release/
+electron/compiled/
+electron/renderer/app.js
+electron/renderer/app.js.map
 *.exe
 !installer/*.exe
 

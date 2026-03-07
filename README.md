@@ -49,17 +49,27 @@ pip install -r requirements.txt
 # Install Node.js dependencies
 npm install
 
+# Compile TypeScript (required before first run)
+npm run compile
+
 # Run the backend server
 python -m backend.server
 
-# Run the Electron app
+# Run the Electron app (auto-compiles TypeScript)
 npm start
 ```
 
 ### Running Tests
 
 ```bash
-pytest tests/ -v
+# Backend tests (pytest)
+npm run test:backend
+
+# Frontend tests (vitest)
+npm run test
+
+# Both
+npm run test:backend && npm run test
 ```
 
 ### Building the Installer
@@ -68,23 +78,30 @@ pytest tests/ -v
 npm run build
 ```
 
-This produces a `.exe` installer via electron-builder.
+This compiles TypeScript, bundles the renderer, and produces a `.exe` installer via electron-builder.
 
 ## Project Structure
 
 ```
 tojo-assistant/
-├── electron/              # Electron desktop app
-│   ├── main.js            # Main process
-│   ├── preload.js         # Context bridge
-│   └── renderer/          # Frontend (HTML/CSS/JS)
+├── electron/
+│   ├── src/               # TypeScript source
+│   │   ├── main.ts        # Main process
+│   │   ├── preload.ts     # Context bridge
+│   │   ├── shared/        # Shared types (IPC channels, API interfaces)
+│   │   └── renderer/      # Renderer modules (app, chat, websocket, etc.)
+│   ├── compiled/          # tsc output (main + preload, gitignored)
+│   └── renderer/          # Frontend (HTML/CSS + esbuild bundle)
 ├── backend/               # Python backend
 │   ├── server.py          # FastAPI entry point
 │   ├── core/              # File org, Excel checker, data processor
 │   ├── integrations/      # Salesforce, Google Suite, databases, API discovery
 │   ├── pipeline/          # Data pipeline builder
 │   └── openclaw/          # OpenClaw bridge + WSL manager
-├── tests/                 # pytest test suite
+├── tests/
+│   ├── backend/           # pytest test suite
+│   └── frontend/          # vitest test suite
+├── scripts/               # Build scripts (esbuild + tsc)
 ├── .github/workflows/     # CI/CD
 ├── assets/                # Shared assets (Kirumi Tojo avatar)
 └── planning/              # Architecture docs
@@ -95,10 +112,10 @@ tojo-assistant/
 | Layer | Technology |
 |-------|-----------|
 | Desktop App | Electron 28+ |
-| Frontend | HTML/CSS/JS (vanilla) |
+| Frontend | TypeScript + esbuild (modular architecture) |
 | Backend | Python 3.13 + FastAPI |
 | AI Engine | OpenClaw (LLM-agnostic CLI) via WSL |
-| Testing | pytest + GitHub Actions |
+| Testing | pytest (backend) + vitest (frontend) + GitHub Actions |
 | Installer | electron-builder (NSIS) |
 
 

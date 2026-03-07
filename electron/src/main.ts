@@ -1,40 +1,43 @@
-const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage, session } = require('electron');
-const path = require('path');
-const { spawn } = require('child_process');
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  dialog,
+  Tray,
+  Menu,
+  nativeImage,
+  session,
+} from 'electron';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as http from 'http';
+import { spawn, ChildProcess } from 'child_process';
+import { IPC_CHANNELS, BackendStatus, FileDialogOptions, OpenClawStatus } from './shared/types';
 
 // ── Paths ──────────────────────────────────────────────────────────────────────
-const ROOT_DIR = path.join(__dirname, '..');
+const ROOT_DIR = path.join(__dirname, '..', '..');
 const ASSETS_DIR = path.join(ROOT_DIR, 'assets');
 const ICON_PATH = path.join(ASSETS_DIR, 'tojo-avatar.png');
 const PRELOAD_PATH = path.join(__dirname, 'preload.js');
-const RENDERER_PATH = path.join(__dirname, 'renderer', 'index.html');
-const BACKEND_DIR = path.join(ROOT_DIR, 'backend');
+const RENDERER_PATH = path.join(__dirname, '..', 'renderer', 'index.html');
 
 // ── Packaged mode detection ─────────────────────────────────────────────────
-// When built with electron-builder, app.isPackaged is true and the PyInstaller
-// backend exe lives in resources/backend/tojo-backend/tojo-backend.exe
 const IS_PACKAGED = app.isPackaged;
 const PACKAGED_BACKEND_EXE = IS_PACKAGED
   ? path.join(process.resourcesPath, 'backend', 'tojo-backend', 'tojo-backend.exe')
   : null;
 
 // ── State ──────────────────────────────────────────────────────────────────────
-let mainWindow = null;
-let tray = null;
-let backendProcess = null;
+let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let backendProcess: ChildProcess | null = null;
 let backendReady = false;
 
 // ── Backend lifecycle ──────────────────────────────────────────────────────────
 
-function findPython() {
-  // Find the correct Python interpreter with our packages installed.
-  // On this system, the default `python` may resolve to a different user's
-  // installation that lacks required packages.
-  const fs = require('fs');
+function findPython(): string {
   const candidates = [
-    // Prefer the Immanuelle installation (has all packages)
     path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python313', 'python.exe'),
-    // Fall back to PATH
     process.platform === 'win32' ? 'python' : 'python3',
   ];
   for (const candidate of candidates) {
@@ -43,7 +46,7 @@ function findPython() {
         return candidate;
       }
       if (!candidate.includes(path.sep)) {
-        return candidate; // bare command, let PATH resolve
+        return candidate;
       }
     } catch {
       continue;
@@ -52,12 +55,27 @@ function findPython() {
   return process.platform === 'win32' ? 'python' : 'python3';
 }
 
-function startBackend() {
-  let cmd, args, cwd;
+function notifyBackendStatus(status: BackendStatus): void {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(IPC_CHANNELS.BACKEND_STATUS, status);
+  }
+}
+
+function handleBackendOutput(data: Buffer): void {
+  const output = data.toString().trim();
+  console.log(`[backend] ${output}`);
+  if (output.includes('Application startup complete') || output.includes('Uvicorn running')) {
+    backendReady = true;
+    notifyBackendStatus({ connected: true });
+  }
+}
+
+function startBackend(): void {
+  let cmd: string;
+  let args: string[];
+  let cwd: string;
 
   if (IS_PACKAGED && PACKAGED_BACKEND_EXE) {
-    // Packaged mode: run the PyInstaller-built executable
-    const fs = require('fs');
     if (fs.existsSync(PACKAGED_BACKEND_EXE)) {
       cmd = PACKAGED_BACKEND_EXE;
       args = [];
@@ -70,8 +88,6 @@ function startBackend() {
       cwd = ROOT_DIR;
     }
   } else {
-    // Dev mode: run via Python interpreter
-    // cwd must be the project root so `from backend.core...` imports resolve
     cmd = findPython();
     args = ['-m', 'backend.server'];
     cwd = ROOT_DIR;
@@ -80,70 +96,41 @@ function startBackend() {
 
   try {
     backendProcess = spawn(cmd, args, {
-      cwd: cwd,
+      cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, PYTHONUNBUFFERED: '1' },
     });
 
-    backendProcess.stdout.on('data', (data) => {
-      const output = data.toString().trim();
-      console.log(`[backend] ${output}`);
-      if (output.includes('Application startup complete') || output.includes('Uvicorn running')) {
-        backendReady = true;
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('backend-status', { connected: true });
-        }
-      }
-    });
+    backendProcess.stdout?.on('data', handleBackendOutput);
+    backendProcess.stderr?.on('data', handleBackendOutput);
 
-    backendProcess.stderr.on('data', (data) => {
-      const output = data.toString().trim();
-      // Uvicorn prints normal startup info to stderr
-      console.log(`[backend:err] ${output}`);
-      if (output.includes('Application startup complete') || output.includes('Uvicorn running')) {
-        backendReady = true;
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('backend-status', { connected: true });
-        }
-      }
-    });
-
-    backendProcess.on('error', (err) => {
+    backendProcess.on('error', (err: Error) => {
       console.error('[backend] Failed to start:', err.message);
       backendReady = false;
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('backend-status', {
-          connected: false,
-          error: err.message,
-        });
-      }
+      notifyBackendStatus({ connected: false, error: err.message });
     });
 
     backendProcess.on('exit', (code) => {
       console.log(`[backend] Exited with code ${code}`);
       backendReady = false;
       backendProcess = null;
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('backend-status', { connected: false });
-      }
+      notifyBackendStatus({ connected: false });
     });
   } catch (err) {
     console.error('[backend] Spawn error:', err);
   }
 }
 
-function stopBackend() {
+function stopBackend(): void {
   if (backendProcess) {
     console.log('[backend] Stopping...');
     backendProcess.kill('SIGTERM');
-    // Force-kill after 3 seconds if it hasn't exited
+    const proc = backendProcess;
     setTimeout(() => {
-      if (backendProcess) {
-        try {
-          backendProcess.kill('SIGKILL');
-        } catch (_) {
-          // already dead
-        }
+      try {
+        proc.kill('SIGKILL');
+      } catch {
+        // already dead
       }
     }, 3000);
   }
@@ -151,7 +138,7 @@ function stopBackend() {
 
 // ── Window creation ────────────────────────────────────────────────────────────
 
-function createMainWindow() {
+function createMainWindow(): void {
   const icon = nativeImage.createFromPath(ICON_PATH);
 
   mainWindow = new BrowserWindow({
@@ -159,10 +146,10 @@ function createMainWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    icon: icon,
+    icon,
     title: 'Tojo Assistant',
     backgroundColor: '#2d2d2d',
-    show: false, // show after ready-to-show to avoid flash
+    show: false,
     webPreferences: {
       preload: PRELOAD_PATH,
       contextIsolation: true,
@@ -173,28 +160,23 @@ function createMainWindow() {
 
   mainWindow.loadFile(RENDERER_PATH);
 
-  // Log renderer console messages to main process for debugging
-  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+  mainWindow.webContents.on('console-message', (_event, level, message) => {
     const prefix = ['LOG', 'WARN', 'ERR'][level] || 'LOG';
     console.log(`[renderer:${prefix}] ${message}`);
   });
 
-  // Graceful show
   mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-    // Open DevTools in dev mode for debugging
+    mainWindow!.show();
     if (!IS_PACKAGED) {
-      mainWindow.webContents.openDevTools({ mode: 'detach' });
+      mainWindow!.webContents.openDevTools({ mode: 'detach' });
     }
-    // Notify renderer of current backend status
-    mainWindow.webContents.send('backend-status', { connected: backendReady });
+    notifyBackendStatus({ connected: backendReady });
   });
 
   mainWindow.on('close', (event) => {
-    // Minimize to tray instead of closing (optional behavior)
-    if (tray && !app.isQuitting) {
+    if (tray && !(app as unknown as { isQuitting: boolean }).isQuitting) {
       event.preventDefault();
-      mainWindow.hide();
+      mainWindow!.hide();
     }
   });
 
@@ -205,7 +187,7 @@ function createMainWindow() {
 
 // ── System tray ────────────────────────────────────────────────────────────────
 
-function createTray() {
+function createTray(): void {
   const icon = nativeImage.createFromPath(ICON_PATH).resize({ width: 16, height: 16 });
   tray = new Tray(icon);
   tray.setToolTip('Tojo Assistant - I shall handle everything.');
@@ -232,7 +214,7 @@ function createTray() {
     {
       label: 'Quit',
       click: () => {
-        app.isQuitting = true;
+        (app as unknown as { isQuitting: boolean }).isQuitting = true;
         app.quit();
       },
     },
@@ -250,10 +232,9 @@ function createTray() {
 
 // ── IPC handlers ───────────────────────────────────────────────────────────────
 
-function registerIPC() {
-  // File picker
-  ipcMain.handle('dialog-open-file', async (_event, options = {}) => {
-    const result = await dialog.showOpenDialog(mainWindow, {
+function registerIPC(): void {
+  ipcMain.handle(IPC_CHANNELS.DIALOG_OPEN_FILE, async (_event, options: FileDialogOptions = {}) => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
       title: options.title || 'Select File',
       filters: options.filters || [
         { name: 'All Files', extensions: ['*'] },
@@ -265,18 +246,16 @@ function registerIPC() {
     return result.canceled ? null : result.filePaths[0];
   });
 
-  // Folder picker
-  ipcMain.handle('dialog-open-folder', async () => {
-    const result = await dialog.showOpenDialog(mainWindow, {
+  ipcMain.handle(IPC_CHANNELS.DIALOG_OPEN_FOLDER, async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
       title: 'Select Folder',
       properties: ['openDirectory'],
     });
     return result.canceled ? null : result.filePaths[0];
   });
 
-  // Save-as dialog
-  ipcMain.handle('dialog-save-file', async (_event, options = {}) => {
-    const result = await dialog.showSaveDialog(mainWindow, {
+  ipcMain.handle(IPC_CHANNELS.DIALOG_SAVE_FILE, async (_event, options: FileDialogOptions = {}) => {
+    const result = await dialog.showSaveDialog(mainWindow!, {
       title: options.title || 'Save File',
       defaultPath: options.defaultPath || '',
       filters: options.filters || [{ name: 'All Files', extensions: ['*'] }],
@@ -284,26 +263,22 @@ function registerIPC() {
     return result.canceled ? null : result.filePath;
   });
 
-  // Forward messages to backend (placeholder -- real impl uses WebSocket from renderer)
-  ipcMain.handle('send-message', async (_event, message) => {
-    // This is a fallback path; the renderer normally talks over WebSocket directly.
+  ipcMain.handle(IPC_CHANNELS.SEND_MESSAGE, async () => {
     return { ok: true, note: 'Use WebSocket for real-time communication.' };
   });
 
-  // OpenClaw status check — queries the Python backend
-  ipcMain.handle('openclaw-status', async () => {
+  ipcMain.handle(IPC_CHANNELS.OPENCLAW_STATUS, async (): Promise<OpenClawStatus> => {
     if (!backendReady) {
       return { available: false, note: 'Backend not running yet.' };
     }
     try {
-      const http = require('http');
-      return await new Promise((resolve) => {
+      return await new Promise<OpenClawStatus>((resolve) => {
         const req = http.get('http://127.0.0.1:8000/api/openclaw/status', (res) => {
           let body = '';
-          res.on('data', (chunk) => (body += chunk));
+          res.on('data', (chunk: Buffer) => (body += chunk));
           res.on('end', () => {
             try {
-              resolve(JSON.parse(body));
+              resolve(JSON.parse(body) as OpenClawStatus);
             } catch {
               resolve({ available: false, note: 'Invalid response from backend.' });
             }
@@ -322,22 +297,20 @@ function registerIPC() {
     }
   });
 
-  // Window controls
-  ipcMain.on('window-minimize', () => mainWindow?.minimize());
-  ipcMain.on('window-maximize', () => {
+  ipcMain.on(IPC_CHANNELS.WINDOW_MINIMIZE, () => mainWindow?.minimize());
+  ipcMain.on(IPC_CHANNELS.WINDOW_MAXIMIZE, () => {
     if (mainWindow?.isMaximized()) {
       mainWindow.unmaximize();
     } else {
       mainWindow?.maximize();
     }
   });
-  ipcMain.on('window-close', () => mainWindow?.close());
+  ipcMain.on(IPC_CHANNELS.WINDOW_CLOSE, () => mainWindow?.close());
 }
 
 // ── App lifecycle ──────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
-  // Set CSP via session headers so WebSocket connections work from file:// origin
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
@@ -347,7 +320,7 @@ app.whenReady().then(() => {
           " style-src 'self' 'unsafe-inline';" +
           " script-src 'self';" +
           " img-src 'self' data:;" +
-          " connect-src 'self' ws://127.0.0.1:8000 ws://localhost:8000 http://127.0.0.1:8000 http://localhost:8000 http://127.0.0.1:18789;"
+          " connect-src 'self' ws://127.0.0.1:8000 ws://localhost:8000 http://127.0.0.1:8000 http://localhost:8000 http://127.0.0.1:18789;",
         ],
       },
     });
@@ -359,7 +332,6 @@ app.whenReady().then(() => {
   createTray();
 
   app.on('activate', () => {
-    // macOS dock click re-creates window
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
     } else if (mainWindow) {
@@ -370,12 +342,12 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    app.isQuitting = true;
+    (app as unknown as { isQuitting: boolean }).isQuitting = true;
     app.quit();
   }
 });
 
 app.on('before-quit', () => {
-  app.isQuitting = true;
+  (app as unknown as { isQuitting: boolean }).isQuitting = true;
   stopBackend();
 });
