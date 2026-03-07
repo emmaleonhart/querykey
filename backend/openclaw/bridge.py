@@ -1,33 +1,35 @@
 """
 OpenClaw Bridge Module
 
-Manages the OpenClaw CLI subprocess lifecycle:
-- Detects and manages WSL availability
-- Translates Windows <-> WSL paths
-- Spawns and communicates with OpenClaw processes
-- Session management with unique IDs
+Connects to the OpenClaw Gateway via its OpenAI-compatible HTTP API:
+- POST /v1/chat/completions (streaming and non-streaming)
+- Gateway runs at ws://127.0.0.1:18789 by default (configurable)
+- Authentication via bearer token from OpenClaw config
 
 OpenClaw is LLM-agnostic and can work with any LLM backend
-(cloud APIs, local models, etc.). The CLI command and arguments
-are fully configurable.
+(cloud APIs, local models, etc.). The gateway is the control plane;
+Tojo Assistant is just another client.
+
+Also includes WSL path translation utilities.
 """
 
+import json
 import logging
 import os
-import shutil
 import subprocess
-import uuid
-from typing import Any, Optional
+from typing import Any, AsyncIterator, Optional
+
+import httpx
 
 logger = logging.getLogger("tojo.openclaw_bridge")
 
-# Default command to invoke OpenClaw. Can be overridden via environment
-# variable OPENCLAW_CMD or by passing `command` to OpenClawBridge.
-DEFAULT_OPENCLAW_CMD = os.environ.get("OPENCLAW_CMD", "openclaw")
+# Gateway defaults — can be overridden via environment variables
+DEFAULT_GATEWAY_URL = os.environ.get("OPENCLAW_GATEWAY_URL", "http://127.0.0.1:18789")
+DEFAULT_AGENT_ID = os.environ.get("OPENCLAW_AGENT_ID", "main")
 
 
 # ---------------------------------------------------------------------------
-# WSL Manager
+# WSL Manager (kept for path translation utilities)
 # ---------------------------------------------------------------------------
 
 class WSLManager:
@@ -64,15 +66,11 @@ class WSLManager:
 
         Example: C:\\Users\\test\\file.txt -> /mnt/c/Users/test/file.txt
         """
-        # Normalize backslashes
         path = windows_path.replace("\\", "/")
-
-        # Check for drive letter pattern (e.g., C:/)
         if len(path) >= 2 and path[1] == ":":
             drive_letter = path[0].lower()
-            rest = path[2:]  # skip "C:"
+            rest = path[2:]
             return f"/mnt/{drive_letter}{rest}"
-
         return path
 
     def wsl_to_windows_path(self, wsl_path: str) -> str:
@@ -83,23 +81,12 @@ class WSLManager:
         """
         if wsl_path.startswith("/mnt/") and len(wsl_path) >= 6:
             drive_letter = wsl_path[5].upper()
-            rest = wsl_path[6:]  # skip "/mnt/c"
-            # Convert forward slashes to backslashes
+            rest = wsl_path[6:]
             return f"{drive_letter}:{rest}".replace("/", "\\")
-
         return wsl_path
 
     def run_command(self, command: str, timeout: int = 60) -> dict[str, Any]:
-        """
-        Execute a command inside WSL.
-
-        Args:
-            command: Shell command to run in WSL.
-            timeout: Maximum seconds to wait.
-
-        Returns:
-            Dictionary with stdout, stderr, and return code.
-        """
+        """Execute a command inside WSL."""
         try:
             result = subprocess.run(
                 ["wsl", "bash", "-c", command],
@@ -113,17 +100,49 @@ class WSLManager:
                 "returncode": result.returncode,
             }
         except subprocess.TimeoutExpired:
-            return {
-                "stdout": "",
-                "stderr": f"Command timed out after {timeout}s",
-                "returncode": -1,
-            }
+            return {"stdout": "", "stderr": f"Command timed out after {timeout}s", "returncode": -1}
         except FileNotFoundError:
-            return {
-                "stdout": "",
-                "stderr": "WSL not found",
-                "returncode": -1,
-            }
+            return {"stdout": "", "stderr": "WSL not found", "returncode": -1}
+
+
+# ---------------------------------------------------------------------------
+# OpenClaw config reader
+# ---------------------------------------------------------------------------
+
+def _read_openclaw_config() -> dict[str, Any]:
+    """
+    Read the OpenClaw gateway config to get port and auth token.
+
+    Checks ~/.openclaw/openclaw.json (via WSL if on Windows).
+    """
+    config_paths = []
+
+    if os.name == "nt":
+        # On Windows, OpenClaw config lives inside WSL
+        wsl_home = os.environ.get("WSL_HOME", "")
+        if wsl_home:
+            config_paths.append(os.path.join(wsl_home, ".openclaw", "openclaw.json"))
+        # Try reading via wsl command
+        try:
+            result = subprocess.run(
+                ["wsl", "-d", "Ubuntu", "--", "bash", "-lc", "cat ~/.openclaw/openclaw.json"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return json.loads(result.stdout)
+        except (FileNotFoundError, subprocess.TimeoutExpired, json.JSONDecodeError):
+            pass
+    else:
+        home = os.path.expanduser("~")
+        config_path = os.path.join(home, ".openclaw", "openclaw.json")
+        config_paths.append(config_path)
+
+    for path in config_paths:
+        if os.path.isfile(path):
+            with open(path, "r") as f:
+                return json.load(f)
+
+    return {}
 
 
 # ---------------------------------------------------------------------------
@@ -132,180 +151,234 @@ class WSLManager:
 
 class OpenClawBridge:
     """
-    Bridge to the OpenClaw CLI process.
+    Bridge to the OpenClaw Gateway via its OpenAI-compatible HTTP API.
 
-    OpenClaw is LLM-agnostic — it works with any LLM backend.
-    The command and arguments are configurable via constructor
-    or the OPENCLAW_CMD environment variable.
+    The gateway exposes POST /v1/chat/completions which accepts standard
+    OpenAI Chat Completions format. Tojo Assistant sends user messages
+    through this endpoint and receives LLM responses.
 
-    Manages subprocess lifecycle, input/output streaming,
-    and session tracking.
+    This is much more reliable than subprocess management — the gateway
+    handles all the LLM communication, session management, and tool execution.
     """
 
-    def __init__(self, command: Optional[str] = None):
+    def __init__(
+        self,
+        gateway_url: Optional[str] = None,
+        auth_token: Optional[str] = None,
+        agent_id: Optional[str] = None,
+    ):
         """
         Args:
-            command: CLI command to invoke OpenClaw (default: env OPENCLAW_CMD or 'openclaw').
+            gateway_url: Gateway base URL (default: env OPENCLAW_GATEWAY_URL or http://127.0.0.1:18789).
+            auth_token: Bearer token for gateway auth (auto-read from OpenClaw config if not provided).
+            agent_id: OpenClaw agent ID to use (default: env OPENCLAW_AGENT_ID or 'main').
         """
-        self.command = command or DEFAULT_OPENCLAW_CMD
-        self.process: Optional[subprocess.Popen] = None
+        self._gateway_url = gateway_url or DEFAULT_GATEWAY_URL
+        self._agent_id = agent_id or DEFAULT_AGENT_ID
+        self._auth_token = auth_token
+        self._config: Optional[dict[str, Any]] = None
         self.wsl_manager = WSLManager()
-        self._session_id: Optional[str] = None
-        self._output_buffer: list[str] = []
 
-    def _generate_session_id(self) -> str:
-        """Generate a unique session identifier."""
-        return str(uuid.uuid4())
+    def _get_config(self) -> dict[str, Any]:
+        """Lazily load OpenClaw config."""
+        if self._config is None:
+            self._config = _read_openclaw_config()
+        return self._config
 
-    def is_running(self) -> bool:
-        """Check whether the OpenClaw process is currently running."""
-        if self.process is None:
-            return False
-        return self.process.poll() is None
+    def _get_auth_token(self) -> Optional[str]:
+        """Get the gateway auth token from config or constructor."""
+        if self._auth_token:
+            return self._auth_token
 
-    def _build_command(self, prompt: str) -> list[str]:
-        """
-        Build the command to launch OpenClaw.
+        # Try environment variable
+        env_token = os.environ.get("OPENCLAW_GATEWAY_TOKEN")
+        if env_token:
+            self._auth_token = env_token
+            return self._auth_token
 
-        Args:
-            prompt: The initial prompt/message to send.
+        # Read from OpenClaw config
+        config = self._get_config()
+        gateway_config = config.get("gateway", {})
+        auth_config = gateway_config.get("auth", {})
+        self._auth_token = auth_config.get("token")
+        return self._auth_token
 
-        Returns:
-            Command as a list of strings.
-        """
-        # Base command - uses WSL if available on Windows and command
-        # is not found natively
-        cmd = self.command
-        if os.name == "nt" and not shutil.which(cmd) and self.wsl_manager.is_available():
-            return ["wsl", cmd, "--print", prompt]
-        else:
-            return [cmd, "--print", prompt]
+    def _get_gateway_url(self) -> str:
+        """Get the gateway URL, potentially from config."""
+        if self._gateway_url != DEFAULT_GATEWAY_URL:
+            return self._gateway_url
+
+        config = self._get_config()
+        gateway_config = config.get("gateway", {})
+        port = gateway_config.get("port", 18789)
+        bind = gateway_config.get("bind", "loopback")
+
+        host = "127.0.0.1" if bind == "loopback" else "0.0.0.0"
+        self._gateway_url = f"http://{host}:{port}"
+        return self._gateway_url
+
+    def _build_headers(self) -> dict[str, str]:
+        """Build HTTP headers including auth."""
+        headers = {
+            "Content-Type": "application/json",
+            "x-openclaw-agent-id": self._agent_id,
+        }
+        token = self._get_auth_token()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        return headers
 
     def detect(self) -> dict[str, Any]:
         """
-        Detect whether OpenClaw is available on this system.
+        Detect whether the OpenClaw gateway is reachable and the
+        chat completions endpoint is enabled.
 
         Returns:
-            Dictionary with 'available' bool, 'command' string, and 'via_wsl' bool.
+            Dictionary with 'available', 'gateway_url', 'agent_id', and optional 'error'.
         """
-        cmd = self.command
-
-        # Check native availability first
-        if shutil.which(cmd):
-            return {"available": True, "command": cmd, "via_wsl": False}
-
-        # On Windows, check WSL
-        if os.name == "nt" and self.wsl_manager.is_available():
-            result = self.wsl_manager.run_command(f"which {cmd}", timeout=10)
-            if result["returncode"] == 0:
-                return {"available": True, "command": cmd, "via_wsl": True}
-
-        return {"available": False, "command": cmd, "via_wsl": False}
-
-    def start(self, prompt: str) -> str:
-        """
-        Start an OpenClaw session with an initial prompt.
-
-        Args:
-            prompt: The initial message to send to OpenClaw.
-
-        Returns:
-            Session ID for tracking this session.
-        """
-        if self.is_running():
-            self.stop()
-
-        self._session_id = self._generate_session_id()
-        self._output_buffer = []
-
-        cmd = self._build_command(prompt)
-        logger.info("Starting OpenClaw session %s: %s", self._session_id, " ".join(cmd))
-
+        url = self._get_gateway_url()
         try:
-            self.process = subprocess.Popen(
-                cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-        except FileNotFoundError as exc:
-            logger.error("Failed to start OpenClaw: %s", exc)
-            raise RuntimeError(
-                f"OpenClaw ('{cmd[0]}') not found. Ensure it is installed and "
-                "accessible, or set the OPENCLAW_CMD environment variable."
-            ) from exc
+            with httpx.Client(timeout=5.0) as client:
+                # First check if gateway is up at all
+                resp = client.get(url)
+                if resp.status_code != 200:
+                    return {
+                        "available": False,
+                        "gateway_url": url,
+                        "agent_id": self._agent_id,
+                        "error": f"Gateway returned status {resp.status_code}",
+                    }
 
-        return self._session_id
+                # Test the chat completions endpoint with a minimal request
+                chat_url = f"{url}/v1/chat/completions"
+                chat_resp = client.post(
+                    chat_url,
+                    headers=self._build_headers(),
+                    json={
+                        "model": f"openclaw:{self._agent_id}",
+                        "messages": [{"role": "user", "content": "ping"}],
+                    },
+                )
 
-    def stop(self) -> None:
-        """Stop the current OpenClaw session."""
-        if self.process is not None:
-            logger.info("Stopping OpenClaw session %s", self._session_id)
-            try:
-                self.process.terminate()
-                self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.process.kill()
-            finally:
-                self.process = None
+                if chat_resp.status_code == 405:
+                    return {
+                        "available": False,
+                        "gateway_url": url,
+                        "agent_id": self._agent_id,
+                        "error": "Chat completions endpoint is disabled. "
+                                 "Enable it in ~/.openclaw/openclaw.json: "
+                                 "gateway.http.endpoints.chatCompletions.enabled = true",
+                    }
 
-    def send(self, message: str) -> None:
+                if chat_resp.status_code == 401:
+                    return {
+                        "available": False,
+                        "gateway_url": url,
+                        "agent_id": self._agent_id,
+                        "error": "Authentication failed. Check gateway token.",
+                    }
+
+                return {
+                    "available": chat_resp.status_code == 200,
+                    "gateway_url": url,
+                    "agent_id": self._agent_id,
+                }
+
+        except httpx.ConnectError:
+            return {
+                "available": False,
+                "gateway_url": url,
+                "agent_id": self._agent_id,
+                "error": "Cannot connect to OpenClaw gateway. "
+                         "Start it with: openclaw gateway (in WSL/Ubuntu)",
+            }
+        except Exception as exc:
+            return {
+                "available": False,
+                "gateway_url": url,
+                "agent_id": self._agent_id,
+                "error": str(exc),
+            }
+
+    def chat(
+        self,
+        message: str,
+        history: Optional[list[dict[str, str]]] = None,
+    ) -> str:
         """
-        Send a message to the running OpenClaw process.
+        Send a message to OpenClaw and get a response (non-streaming).
 
         Args:
-            message: Text to send to stdin.
-        """
-        if not self.is_running():
-            raise RuntimeError("OpenClaw is not running.")
-        if self.process and self.process.stdin:
-            self.process.stdin.write(message + "\n")
-            self.process.stdin.flush()
-
-    def read_output(self, timeout: float = 5.0) -> str:
-        """
-        Read available output from the OpenClaw process.
-
-        Args:
-            timeout: Maximum seconds to wait for output.
+            message: User message text.
+            history: Optional prior conversation messages
+                     (list of {"role": "user"|"assistant", "content": "..."}).
 
         Returns:
-            Output text from OpenClaw.
+            Assistant response text.
         """
-        if not self.is_running():
-            # Process finished, read remaining output
-            if self.process and self.process.stdout:
-                remaining = self.process.stdout.read()
-                if remaining:
-                    self._output_buffer.append(remaining)
+        url = f"{self._get_gateway_url()}/v1/chat/completions"
+        messages = list(history or [])
+        messages.append({"role": "user", "content": message})
 
-        if self.process and self.process.stdout:
-            import select
-            import sys
+        with httpx.Client(timeout=120.0) as client:
+            resp = client.post(
+                url,
+                headers=self._build_headers(),
+                json={
+                    "model": f"openclaw:{self._agent_id}",
+                    "messages": messages,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
 
-            if sys.platform != "win32":
-                # Unix: use select for non-blocking read
-                ready, _, _ = select.select([self.process.stdout], [], [], timeout)
-                if ready:
-                    line = self.process.stdout.readline()
-                    if line:
-                        self._output_buffer.append(line)
-                        return line
-            else:
-                # Windows: blocking read with timeout via thread
-                line = self.process.stdout.readline()
-                if line:
-                    self._output_buffer.append(line)
-                    return line
-
+        choices = data.get("choices", [])
+        if choices:
+            return choices[0].get("message", {}).get("content", "")
         return ""
 
-    def get_full_output(self) -> str:
-        """Return all captured output from this session."""
-        return "".join(self._output_buffer)
+    async def chat_stream(
+        self,
+        message: str,
+        history: Optional[list[dict[str, str]]] = None,
+    ) -> AsyncIterator[str]:
+        """
+        Send a message to OpenClaw and stream the response via SSE.
 
-    @property
-    def session_id(self) -> Optional[str]:
-        """Current session ID."""
-        return self._session_id
+        Args:
+            message: User message text.
+            history: Optional prior conversation messages.
+
+        Yields:
+            Response text chunks as they arrive.
+        """
+        url = f"{self._get_gateway_url()}/v1/chat/completions"
+        messages = list(history or [])
+        messages.append({"role": "user", "content": message})
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            async with client.stream(
+                "POST",
+                url,
+                headers=self._build_headers(),
+                json={
+                    "model": f"openclaw:{self._agent_id}",
+                    "messages": messages,
+                    "stream": True,
+                },
+            ) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    data_str = line[6:]
+                    if data_str == "[DONE]":
+                        return
+                    try:
+                        chunk = json.loads(data_str)
+                        delta = chunk.get("choices", [{}])[0].get("delta", {})
+                        content = delta.get("content", "")
+                        if content:
+                            yield content
+                    except (json.JSONDecodeError, IndexError, KeyError):
+                        continue

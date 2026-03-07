@@ -259,9 +259,27 @@ async def websocket_chat(ws: WebSocket):
                 elif handler == "pipeline":
                     result = await _handle_pipeline_chat(user_message, context)
                 else:
+                    # Default handler uses OpenClaw streaming when available
+                    bridge: OpenClawBridge = _state.get("openclaw_bridge")
+                    if bridge and _state.get("openclaw_available"):
+                        try:
+                            # Build history from payload
+                            raw_history = payload.get("history", [])
+                            history = [
+                                {"role": h.get("role", "user"), "content": h.get("content", "")}
+                                for h in raw_history
+                                if h.get("role") in ("user", "assistant") and h.get("content")
+                            ]
+                            await ws.send_json({"type": "stream_start"})
+                            async for chunk in bridge.chat_stream(user_message, history):
+                                await ws.send_json({"type": "stream_chunk", "content": chunk})
+                            await ws.send_json({"type": "stream_end"})
+                            continue
+                        except Exception as exc:
+                            logger.warning("OpenClaw streaming failed, using fallback: %s", exc)
                     result = _handle_default_chat(user_message)
 
-                # Stream the response in chunks to simulate real-time output
+                # Stream the response in chunks
                 chunk_size = 80
                 text = result if isinstance(result, str) else json.dumps(result)
 
@@ -272,7 +290,7 @@ async def websocket_chat(ws: WebSocket):
                         "type": "stream_chunk",
                         "content": text[i : i + chunk_size],
                     })
-                    await asyncio.sleep(0.02)  # Small delay for streaming feel
+                    await asyncio.sleep(0.02)
 
                 await ws.send_json({"type": "stream_end"})
 
@@ -291,29 +309,10 @@ async def websocket_chat(ws: WebSocket):
 
 def _handle_default_chat(message: str) -> str:
     """
-    Default chat handler.
+    Fallback chat handler when OpenClaw is not available.
 
-    If OpenClaw is available, routes the message through it.
-    Otherwise, responds with capability hints.
+    Returns capability hints so the user knows what Tojo can do.
     """
-    bridge: OpenClawBridge = _state.get("openclaw_bridge")
-    if bridge and _state.get("openclaw_available"):
-        try:
-            session_id = bridge.start(message)
-            # Wait for the process to finish and collect output
-            if bridge.process:
-                stdout, stderr = bridge.process.communicate(timeout=120)
-                output = stdout.strip() if stdout else ""
-                if output:
-                    bridge._output_buffer.append(output)
-                    return output
-                # If no stdout, check stderr for useful info
-                if stderr and stderr.strip():
-                    return f"OpenClaw: {stderr.strip()}"
-        except Exception as exc:
-            logger.warning("OpenClaw failed, falling back to built-in handler: %s", exc)
-
-    # Fallback: capability list
     capabilities = [
         "file organization (scan, categorize, deduplicate)",
         "Excel/CSV error checking",
@@ -328,8 +327,8 @@ def _handle_default_chat(message: str) -> str:
         f"I received your message: \"{message}\"\n\n"
         "I can help you with:\n"
         + "\n".join(f"  - {c}" for c in capabilities)
-        + "\n\nOpenClaw is not currently available. "
-        "Install it or set the OPENCLAW_CMD environment variable to enable LLM-powered responses."
+        + "\n\nOpenClaw gateway is not connected. "
+        "Start it in WSL with: openclaw gateway"
     )
 
 

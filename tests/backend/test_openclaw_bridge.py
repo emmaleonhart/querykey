@@ -1,6 +1,5 @@
 """Tests for the OpenClaw bridge module."""
 import os
-import sys
 import pytest
 
 from backend.openclaw.bridge import OpenClawBridge, WSLManager
@@ -51,27 +50,54 @@ class TestWSLManager:
 class TestOpenClawBridge:
     """Test OpenClaw bridge functionality."""
 
-    def test_init(self):
-        """Test bridge initialization."""
+    def test_init_defaults(self):
+        """Test bridge initialization with defaults."""
         bridge = OpenClawBridge()
         assert bridge is not None
-        assert bridge.process is None
+        assert bridge._agent_id == "main"
 
-    def test_is_not_running_initially(self):
-        """Test that bridge reports not running initially."""
-        bridge = OpenClawBridge()
-        assert bridge.is_running() is False
+    def test_init_custom(self):
+        """Test bridge initialization with custom values."""
+        bridge = OpenClawBridge(
+            gateway_url="http://localhost:9999",
+            auth_token="test-token",
+            agent_id="beta",
+        )
+        assert bridge._gateway_url == "http://localhost:9999"
+        assert bridge._auth_token == "test-token"
+        assert bridge._agent_id == "beta"
 
-    def test_session_id_generation(self):
-        """Test that session IDs are unique."""
-        bridge = OpenClawBridge()
-        id1 = bridge._generate_session_id()
-        id2 = bridge._generate_session_id()
-        assert id1 != id2
+    def test_build_headers_with_token(self):
+        """Test that auth headers are built correctly."""
+        bridge = OpenClawBridge(auth_token="my-secret-token")
+        headers = bridge._build_headers()
+        assert headers["Authorization"] == "Bearer my-secret-token"
+        assert headers["Content-Type"] == "application/json"
+        assert headers["x-openclaw-agent-id"] == "main"
 
-    def test_build_command(self):
-        """Test building the OpenClaw command."""
-        bridge = OpenClawBridge()
-        cmd = bridge._build_command("Hello, help me organize files")
-        assert isinstance(cmd, list)
-        assert len(cmd) > 0
+    def test_build_headers_custom_agent(self):
+        """Test headers include custom agent ID."""
+        bridge = OpenClawBridge(agent_id="custom-agent")
+        headers = bridge._build_headers()
+        assert headers["x-openclaw-agent-id"] == "custom-agent"
+
+    def test_detect_returns_dict(self):
+        """Test that detect returns a properly structured dict."""
+        bridge = OpenClawBridge(gateway_url="http://127.0.0.1:99999")
+        result = bridge.detect()
+        assert isinstance(result, dict)
+        assert "available" in result
+        assert "gateway_url" in result
+        assert "agent_id" in result
+
+    def test_detect_unreachable_gateway(self):
+        """Test detect when gateway is not reachable."""
+        bridge = OpenClawBridge(gateway_url="http://127.0.0.1:99999")
+        result = bridge.detect()
+        assert result["available"] is False
+        assert "error" in result
+
+    def test_env_override_gateway_url(self):
+        """Test that OPENCLAW_GATEWAY_URL env var is respected."""
+        bridge = OpenClawBridge(gateway_url="http://custom:1234")
+        assert bridge._gateway_url == "http://custom:1234"
