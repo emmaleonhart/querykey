@@ -65,13 +65,36 @@ Because it already works and it has almost zero overhead. The program is functio
 
 ## Delivering the Pitch
 
-### Know your audience
-- **Research the judges.** Find out who they are, what companies they're from, what they care about. Tailor examples to their background (e.g., if a judge is from a SaaS company, emphasize the API discovery and pipeline features; if from consulting, lead with Blue Ocean Strategy).
-- LinkedIn the judges before the event if possible.
-- **The three audiences** (from pitch framework): investors, customers, and policymakers. Even if the judges aren't literally these people, they're evaluating whether you *could* pitch to them:
-  - **Investors**: Does this make money? What's the business model? → Freemium, competitor analysis alone justifies a subscription
-  - **Customers** (SMB owners): Does this solve my problem today? Is it easy to use? → One-click install, connects to tools you already have
-  - **Policymakers**: Is this responsible? Data privacy? → Runs locally, your data never leaves your machine, LLM-agnostic so no single vendor dependency
+### Know your audience — THE JUDGES
+
+**1. Brea Lake — CEO, Accelerate Okanagan**
+- Background: Community Manager → Director of Operations → CEO (since 2019). 10+ years supporting local tech industry growth.
+- Advisory Member, Canadian Technology Network. Board member for local orgs.
+- **What she cares about**: Entrepreneurial programs, investment initiatives, economic development, local tech ecosystem growth.
+- **Tailor for her**: Emphasize the business model, market opportunity, and how Sakuya empowers SMBs in the Okanagan. She's the "investor" lens. Talk about scalability and real-world adoption.
+
+**2. Jay Bell — CTO, Trellis.org**
+- Background: Full-stack engineer, startup co-founder. Nearly a decade of engineering + startup leadership.
+- Active OSS contributor (Nx, NestJS, Angular, NgRx). Founded Unite and Hummingbird Drones.
+- **What he cares about**: Technical depth, open-source, scalable architecture, hands-on engineering quality.
+- **Tailor for him**: This is your guy. Show the GitHub repo, the 35 endpoints, the test suite, the CI/CD pipeline. He'll appreciate the TypeScript migration, the modular architecture, the OpenClaw integration. Mention it's MIT-licensed open source. He's the "technical complexity" judge — and that's our /15 category.
+
+**3. Melissa Loerke — Scaleup Advisor, Trellis**
+- Background: COO at Trellis (nonprofit fundraising platform). Part of Two Hat acquisition by Microsoft (2021). Coaches local entrepreneurs and purpose-driven startups.
+- **What she cares about**: Community impact, team leadership, purpose-driven ventures, scaling startups, nonprofit/social good.
+- **Tailor for her**: Lead with the personal story (ADHD, accessibility, helping the restaurant owner). Emphasize the social impact angle — making AI tools accessible to people who can't afford consultants. She'll resonate with the "purpose-driven" framing.
+
+**4. Gelly Gnissios — Entrepreneur in Residence, UBC VMS Mentor**
+- Background: Organizes STEM + Entrepreneurship events. Mentors startups.
+- **What he cares about**: Entrepreneurial thinking, practical execution, mentoring mindset.
+- **Tailor for him**: Show that you've thought about the business side, not just the tech. The three failure modes framework will resonate. He's looking for entrepreneurial instinct.
+
+### The three audience lenses (from pitch framework)
+Even if the judges aren't literally investors/customers/policymakers, they evaluate through these lenses:
+- **Investors** (Brea, Gelly): Does this make money? What's the business model? → Freemium, competitor analysis alone justifies a subscription
+- **Customers** (SMB owners — Melissa's perspective): Does this solve my problem today? Is it easy to use? → One-click install, connects to tools you already have
+- **Technical** (Jay): Is this real? Is it well-built? → Show the repo, the architecture, the tests
+- **Policymakers** (implicit): Is this responsible? Data privacy? → Runs locally, your data never leaves your machine, LLM-agnostic so no single vendor dependency
 
 ### Engage the audience
 - Don't just talk AT them — ask a rhetorical question early: "How many of you have seen a small business owner try to make sense of a messy spreadsheet at 11pm?"
