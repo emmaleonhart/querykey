@@ -99,6 +99,28 @@ tojo-assistant/
 | Testing | pytest + GitHub Actions |
 | Installer | electron-builder (NSIS) |
 
+
+## Hackathon Strategy
+
+### Scoring Rubric (Hack-Attack 2026 — /65 total)
+
+| Category | Points | Our approach |
+|---|---|---|
+| **Technical Complexity & Implementation** | **/15** | **This is the big one.** 8 working skills, LLM-agnostic architecture via OpenClaw, Electron desktop app, full test suite (50 tests), CI/CD pipeline, script generation. We're not demoing a mockup — this is a working product. |
+| Innovation & Creativity | /10 | Blue Ocean Strategy analysis for small businesses. Nobody else is making MBA-level strategy accessible to a bakery owner through a Rainbow Dash chatbot. |
+| Entrepreneurial Value & Business Impact | /10 | Real value: competitor review analysis, customer personas with actionable marketing specs, AI-generated campaigns. A small business owner can paste reviews and get a strategy. |
+| Design & User Experience | /10 | Rainbow Dash themed, non-intimidating, double-click-to-run. Designed for people who find business software scary. |
+| Presentation | /5 | Demo the flow: paste reviews → get competitor analysis → generate personas → create targeted email campaign. End-to-end story. |
+| Q&A Session | /5 | Know the architecture decisions cold: why OpenClaw, why Electron, why Blue Ocean, why LLM-agnostic. |
+| Exec Check-in | /5 | GitHub with full commit history, this README, todo.md with project plan. |
+
+### Key talking points for the pitch
+- **Technical depth** is our strongest card — working prototype, not slides
+- The AI doesn't just chat — it **generates real code** (scripts, automations)
+- **LLM-agnostic** means the customer saves money — use what you already pay for
+
+
+
 ## License
 
 MIT
