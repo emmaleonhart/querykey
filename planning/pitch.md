@@ -85,9 +85,9 @@ Because it already works and it has almost zero overhead. The program is functio
 - **Tailor for her**: Lead with the personal story (ADHD, accessibility, helping the restaurant owner). Emphasize the social impact angle — making AI tools accessible to people who can't afford consultants. She'll resonate with the "purpose-driven" framing.
 
 **4. Gelly Gnissios — Entrepreneur in Residence, UBC VMS Mentor**
-- Background: Organizes STEM + Entrepreneurship events. Mentors startups.
-- **What he cares about**: Entrepreneurial thinking, practical execution, mentoring mindset.
-- **Tailor for him**: Show that you've thought about the business side, not just the tech. The three failure modes framework will resonate. He's looking for entrepreneurial instinct.
+- Background: Organizes STEM + Entrepreneurship events at UBC. Mentors startups through UBC's Venture Mentoring Service. (Note: limited public bio — the event PDF only has a short blurb.)
+- **What they care about**: Entrepreneurial thinking, practical execution, mentoring mindset, STEM community building.
+- **Tailor for them**: Show that you've thought about the business side, not just the tech. The three failure modes framework will resonate. They're looking for entrepreneurial instinct — demonstrate you understand the market, the risks, and why this isn't just a school project.
 
 ### The three audience lenses (from pitch framework)
 Even if the judges aren't literally investors/customers/policymakers, they evaluate through these lenses:
