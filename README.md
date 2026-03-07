@@ -2,7 +2,7 @@
 
 A business data assistant themed after Kirumi Tojo from Danganronpa, built for the Girls in Tech Hackathon 2026 at UBC Okanagan.
 
-Tojo Assistant provides an Electron desktop GUI wrapping OpenClaw (Claude Code CLI) with specialized business capabilities.
+Tojo Assistant provides an Electron desktop GUI wrapping OpenClaw with specialized business capabilities, and an easier installaton for non-technical customers.
 
 ## Features
 
