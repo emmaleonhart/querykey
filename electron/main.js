@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage, session } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
@@ -173,9 +173,19 @@ function createMainWindow() {
 
   mainWindow.loadFile(RENDERER_PATH);
 
+  // Log renderer console messages to main process for debugging
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    const prefix = ['LOG', 'WARN', 'ERR'][level] || 'LOG';
+    console.log(`[renderer:${prefix}] ${message}`);
+  });
+
   // Graceful show
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+    // Open DevTools in dev mode for debugging
+    if (!IS_PACKAGED) {
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
     // Notify renderer of current backend status
     mainWindow.webContents.send('backend-status', { connected: backendReady });
   });
@@ -327,6 +337,22 @@ function registerIPC() {
 // ── App lifecycle ──────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
+  // Set CSP via session headers so WebSocket connections work from file:// origin
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self';" +
+          " style-src 'self' 'unsafe-inline';" +
+          " script-src 'self';" +
+          " img-src 'self' data:;" +
+          " connect-src 'self' ws://127.0.0.1:8000 ws://localhost:8000 http://127.0.0.1:8000 http://localhost:8000 http://127.0.0.1:18789;"
+        ],
+      },
+    });
+  });
+
   registerIPC();
   startBackend();
   createMainWindow();
