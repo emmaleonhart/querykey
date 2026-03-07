@@ -44,6 +44,25 @@ Because it already works and it has almost zero overhead. The program is functio
 
 ---
 
+## Delivering the Pitch
+
+### Know your audience
+- **Research the judges.** Find out who they are, what companies they're from, what they care about. Tailor examples to their background (e.g., if a judge is from a SaaS company, emphasize the API discovery and pipeline features; if from consulting, lead with Blue Ocean Strategy).
+- LinkedIn the judges before the event if possible.
+
+### Engage the audience
+- Don't just talk AT them — ask a rhetorical question early: "How many of you have seen a small business owner try to make sense of a messy spreadsheet at 11pm?"
+- **Live demo > slides.** Show the product working. The STOP button, the streaming chat, the competitor analysis output — these are visceral.
+- Keep energy up. Vary your tone. Pause after key points.
+
+### Practice and get feedback
+- Do at least 2-3 dry runs with teammates before the real pitch.
+- Time it — know exactly how long your pitch runs so you don't get cut off.
+- Get feedback from someone outside the team (fresh ears catch assumptions you don't notice).
+- Record yourself and watch it back — painful but effective.
+
+---
+
 ## The 60-Second Pitch
 
 > "Every team here built something cool. But the judges asked the right question: **will businesses actually use it?**
