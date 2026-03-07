@@ -72,7 +72,23 @@ function handleBackendOutput(data: Buffer): void {
   }
 }
 
-function startBackend(): void {
+async function startBackend(): Promise<void> {
+  // Check if backend is already running (stale process or external)
+  const alreadyRunning = await new Promise<boolean>((resolve) => {
+    const req = http.get('http://127.0.0.1:8000/health', (res) => {
+      resolve(res.statusCode === 200);
+    });
+    req.on('error', () => resolve(false));
+    req.setTimeout(2000, () => { req.destroy(); resolve(false); });
+  });
+
+  if (alreadyRunning) {
+    console.log('[backend] Backend already running on port 8000, reusing existing instance');
+    backendReady = true;
+    notifyBackendStatus({ connected: true });
+    return;
+  }
+
   let cmd: string;
   let args: string[];
   let cwd: string;
