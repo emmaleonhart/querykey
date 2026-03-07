@@ -1,5 +1,5 @@
 /**
- * Build script for Tojo Assistant Electron app.
+ * Build script for Sakuya Assistant Electron app.
  * Compiles TypeScript → JavaScript using tsc (main/preload) and esbuild (renderer).
  */
 

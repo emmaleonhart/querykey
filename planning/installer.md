@@ -1,8 +1,8 @@
-# Tojo Assistant - Installer Architecture
+# Sakuya Assistant - Installer Architecture
 
 ## Goal
 A single `.exe` that takes a non-technical Windows user from zero to a working
-Tojo Assistant with full OpenClaw + browser relay capabilities. No command line
+Sakuya Assistant with full OpenClaw + browser relay capabilities. No command line
 knowledge required.
 
 ## What Must Be Installed
@@ -17,7 +17,7 @@ The full stack requires these components, in dependency order:
 5. Chromium inside WSL                   ← for browser relay
 6. OpenClaw config                       ← gateway, browser, auth
 7. Python 3.13 on Windows               ← for the FastAPI backend
-8. Tojo Assistant Electron app           ← the actual product
+8. Sakuya Assistant Electron app         ← the actual product
 ```
 
 ## Installation Phases

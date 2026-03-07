@@ -1,11 +1,11 @@
 {
   "name": "tojo-assistant",
   "version": "1.0.0",
-  "description": "Kirumi Tojo-themed business assistant powered by OpenClaw",
+  "description": "Izayoi Sakuya-themed business assistant powered by OpenClaw",
   "main": "electron/compiled/main.js",
-  "productName": "Tojo Assistant",
+  "productName": "Sakuya Assistant",
   "author": {
-    "name": "Team Tojo",
+    "name": "Team Sakuya",
     "email": "hackathon@tojo-assistant.dev"
   },
   "license": "MIT",
@@ -33,8 +33,8 @@
   },
   "build": {
     "appId": "dev.tojo-assistant.app",
-    "productName": "Tojo Assistant",
-    "copyright": "Copyright 2026 Team Tojo",
+    "productName": "Sakuya Assistant",
+    "copyright": "Copyright 2026 Team Sakuya",
     "directories": {
       "output": "dist",
       "buildResources": "installer"
@@ -92,7 +92,7 @@
       "installerHeaderIcon": "assets/tojo-avatar.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Tojo Assistant",
+      "shortcutName": "Sakuya Assistant",
       "installerSidebar": null,
       "license": null
     }

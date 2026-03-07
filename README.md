@@ -1,8 +1,8 @@
-# Tojo Assistant
+# Sakuya Assistant
 
-A business data assistant themed after Kirumi Tojo from Danganronpa, built for the Girls in Tech Hackathon 2026 at UBC Okanagan.
+A business data assistant themed after Izayoi Sakuya from Touhou Project, built for the Girls in Tech Hackathon 2026 at UBC Okanagan.
 
-Tojo Assistant provides an Electron desktop GUI wrapping OpenClaw with specialized business capabilities, and an easier installation for non-technical customers.
+Sakuya Assistant provides an Electron desktop GUI wrapping OpenClaw with specialized business capabilities, and an easier installation for non-technical customers.
 
 ## Features
 
@@ -21,7 +21,7 @@ Tojo Assistant provides an Electron desktop GUI wrapping OpenClaw with specializ
 ## Architecture
 
 ```
-Electron Desktop App (Kirumi Tojo themed UI, TypeScript)
+Electron Desktop App (Izayoi Sakuya themed UI, TypeScript)
         |  WebSocket / IPC
 Python Backend (FastAPI, 35 REST endpoints + streaming chat)
         |
@@ -135,7 +135,7 @@ tojo-assistant/
 ├── scripts/build.js          # tsc + esbuild build orchestrator
 ├── planning/                 # Architecture + installer docs
 ├── .github/workflows/        # CI/CD (lint → test → build)
-└── assets/                   # Tojo avatar (PNG + ICO)
+└── assets/                   # Sakuya avatar (PNG + ICO)
 ```
 
 ## Tech Stack
@@ -158,8 +158,8 @@ tojo-assistant/
 |---|---|---|
 | **Technical Complexity & Implementation** | **/15** | **This is the big one.** 9 working skills (including web-scraping competitor analysis), LLM-agnostic architecture via OpenClaw with browser automation, Electron desktop app with TypeScript frontend, full test suite (15 test files), CI/CD pipeline, 35 REST endpoints. We're not demoing a mockup — this is a working product. |
 | Innovation & Creativity | /10 | Blue Ocean Strategy analysis — web-scrape competitors, build a Strategy Canvas, auto-generate the Four Actions Framework. No other hackathon project replaces a business consultant. |
-| Entrepreneurial Value & Business Impact | /10 | The competitor analysis feature alone justifies a subscription. Businesses pay consultants thousands for the kind of strategic output Tojo generates from a URL list. |
-| Design & User Experience | /10 | Kirumi Tojo themed dark UI with gold accents. Chat-based interface with real-time streaming. System tray integration. One-click installer for non-technical users. |
+| Entrepreneurial Value & Business Impact | /10 | The competitor analysis feature alone justifies a subscription. Businesses pay consultants thousands for the kind of strategic output Sakuya generates from a URL list. |
+| Design & User Experience | /10 | Izayoi Sakuya themed dark UI with silver-blue accents. Chat-based interface with real-time streaming. System tray integration. One-click installer for non-technical users. |
 | Presentation | /5 |  |
 | Q&A Session | /5 |  |
 | Exec Check-in | /5 | GitHub with full commit history, this README, todo.md with project plan, architecture docs. |
@@ -169,7 +169,7 @@ tojo-assistant/
 - The AI doesn't just chat — it does **web research via browser automation** and **generates real analysis**
 - **LLM-agnostic** means the customer saves money — use what you already pay for (OpenAI, Anthropic, local models, anything)
 - **Competitor Analysis** is the killer feature — it doesn't just replace a database person, it replaces a strategy consultant. Give it your competitors' URLs and it delivers a full Blue Ocean Strategy analysis
-- Blue Ocean Strategy is a proven framework used by Fortune 500 companies — Tojo automates it for SMBs who can't afford McKinsey
+- Blue Ocean Strategy is a proven framework used by Fortune 500 companies — Sakuya automates it for SMBs who can't afford McKinsey
 - **Zero-to-working installer** — one `.exe` sets up everything including WSL, OpenClaw, and browser automation
 
 ## License

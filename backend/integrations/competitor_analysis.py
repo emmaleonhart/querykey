@@ -2,7 +2,7 @@
 Competitor Analysis & Blue Ocean Strategy Module
 
 Provides web scraping-powered competitor research and Blue Ocean Strategy
-analysis. This turns Tojo Assistant from a data tool into a strategic
+analysis. This turns Sakuya Assistant from a data tool into a strategic
 business consultant:
 
   1. Scrape public competitor information (websites, social media, reviews)
