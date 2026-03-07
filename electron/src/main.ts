@@ -11,7 +11,7 @@ import {
 import * as path from 'path';
 import * as fs from 'fs';
 import * as http from 'http';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, execSync, ChildProcess } from 'child_process';
 import { IPC_CHANNELS, BackendStatus, FileDialogOptions, OpenClawStatus } from './shared/types';
 
 // ── Paths ──────────────────────────────────────────────────────────────────────
@@ -31,7 +31,9 @@ const PACKAGED_BACKEND_EXE = IS_PACKAGED
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let backendProcess: ChildProcess | null = null;
+let openclawProcess: ChildProcess | null = null;
 let backendReady = false;
+let backendHealthTimer: ReturnType<typeof setInterval> | null = null;
 
 // ── Backend lifecycle ──────────────────────────────────────────────────────────
 
@@ -75,6 +77,12 @@ function startBackend(): void {
   let args: string[];
   let cwd: string;
 
+  // Startup diagnostics
+  console.log('[startup] __dirname:', __dirname);
+  console.log('[startup] ROOT_DIR:', ROOT_DIR);
+  console.log('[startup] RENDERER_PATH:', RENDERER_PATH, 'exists:', fs.existsSync(RENDERER_PATH));
+  console.log('[startup] PRELOAD_PATH:', PRELOAD_PATH, 'exists:', fs.existsSync(PRELOAD_PATH));
+
   if (IS_PACKAGED && PACKAGED_BACKEND_EXE) {
     if (fs.existsSync(PACKAGED_BACKEND_EXE)) {
       cmd = PACKAGED_BACKEND_EXE;
@@ -92,6 +100,8 @@ function startBackend(): void {
     args = ['-m', 'backend.server'];
     cwd = ROOT_DIR;
     console.log('[backend] Using Python:', cmd);
+    console.log('[backend] CWD:', cwd);
+    console.log('[backend] backend/ exists:', fs.existsSync(path.join(cwd, 'backend')));
   }
 
   try {
@@ -100,6 +110,8 @@ function startBackend(): void {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, PYTHONUNBUFFERED: '1' },
     });
+
+    console.log('[backend] Spawned PID:', backendProcess.pid);
 
     backendProcess.stdout?.on('data', handleBackendOutput);
     backendProcess.stderr?.on('data', handleBackendOutput);
@@ -116,16 +128,150 @@ function startBackend(): void {
       backendProcess = null;
       notifyBackendStatus({ connected: false });
     });
+
+    // Poll backend health as a safety net
+    startBackendHealthCheck();
   } catch (err) {
     console.error('[backend] Spawn error:', err);
   }
 }
 
+function startBackendHealthCheck(): void {
+  if (backendHealthTimer) return;
+  let attempts = 0;
+  const MAX_ATTEMPTS = 30; // 30 × 2s = 60s
+
+  backendHealthTimer = setInterval(() => {
+    if (backendReady) {
+      if (backendHealthTimer) clearInterval(backendHealthTimer);
+      backendHealthTimer = null;
+      return;
+    }
+
+    attempts++;
+    if (attempts > MAX_ATTEMPTS) {
+      console.error('[backend] Health check gave up after', MAX_ATTEMPTS, 'attempts');
+      if (backendHealthTimer) clearInterval(backendHealthTimer);
+      backendHealthTimer = null;
+      return;
+    }
+
+    const req = http.get('http://127.0.0.1:8000/health', (res) => {
+      if (res.statusCode === 200 && !backendReady) {
+        console.log('[backend] Health check detected running backend');
+        backendReady = true;
+        notifyBackendStatus({ connected: true });
+      }
+    });
+    req.on('error', () => {
+      // Backend not ready yet, keep polling
+    });
+    req.setTimeout(2000, () => req.destroy());
+  }, 2000);
+}
+
 function stopBackend(): void {
+  if (backendHealthTimer) {
+    clearInterval(backendHealthTimer);
+    backendHealthTimer = null;
+  }
   if (backendProcess) {
     console.log('[backend] Stopping...');
     backendProcess.kill('SIGTERM');
     const proc = backendProcess;
+    setTimeout(() => {
+      try {
+        proc.kill('SIGKILL');
+      } catch {
+        // already dead
+      }
+    }, 3000);
+  }
+}
+
+// ── OpenClaw gateway lifecycle ────────────────────────────────────────────────
+
+function findWSLDistro(): string | null {
+  try {
+    const output = execSync('wsl --list --quiet', { encoding: 'utf-8', timeout: 5000 });
+    // Prefer Ubuntu, fall back to first non-docker distro
+    const distros = output
+      .split(/\r?\n/)
+      .map((line) => line.replace(/\0/g, '').trim())
+      .filter((line) => line.length > 0);
+
+    const ubuntu = distros.find((d) => d.toLowerCase().includes('ubuntu'));
+    if (ubuntu) return ubuntu;
+
+    const nonDocker = distros.find((d) => !d.toLowerCase().includes('docker'));
+    return nonDocker || null;
+  } catch {
+    return null;
+  }
+}
+
+function isOpenClawGatewayRunning(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = http.get('http://127.0.0.1:18789/', (res) => {
+      resolve(res.statusCode === 200);
+    });
+    req.on('error', () => resolve(false));
+    req.setTimeout(3000, () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
+}
+
+async function startOpenClawGateway(): Promise<void> {
+  const running = await isOpenClawGatewayRunning();
+  if (running) {
+    console.log('[openclaw] Gateway already running on port 18789');
+    return;
+  }
+
+  const distro = findWSLDistro();
+  if (!distro) {
+    console.warn('[openclaw] No suitable WSL distro found (need Ubuntu)');
+    return;
+  }
+
+  console.log('[openclaw] Starting gateway via WSL distro:', distro);
+
+  try {
+    openclawProcess = spawn('wsl', ['-d', distro, '-e', 'bash', '-lc', 'openclaw gateway'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      detached: false,
+    });
+
+    openclawProcess.stdout?.on('data', (data: Buffer) => {
+      const output = data.toString().trim();
+      if (output) console.log(`[openclaw] ${output}`);
+    });
+
+    openclawProcess.stderr?.on('data', (data: Buffer) => {
+      const output = data.toString().trim();
+      if (output) console.log(`[openclaw:err] ${output}`);
+    });
+
+    openclawProcess.on('error', (err: Error) => {
+      console.error('[openclaw] Failed to start gateway:', err.message);
+    });
+
+    openclawProcess.on('exit', (code) => {
+      console.log(`[openclaw] Gateway exited with code ${code}`);
+      openclawProcess = null;
+    });
+  } catch (err) {
+    console.error('[openclaw] Spawn error:', err);
+  }
+}
+
+function stopOpenClawGateway(): void {
+  if (openclawProcess) {
+    console.log('[openclaw] Stopping gateway...');
+    openclawProcess.kill('SIGTERM');
+    const proc = openclawProcess;
     setTimeout(() => {
       try {
         proc.kill('SIGKILL');
@@ -208,6 +354,13 @@ function createTray(): void {
       click: () => {
         stopBackend();
         setTimeout(startBackend, 1000);
+      },
+    },
+    {
+      label: 'Restart OpenClaw Gateway',
+      click: () => {
+        stopOpenClawGateway();
+        setTimeout(startOpenClawGateway, 1000);
       },
     },
     { type: 'separator' },
@@ -327,6 +480,7 @@ app.whenReady().then(() => {
   });
 
   registerIPC();
+  startOpenClawGateway();
   startBackend();
   createMainWindow();
   createTray();
@@ -350,4 +504,5 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   (app as unknown as { isQuitting: boolean }).isQuitting = true;
   stopBackend();
+  stopOpenClawGateway();
 });
