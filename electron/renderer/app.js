@@ -6,7 +6,7 @@
   'use strict';
 
   // ── Constants ──────────────────────────────────────────────────────────────
-  const WS_URL = 'ws://localhost:8765';
+  const WS_URL = 'ws://localhost:8000/ws/chat';
   const RECONNECT_INTERVAL = 3000;   // ms between reconnect attempts
   const MAX_RECONNECT_TRIES = 20;
   const AVATAR_SRC = '../../assets/tojo-avatar.png';

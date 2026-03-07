@@ -31,6 +31,7 @@ from backend.integrations.google_suite import GoogleSuiteConnector, GoogleSheets
 from backend.integrations.databases import DatabaseConnector, DatabaseConfig
 from backend.integrations.api_discovery import APIDiscovery, APIConfig
 from backend.pipeline.builder import PipelineBuilder, PipelineDefinition
+from backend.openclaw.bridge import OpenClawBridge
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -58,7 +59,16 @@ async def lifespan(app: FastAPI):
     _state["data_processor"] = DataProcessor()
     _state["pipeline_builder"] = PipelineBuilder()
     _state["api_discovery"] = APIDiscovery()
+    _state["openclaw_bridge"] = OpenClawBridge()
     _state["active_websockets"] = set()
+
+    # Detect OpenClaw availability at startup
+    openclaw_status = _state["openclaw_bridge"].detect()
+    _state["openclaw_available"] = openclaw_status["available"]
+    if openclaw_status["available"]:
+        logger.info("OpenClaw detected: %s (WSL: %s)", openclaw_status["command"], openclaw_status["via_wsl"])
+    else:
+        logger.warning("OpenClaw not found. Chat will use built-in handlers only.")
     logger.info("Backend ready.")
     yield
     logger.info("Tojo Assistant backend shutting down...")
@@ -194,6 +204,14 @@ async def health_check() -> HealthResponse:
     )
 
 
+@app.get("/api/openclaw/status", tags=["openclaw"])
+async def openclaw_status() -> JSONResponse:
+    """Check OpenClaw CLI availability."""
+    bridge: OpenClawBridge = _state["openclaw_bridge"]
+    status = bridge.detect()
+    return JSONResponse(content=status)
+
+
 # ---------------------------------------------------------------------------
 # WebSocket - Streaming Chat
 # ---------------------------------------------------------------------------
@@ -210,6 +228,12 @@ async def websocket_chat(ws: WebSocket):
     _state.setdefault("active_websockets", set()).add(ws)
     logger.info("WebSocket client connected.")
 
+    # Notify client of OpenClaw status on connect
+    await ws.send_json({
+        "type": "status",
+        "openclaw": _state.get("openclaw_available", False),
+    })
+
     try:
         while True:
             raw = await ws.receive_text()
@@ -219,7 +243,7 @@ async def websocket_chat(ws: WebSocket):
                 await ws.send_json({"type": "error", "content": "Invalid JSON"})
                 continue
 
-            user_message = payload.get("message", "")
+            user_message = payload.get("content", payload.get("message", ""))
             context = payload.get("context", {})
 
             # Route the message to the appropriate handler based on context
@@ -240,20 +264,23 @@ async def websocket_chat(ws: WebSocket):
                 # Stream the response in chunks to simulate real-time output
                 chunk_size = 80
                 text = result if isinstance(result, str) else json.dumps(result)
+
+                await ws.send_json({"type": "stream_start"})
+
                 for i in range(0, len(text), chunk_size):
                     await ws.send_json({
-                        "type": "chunk",
+                        "type": "stream_chunk",
                         "content": text[i : i + chunk_size],
                     })
                     await asyncio.sleep(0.02)  # Small delay for streaming feel
 
-                await ws.send_json({"type": "done", "content": ""})
+                await ws.send_json({"type": "stream_end"})
 
             except Exception as exc:
                 logger.exception("Error processing chat message")
                 await ws.send_json({
                     "type": "error",
-                    "content": str(exc),
+                    "message": str(exc),
                 })
 
     except WebSocketDisconnect:
@@ -263,7 +290,30 @@ async def websocket_chat(ws: WebSocket):
 
 
 def _handle_default_chat(message: str) -> str:
-    """Default chat handler - echo with capability hints."""
+    """
+    Default chat handler.
+
+    If OpenClaw is available, routes the message through it.
+    Otherwise, responds with capability hints.
+    """
+    bridge: OpenClawBridge = _state.get("openclaw_bridge")
+    if bridge and _state.get("openclaw_available"):
+        try:
+            session_id = bridge.start(message)
+            # Wait for the process to finish and collect output
+            if bridge.process:
+                stdout, stderr = bridge.process.communicate(timeout=120)
+                output = stdout.strip() if stdout else ""
+                if output:
+                    bridge._output_buffer.append(output)
+                    return output
+                # If no stdout, check stderr for useful info
+                if stderr and stderr.strip():
+                    return f"OpenClaw: {stderr.strip()}"
+        except Exception as exc:
+            logger.warning("OpenClaw failed, falling back to built-in handler: %s", exc)
+
+    # Fallback: capability list
     capabilities = [
         "file organization (scan, categorize, deduplicate)",
         "Excel/CSV error checking",
@@ -278,7 +328,8 @@ def _handle_default_chat(message: str) -> str:
         f"I received your message: \"{message}\"\n\n"
         "I can help you with:\n"
         + "\n".join(f"  - {c}" for c in capabilities)
-        + "\n\nProvide a handler context to route to a specific capability."
+        + "\n\nOpenClaw is not currently available. "
+        "Install it or set the OPENCLAW_CMD environment variable to enable LLM-powered responses."
     )
 
 

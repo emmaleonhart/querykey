@@ -252,9 +252,36 @@ function registerIPC() {
     return { ok: true, note: 'Use WebSocket for real-time communication.' };
   });
 
-  // OpenClaw status check
+  // OpenClaw status check — queries the Python backend
   ipcMain.handle('openclaw-status', async () => {
-    return { available: false, note: 'OpenClaw bridge not yet implemented.' };
+    if (!backendReady) {
+      return { available: false, note: 'Backend not running yet.' };
+    }
+    try {
+      const http = require('http');
+      return await new Promise((resolve) => {
+        const req = http.get('http://127.0.0.1:8000/api/openclaw/status', (res) => {
+          let body = '';
+          res.on('data', (chunk) => (body += chunk));
+          res.on('end', () => {
+            try {
+              resolve(JSON.parse(body));
+            } catch {
+              resolve({ available: false, note: 'Invalid response from backend.' });
+            }
+          });
+        });
+        req.on('error', () => {
+          resolve({ available: false, note: 'Could not reach backend.' });
+        });
+        req.setTimeout(3000, () => {
+          req.destroy();
+          resolve({ available: false, note: 'Backend request timed out.' });
+        });
+      });
+    } catch {
+      return { available: false, note: 'Error checking OpenClaw status.' };
+    }
   });
 
   // Window controls

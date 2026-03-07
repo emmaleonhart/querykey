@@ -1,20 +1,29 @@
 """
 OpenClaw Bridge Module
 
-Manages the OpenClaw (Claude Code CLI) subprocess lifecycle:
+Manages the OpenClaw CLI subprocess lifecycle:
 - Detects and manages WSL availability
 - Translates Windows <-> WSL paths
 - Spawns and communicates with OpenClaw processes
 - Session management with unique IDs
+
+OpenClaw is LLM-agnostic and can work with any LLM backend
+(cloud APIs, local models, etc.). The CLI command and arguments
+are fully configurable.
 """
 
 import logging
 import os
+import shutil
 import subprocess
 import uuid
 from typing import Any, Optional
 
 logger = logging.getLogger("tojo.openclaw_bridge")
+
+# Default command to invoke OpenClaw. Can be overridden via environment
+# variable OPENCLAW_CMD or by passing `command` to OpenClawBridge.
+DEFAULT_OPENCLAW_CMD = os.environ.get("OPENCLAW_CMD", "openclaw")
 
 
 # ---------------------------------------------------------------------------
@@ -123,13 +132,22 @@ class WSLManager:
 
 class OpenClawBridge:
     """
-    Bridge to the OpenClaw (Claude Code CLI) process.
+    Bridge to the OpenClaw CLI process.
+
+    OpenClaw is LLM-agnostic — it works with any LLM backend.
+    The command and arguments are configurable via constructor
+    or the OPENCLAW_CMD environment variable.
 
     Manages subprocess lifecycle, input/output streaming,
     and session tracking.
     """
 
-    def __init__(self):
+    def __init__(self, command: Optional[str] = None):
+        """
+        Args:
+            command: CLI command to invoke OpenClaw (default: env OPENCLAW_CMD or 'openclaw').
+        """
+        self.command = command or DEFAULT_OPENCLAW_CMD
         self.process: Optional[subprocess.Popen] = None
         self.wsl_manager = WSLManager()
         self._session_id: Optional[str] = None
@@ -155,11 +173,34 @@ class OpenClawBridge:
         Returns:
             Command as a list of strings.
         """
-        # Base command - uses WSL if available on Windows
-        if os.name == "nt" and self.wsl_manager.is_available():
-            return ["wsl", "claude", "--print", prompt]
+        # Base command - uses WSL if available on Windows and command
+        # is not found natively
+        cmd = self.command
+        if os.name == "nt" and not shutil.which(cmd) and self.wsl_manager.is_available():
+            return ["wsl", cmd, "--print", prompt]
         else:
-            return ["claude", "--print", prompt]
+            return [cmd, "--print", prompt]
+
+    def detect(self) -> dict[str, Any]:
+        """
+        Detect whether OpenClaw is available on this system.
+
+        Returns:
+            Dictionary with 'available' bool, 'command' string, and 'via_wsl' bool.
+        """
+        cmd = self.command
+
+        # Check native availability first
+        if shutil.which(cmd):
+            return {"available": True, "command": cmd, "via_wsl": False}
+
+        # On Windows, check WSL
+        if os.name == "nt" and self.wsl_manager.is_available():
+            result = self.wsl_manager.run_command(f"which {cmd}", timeout=10)
+            if result["returncode"] == 0:
+                return {"available": True, "command": cmd, "via_wsl": True}
+
+        return {"available": False, "command": cmd, "via_wsl": False}
 
     def start(self, prompt: str) -> str:
         """
@@ -191,7 +232,8 @@ class OpenClawBridge:
         except FileNotFoundError as exc:
             logger.error("Failed to start OpenClaw: %s", exc)
             raise RuntimeError(
-                "OpenClaw (claude) not found. Ensure it is installed and accessible."
+                f"OpenClaw ('{cmd[0]}') not found. Ensure it is installed and "
+                "accessible, or set the OPENCLAW_CMD environment variable."
             ) from exc
 
         return self._session_id
