@@ -108,11 +108,89 @@ OpenClaw is the AI analysis engine. It is separate from the Secretarybird Server
 - Ambiguity scoring (how vague is this instruction)
 - Chatlog parsing (turn raw pasted text into structured messages)
 - OCR text interpretation (make sense of screenshot extractions)
+- **Generating follow-up questions** — deciding what to ask whom based on detected ambiguities and contradictions
+- **Composing outbound messages** — short, clear, secretary-style messages to team members
 
 **What OpenClaw does NOT do:**
 - Store the knowledge graph (that's the Secretarybird Server)
 - Handle real-time sync (that's WebSocket on the server)
 - Manage users or permissions (that's the server)
+- Deliver messages (that's the server's outbound messaging service)
+
+## Conversational Agent (The Secretary)
+
+This is the core differentiator. Secretarybird is not a passive dashboard — it actively talks to people.
+
+### Why
+
+The best way to know what someone thinks they're supposed to do is to ask them. No amount of passive monitoring replaces a direct question. A good secretary doesn't just file papers — they follow up, clarify, and make sure everyone is on the same page.
+
+### How It Works
+
+When the AI detects something that needs human input — a contradiction, an ambiguity, a missed deadline, a scope change — it generates a follow-up action:
+
+```
+FollowUp {
+  trigger: Conflict | Task | Instruction    // what triggered this
+  target: Person.id                          // who to ask
+  question: string                           // short, clear question
+  context: string                            // brief background for the recipient
+  channel: "app_notification" | "discord" | "slack" | "sms"
+  status: "pending" | "sent" | "answered" | "expired"
+}
+```
+
+Example flow:
+1. Boss says in a meeting: "Get the video done by 10 PM tonight"
+2. Later, a Slack message from another manager says: "Video needs to be ready by 8 AM tomorrow"
+3. System detects the contradiction
+4. System messages the assignee: "You were asked to finish the video by 10 PM tonight (from the standup meeting) but also by 8 AM tomorrow (from Sarah on Slack). Which one are you going for?"
+5. Person replies: "8 AM tomorrow, Sarah updated the deadline"
+6. System records the resolution, updates the task, logs everything
+
+### Message Style
+
+The AI sends **short, simple messages**. It is not trying to explain or impress. It asks a question and listens.
+
+Good: "Are you doing the video for 10 PM or 8 AM?"
+Bad: "Based on my analysis of your recent communications, I've identified a scheduling discrepancy regarding the video deliverable timeline..."
+
+The AI acts like a secretary, not a consultant.
+
+### What Triggers Follow-ups
+
+- **Contradictions**: Two conflicting instructions about the same task
+- **Ambiguity**: A task was assigned but the scope is unclear
+- **Scope changes**: The definition of a task shifted between conversations
+- **Missed deadlines**: A deadline passed with no status update
+- **Unconfirmed tasks**: AI extracted a task but nobody has acknowledged it
+- **Reassignments**: A task silently moved from one person to another
+
+### Contextual Understanding
+
+The system can message different people on the team with different context. It maintains clear logs of every conversation. If person A asks "what's John working on?", the system can answer based on what it knows — and if it's not sure, it can ask John directly and relay the answer.
+
+## Notification & Scheduling
+
+Secretarybird sends proactive notifications based on:
+
+- **Extracted deadlines** — reminders before a deadline hits
+- **Scheduled check-ins** — periodic "how's X going?" messages
+- **Contradiction alerts** — immediate notification when conflicting instructions are detected
+- **Task assignments** — notify someone when they've been assigned something (with the source)
+- **Resolution requests** — ask for clarification on ambiguous instructions
+
+Notifications go through the Flutter app (push notifications), or through integrated channels (Discord DM, Slack DM) depending on where the person is most reachable.
+
+## Voice Learning
+
+The system learns team members' voices over time. This replaces manual speaker tagging for recorded conversations.
+
+**Enrollment**: Initial voice samples collected during onboarding or from early recordings with manual tagging.
+
+**Recognition**: As the system processes more audio, it builds speaker embeddings and improves identification accuracy. Eventually, recording a meeting produces fully attributed transcripts automatically.
+
+**Privacy**: Voice embeddings are stored on the server (local or cloud, depending on deployment). Raw audio can be discarded after transcription if desired.
 
 ## External Tool Sync
 
@@ -172,7 +250,7 @@ Secretarybird Server
 
 Voice notes follow a simpler path: record → upload → transcribe → analyze. No streaming needed.
 
-**Speaker diarization**: For recorded conversations, the system needs to identify who is speaking. This is hard but important for attribution. Initial approach can be manual tagging ("that was John") with AI-assisted suggestions over time.
+**Speaker diarization**: For recorded conversations, the system identifies who is speaking using learned voice profiles (see Voice Learning above). Initial recordings may need manual tagging, but the system improves over time as it builds speaker embeddings for each team member.
 
 ## Deployment Options
 
@@ -185,10 +263,14 @@ Voice notes follow a simpler path: record → upload → transcribe → analyze.
 ## Open Questions
 
 - Exact graph database choice (Neo4j vs PostgreSQL vs hybrid)
-- Speaker diarization model/service selection
+- Speaker diarization / voice embedding model selection
 - How to handle multi-language conversations
-- Privacy and data retention policies (especially for audio)
+- Privacy and data retention policies (especially for audio and voice embeddings)
 - Rate limiting / cost management for OpenClaw calls on high-volume feeds
 - How to handle encrypted or private channels (permissions model)
 - Offline mode behavior for the Flutter app
 - How much history to port from the original secretarybird repo (socket layer is priority)
+- Outbound message rate limiting (don't spam people with too many follow-ups)
+- How much autonomy should the AI have before asking a human admin? (e.g., auto-resolving obvious contradictions vs. always asking)
+- Voice enrollment UX — how to collect initial voice samples without friction
+- Which channels to use for outbound messages per person (app, Discord, Slack, SMS)

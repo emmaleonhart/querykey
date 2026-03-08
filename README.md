@@ -1,10 +1,8 @@
 # Secretarybird Pivot
 
-A real-time knowledge graph and task extraction system that takes in messy, unstructured communication — Discord chatlogs, screenshots, voice notes, recorded conversations, pasted text, bot feeds — and extracts structured tasks, assignments, and contradictions from it.
+An AI secretary that actively manages your team's communication. It ingests messy, unstructured input — verbal instructions, Discord chats, voice notes, screenshots, recorded meetings — extracts structured tasks and contradictions, and then **conversationally follows up with people** to verify understanding, resolve conflicts, and keep everyone aligned.
 
 **The secretarybird is here to serve you. You don't serve it.**
-
-Small businesses run on informal communication. Tasks get assigned over Discord, in hallway conversations, through voice messages, across group chats. Secretarybird watches all of it and builds a living task board without asking anyone to change how they work.
 
 Built with **Flutter** (mobile, desktop, web). Analysis powered by **OpenClaw**.
 
@@ -21,17 +19,35 @@ Secretarybird takes the opposite approach:
 
 A very large amount of money is lost in businesses due to contradictory or vague verbal instructions. Tasks get assigned informally and people walk away with different understandings of who is doing what. There is no single source of truth for informal task delegation — and nobody is going to start filing Jira tickets for what their boss said in passing.
 
+The best way to know what someone thinks they're supposed to do is to ask them. No tool does this today.
+
 ## The Solution
 
-Secretarybird accepts any form of communication input and builds a continuously updated knowledge graph on the server. OpenClaw processes the incoming information and extracts:
+Secretarybird is an AI secretary. It doesn't just passively organize — it **actively engages with your team**.
 
-- **Who** was assigned a task
-- **What** the task is
-- **When** it was assigned and any deadlines mentioned
-- **Contradictions** — when a newer instruction conflicts with a previous one
-- **Ambiguities** — when instructions are vague enough to cause confusion
+**Ingest**: It accepts any form of communication input (verbal, text, screenshots, bot feeds) and builds a continuously updated knowledge graph.
 
-The result is a Jira-style task board that populates itself automatically from natural conversation, with built-in contradiction detection.
+**Extract**: OpenClaw processes incoming information and extracts who was assigned what, when, by whom, and flags contradictions and ambiguities.
+
+**Follow up**: This is the differentiator. Secretarybird **talks to people**. When it detects a contradiction — "in this conversation you were told to finish the video by 10 PM, but in this other one you were told 8 AM" — it messages the relevant person and asks which one they're planning to follow. It asks simple questions, listens, records the answers, and exchanges information between team members.
+
+**Notify**: It sends notifications based on scheduling, deadlines, and extracted commitments. It doesn't wait for someone to check a dashboard.
+
+**Verify**: The primary purpose is **verifiability of verbal instructions**. When your boss tells you something in passing, the system captures it, confirms it with you, and creates a clear record that both parties can reference.
+
+### How It Communicates
+
+The AI sends **short, simple messages**. The goal is not to explain things. The goal is to:
+- Ask a clear question
+- Listen to the answer
+- Record it
+- Pass relevant information between team members
+
+It acts like a good secretary — concise, organized, never the center of attention. It asks "Are you doing X or Y?" not "Based on my analysis of the situational context, I've identified a potential discrepancy..."
+
+### Voice Learning
+
+Secretarybird learns the voices of team members. Over time, it identifies who is speaking in recorded meetings and conversations without manual tagging. This makes verbal instruction capture seamless — record a conversation, and the system knows who said what.
 
 ## Unstructured Input — Anything Goes
 
@@ -88,9 +104,9 @@ A Discord bot recording a channel in real time and a user pasting a screenshot o
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Secretarybird Server** can run locally on a machine or deployed to the cloud. It handles ingestion, storage, real-time sync, and coordinates with OpenClaw for AI analysis.
+**Secretarybird Server** can run locally on a machine or deployed to the cloud. It handles ingestion, storage, real-time sync, outbound messaging, and coordinates with OpenClaw for AI analysis.
 
-**Secretarybird Mobile** is the Flutter app — runs on phone, desktop, and web. Thin client that streams data to the server and renders the graph.
+**Secretarybird Mobile** is the Flutter app — runs on phone, desktop, and web. Where team members receive questions, view the live task feed, and record conversations.
 
 ## Tech Stack
 

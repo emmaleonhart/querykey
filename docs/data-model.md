@@ -19,11 +19,14 @@ Person {
     { platform: "phone", identifier: "+1..." },
   ]
   role: string (optional)
+  preferred_channel: "app_push" | "discord_dm" | "slack_dm" | "sms" (optional)
   created_at: timestamp
 }
 ```
 
-The system must resolve the same person across platforms. A single person may appear as a Discord username, a Slack user, and a voice in a meeting. Handle linking is done initially by manual mapping and later augmented by AI-assisted matching.
+The system must resolve the same person across platforms. A single person may appear as a Discord username, a Slack user, and a voice in a meeting. Handle linking is done initially by manual mapping and later augmented by AI-assisted matching (including voice recognition — see VoiceProfile).
+
+Each person also has a **preferred contact channel** for outbound messages from the AI secretary. The system tracks where each person is most responsive.
 
 ### Task
 An actionable work item extracted from conversation.
@@ -120,6 +123,43 @@ Instruction {
 }
 ```
 
+### FollowUp
+An outbound question or message sent by the AI secretary to a team member. This is the core of the conversational agent.
+
+```
+FollowUp {
+  id: UUID
+  trigger_type: "conflict" | "ambiguity" | "missed_deadline" | "unconfirmed_task" | "reassignment" | "scope_change" | "check_in"
+  trigger_id: UUID                    // the Conflict, Task, or Instruction that triggered this
+  target: Person.id                   // who to ask
+  question: string                    // the short, clear question to send
+  context: string                     // brief background included with the message
+  channel: "app_push" | "discord_dm" | "slack_dm" | "sms"
+  status: "pending" | "sent" | "answered" | "expired"
+  response: string (nullable)         // what the person replied
+  response_at: timestamp (nullable)
+  created_at: timestamp
+  sent_at: timestamp (nullable)
+}
+```
+
+**Key constraint**: Messages must be short and clear. The AI is a secretary, not a consultant. "Are you doing the video for 10 PM or 8 AM?" — not a paragraph of analysis.
+
+### VoiceProfile
+A learned voice embedding for a team member, used for automatic speaker identification in recorded conversations.
+
+```
+VoiceProfile {
+  id: UUID
+  person_id: Person.id
+  embedding: bytes                    // speaker embedding vector
+  sample_count: int                   // how many audio samples contributed to this profile
+  confidence: float                   // how reliable this voice profile is
+  last_updated: timestamp
+  created_at: timestamp
+}
+```
+
 ### ExternalSync
 Tracks tasks that have been pushed to external project management tools.
 
@@ -153,6 +193,10 @@ Instruction --[CONFLICTS_WITH]--> Instruction
 Task --[DEPENDS_ON]--> Task (optional, if detected)
 Task --[SUPERSEDED_BY]--> Task
 Task --[SYNCED_TO]--> ExternalSync (pushed to Jira, Azure DevOps, etc.)
+Conflict --[TRIGGERED]--> FollowUp (AI asked someone about this conflict)
+Task --[TRIGGERED]--> FollowUp (deadline reminder, confirmation request, etc.)
+FollowUp --[SENT_TO]--> Person
+Person --[HAS_VOICE]--> VoiceProfile
 ```
 
 ## Contradiction Detection Logic
@@ -200,3 +244,7 @@ GraphDiff {
 - "What changed about this task over time?" (audit trail)
 - "What is person X's current workload?"
 - "Show all instructions from the last meeting that haven't been turned into tasks"
+- "What follow-ups are waiting for a response?"
+- "What did person X say when asked about the deadline?"
+- "Show me all conversations the AI has had with person X"
+- "What questions has the system asked today?"
