@@ -70,7 +70,10 @@
       "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && git add planning/pitch.md && git commit -m \"$\\(cat <<'EOF'\nPitch: add delivery notes — know audience, engage, practice\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push origin master 2>&1)",
       "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && git add planning/pitch.md && git commit -m \"$\\(cat <<'EOF'\nPitch: add personal story hook and audience framework\n\nThe ADHD/dyslexia story is the emotional core of the pitch — connects\nthe technical product to a real human need and directly addresses the\nadoption barrier. Also adds investor/customer/policymaker framing.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push origin master 2>&1)",
       "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && git pull origin master 2>&1)",
-      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && git status -u 2>&1)"
+      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && git status -u 2>&1)",
+      "Bash(python:*)",
+      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && npm run build:ts 2>&1)",
+      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && node scripts/build.js --production 2>&1)"
     ]
   }
 }
