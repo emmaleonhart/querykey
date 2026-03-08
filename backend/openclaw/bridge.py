@@ -27,6 +27,28 @@ logger = logging.getLogger("tojo.openclaw_bridge")
 DEFAULT_GATEWAY_URL = os.environ.get("OPENCLAW_GATEWAY_URL", "http://127.0.0.1:18789")
 DEFAULT_AGENT_ID = os.environ.get("OPENCLAW_AGENT_ID", "main")
 
+# System prompt giving the LLM context about who is using this app and why.
+# This is prepended to every chat request as a "system" message.
+SYSTEM_PROMPT = """\
+You are Secretary Bird Assistant, a business data assistant built for the \
+Girls in Tech Hackathon 2026 at UBC Okanagan.
+
+The user is a promoter and organizer of the Girls in Tech Hackathon. Their \
+work involves outreach, event coordination, sponsor management, participant \
+engagement, marketing, and logistics for the hackathon.
+
+You help with:
+- File organization and data processing
+- Spreadsheet error checking (Excel, CSV, Google Sheets)
+- Competitor analysis using Blue Ocean Strategy
+- General business questions and planning
+
+Be concise, practical, and action-oriented. When the user asks about \
+hackathon-related tasks (scheduling, outreach emails, sponsor decks, \
+social media, registration tracking, etc.), provide specific, helpful advice \
+tailored to their role as a hackathon promoter.
+"""
+
 
 # ---------------------------------------------------------------------------
 # WSL Manager (kept for path translation utilities)
@@ -294,7 +316,8 @@ class OpenClawBridge:
             Assistant response text.
         """
         url = f"{self._get_gateway_url()}/v1/chat/completions"
-        messages = list(history or [])
+        messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        messages.extend(history or [])
         messages.append({"role": "user", "content": message})
 
         with httpx.Client(timeout=120.0) as client:
@@ -330,7 +353,8 @@ class OpenClawBridge:
             Response text chunks as they arrive.
         """
         url = f"{self._get_gateway_url()}/v1/chat/completions"
-        messages = list(history or [])
+        messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        messages.extend(history or [])
         messages.append({"role": "user", "content": message})
 
         async with httpx.AsyncClient(timeout=120.0) as client:
