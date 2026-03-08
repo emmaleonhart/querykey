@@ -1,4 +1,4 @@
-# dd
+# Secretarybird Pivot
 
 ## Workflow Rules
 - **Commit early and often.** Every meaningful change gets a commit with a clear message explaining *why*, not just what.
@@ -7,10 +7,22 @@
 - **Update README.md regularly.** It should always reflect the current state of the project for human readers.
 
 ## Project Description
-_TODO: Describe what this project is about._
+AI secretary that ingests unstructured input (Discord chats, voice notes, screenshots, pasted text), extracts tasks/events/contradictions via OpenClaw, and actively follows up with team members to clarify and resolve. Discord bot is the primary interaction surface. Flutter app provides richer features (task boards, calendars, audio recording).
 
 ## Architecture and Conventions
-_TODO: Document key decisions, file structure, and patterns as they emerge._
+- **Framework**: Flutter — single codebase for Windows (current focus), macOS, Linux, Web, iOS, Android
+- **AI Engine**: OpenClaw — entity extraction, task/event detection, contradiction detection, follow-up generation
+- **Server**: Secretarybird Server (local or cloud) — ingestion, knowledge graph, real-time WebSocket sync
+- **Primary integration**: Discord bot (DM-first, hourly batch processing)
+- **Data model**: See `docs/data-model.md` — Person, Task, Event, Message, Conflict, FollowUp, etc.
+- **Architecture**: See `docs/architecture.md`
+- **Roadmap**: See `todo.md`
+
+### Key Design Decisions
+- **Task vs Event**: Tasks are time-flexible (optional deadline). Events are time-fixed (start + end time). If you can move it without asking permission, it's a task.
+- **OpenClaw tone**: Secretary, not consultant. Short, direct messages. Never wordy.
+- **Epistemic humility**: Confidence scores on extracted data. Ask when unsure rather than guess silently.
+- **Cross-platform identity**: Same person tracked across Discord, Slack, phone, voice — single Person entity with multiple handles.
 
 # currentDate
 Today's date is 2026-03-08.
