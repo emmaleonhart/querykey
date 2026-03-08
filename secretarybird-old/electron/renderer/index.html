@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- CSP is set via Electron session headers in main.js to avoid file:// origin issues -->
+  <title>Secretary Bird Assistant</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
+        <img src="../../assets/tojo-avatar.png" alt="Secretary Bird" class="sidebar-avatar" />
+        <div class="sidebar-brand-text">
+          <h1>Secretary Bird</h1>
+          <p class="tagline">Your business assistant.</p>
+        </div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <!-- Strategy (top priority) -->
+      <div class="nav-section" data-section="strategy">
+        <div class="nav-section-header">
+          <span class="nav-icon">&#127919;</span>
+          <span>Strategy</span>
+        </div>
+        <ul class="nav-items">
+          <li><button class="nav-btn" data-action="analyze-competitors">Analyze Competitors</button></li>
+          <li><button class="nav-btn" data-action="blue-ocean">Blue Ocean Strategy</button></li>
+          <li><button class="nav-btn" data-action="scrape-competitor">Scout a Competitor</button></li>
+        </ul>
+      </div>
+
+      <!-- Social Feeds -->
+      <div class="nav-section" data-section="social-feeds">
+        <div class="nav-section-header">
+          <span class="nav-icon">&#128225;</span>
+          <span>Social Feeds</span>
+        </div>
+        <ul class="nav-items">
+          <li><button class="nav-btn" data-action="view-social-feeds">View Feed</button></li>
+          <li><button class="nav-btn" data-action="social-feed-hourly">Hourly Pulse</button></li>
+          <li><button class="nav-btn" data-action="social-feed-daily">Daily Report</button></li>
+          <li><button class="nav-btn" data-action="social-feed-weekly">Weekly Digest</button></li>
+          <li><button class="nav-btn" data-action="toggle-heartbeat">Toggle Heartbeat</button></li>
+        </ul>
+      </div>
+
+      <!-- Files -->
+      <div class="nav-section" data-section="files">
+        <div class="nav-section-header">
+          <span class="nav-icon">&#128193;</span>
+          <span>Files</span>
+        </div>
+        <ul class="nav-items">
+          <li><button class="nav-btn" data-action="organize-files">Organize Files</button></li>
+          <li><button class="nav-btn" data-action="select-file">Open File</button></li>
+          <li><button class="nav-btn" data-action="select-folder">Open Folder</button></li>
+        </ul>
+      </div>
+
+      <!-- Data -->
+      <div class="nav-section" data-section="data">
+        <div class="nav-section-header">
+          <span class="nav-icon">&#128202;</span>
+          <span>Data</span>
+        </div>
+        <ul class="nav-items">
+          <li><button class="nav-btn" data-action="check-spreadsheet">Check Spreadsheet</button></li>
+          <li><button class="nav-btn" data-action="analyze-data">Analyze Data</button></li>
+          <li><button class="nav-btn" data-action="export-report">Export Report</button></li>
+        </ul>
+      </div>
+
+      <!-- Integrations (disabled - not yet implemented)
+      <div class="nav-section" data-section="integrations">
+        <div class="nav-section-header">
+          <span class="nav-icon">&#128279;</span>
+          <span>Integrations</span>
+        </div>
+        <ul class="nav-items">
+          <li><button class="nav-btn" data-action="connect-salesforce">Salesforce</button></li>
+          <li><button class="nav-btn" data-action="connect-gsheets">Google Sheets</button></li>
+          <li><button class="nav-btn" data-action="connect-database">Database</button></li>
+        </ul>
+      </div>
+      -->
+
+      <!-- Pipeline (disabled - not yet implemented)
+      <div class="nav-section" data-section="pipeline">
+        <div class="nav-section-header">
+          <span class="nav-icon">&#9881;</span>
+          <span>Pipeline</span>
+        </div>
+        <ul class="nav-items">
+          <li><button class="nav-btn" data-action="build-pipeline">Build Pipeline</button></li>
+          <li><button class="nav-btn" data-action="run-pipeline">Run Pipeline</button></li>
+          <li><button class="nav-btn" data-action="view-logs">View Logs</button></li>
+        </ul>
+      </div>
+      -->
+    </nav>
+
+    <div class="sidebar-footer">
+      <button id="btn-clear-chat" class="sidebar-footer-btn" title="Clear conversation">Clear Chat</button>
+      <button id="btn-system-info" class="sidebar-footer-btn" title="System information">System Info</button>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════ MAIN CONTENT ═══════════════════ -->
+  <main class="main-content">
+    <!-- Top bar -->
+    <header class="top-bar">
+      <button id="btn-toggle-sidebar" class="top-bar-btn" title="Toggle sidebar">&#9776;</button>
+      <div class="top-bar-title">Secretary Bird Assistant</div>
+      <div class="top-bar-spacer"></div>
+      <div class="connection-indicators">
+        <span class="status-badge" id="status-backend" title="Backend server">
+          <span class="status-dot"></span>
+          Backend
+        </span>
+        <span class="status-badge" id="status-openclaw" title="OpenClaw bridge">
+          <span class="status-dot"></span>
+          OpenClaw
+        </span>
+        <button id="btn-kill-openclaw" class="btn-emergency" title="Kill OpenClaw (emergency stop)">STOP</button>
+        <button id="btn-restart-openclaw" class="btn-restart" title="Restart OpenClaw gateway">Restart</button>
+      </div>
+    </header>
+
+    <!-- Chat area -->
+    <div id="chat-area" class="chat-area">
+      <!-- Welcome message -->
+      <div class="welcome-card">
+        <img src="../../assets/tojo-avatar.png" alt="Secretary Bird" class="welcome-avatar" />
+        <h2>Welcome to Secretary Bird Assistant.</h2>
+        <p>Your AI-powered business assistant. Tell me what you need and I'll handle it.</p>
+        <div class="quick-actions">
+          <button class="quick-action-btn" data-action="organize-files">Organize my files</button>
+          <button class="quick-action-btn" data-action="check-spreadsheet">Check a spreadsheet</button>
+          <button class="quick-action-btn" data-action="analyze-data">Analyze data</button>
+          <button class="quick-action-btn" data-action="analyze-competitors">Analyze competitors</button>
+          <button class="quick-action-btn" data-action="view-social-feeds">Social feeds</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Typing indicator -->
+    <div id="typing-indicator" class="typing-indicator hidden">
+      <img src="../../assets/tojo-avatar.png" alt="Secretary Bird" class="typing-avatar" />
+      <div class="typing-dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <!-- Input area -->
+    <footer class="input-area">
+      <div class="input-wrapper">
+        <textarea
+          id="message-input"
+          class="message-input"
+          placeholder="Type your request..."
+          rows="1"
+        ></textarea>
+        <button id="btn-send" class="btn-send" title="Send message" disabled>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+      <div class="input-hint">Press Enter to send, Shift+Enter for new line</div>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
