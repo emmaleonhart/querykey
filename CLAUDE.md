@@ -12,17 +12,24 @@ AI secretary that ingests unstructured input (Discord chats, voice notes, screen
 ## Architecture and Conventions
 - **Framework**: Flutter — single codebase for Windows (current focus), macOS, Linux, Web, iOS, Android
 - **AI Engine**: OpenClaw — entity extraction, task/event detection, contradiction detection, follow-up generation
+- **Graph Store**: Apache Jena Fuseki — triple store for the knowledge graph
 - **Server**: Secretarybird Server (local or cloud) — ingestion, knowledge graph, real-time WebSocket sync
 - **Primary integration**: Discord bot (DM-first, hourly batch processing)
+- **Future integrations**: WhatsApp, Instagram, Slack
 - **Data model**: See `docs/data-model.md` — Person, Task, Event, Message, Conflict, FollowUp, etc.
 - **Architecture**: See `docs/architecture.md`
 - **Roadmap**: See `todo.md`
 
 ### Key Design Decisions
+- **User accounts**: People have real logins on Secretarybird. Initial signup via Discord OAuth. Future: sign up from any platform the bot contacts you on.
+- **Node IDs**: Human-readable aliases, not just opaque UUIDs.
+- **In-app messaging first**: App has its own DM system with the bot. Falls back to Discord, WhatsApp, Instagram, etc. All responses from all platforms show up in one unified view in the app.
 - **Task vs Event**: Tasks are time-flexible (optional deadline). Events are time-fixed (start + end time). If you can move it without asking permission, it's a task.
+- **Confidence indicators**: Every extracted task/event shows degree of certainty. The bot doesn't pretend to know things perfectly.
 - **OpenClaw tone**: Secretary, not consultant. Short, direct messages. Never wordy.
 - **Epistemic humility**: Confidence scores on extracted data. Ask when unsure rather than guess silently.
-- **Cross-platform identity**: Same person tracked across Discord, Slack, phone, voice — single Person entity with multiple handles.
+- **Cross-platform identity**: Same person tracked across Discord, Slack, WhatsApp, Instagram, phone, voice — single Person entity with multiple handles.
+- **Proactive engagement**: Bot actively asks people things like "what do you think you are expected to do today?"
 
 # currentDate
 Today's date is 2026-03-08.

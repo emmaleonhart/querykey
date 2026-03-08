@@ -6,29 +6,53 @@ The data model must handle the fact that most input is unstructured. A pasted sc
 
 **Epistemic humility is built into the data model.** Confidence scores exist on most extracted entities. When confidence is low, the system triggers follow-up questions rather than silently recording uncertain data as fact. Everything is auditable — every extraction links back to its source, every follow-up links to what triggered it, and every resolution is logged.
 
+### ID Strategy
+
+Node IDs should have **human-readable aliases**, not just opaque UUIDs. UUIDs can exist as internal identifiers but every entity that users interact with should have a readable slug or label (e.g., `person:john-smith`, `task:finish-video-2026-03-08`). This is stored in **Apache Jena Fuseki** as a triple store.
+
 ## Core Entities
 
+### Account
+People have **real accounts** on Secretarybird. This is not just a manager tool — everyone on the team has a login.
+
+```
+Account {
+  id: human-readable slug (e.g., "john-smith")
+  person_id: Person.id
+  auth_provider: "discord" | "whatsapp" | "instagram" | "slack" | "email"
+  auth_provider_id: string           // the ID from the auth provider
+  created_at: timestamp
+  last_login: timestamp
+}
+```
+
+**Account creation flow**: Currently via Discord OAuth. In the future, any platform the bot contacts you on can be used to create an account. If the bot DMs you on WhatsApp and you reply, that can bootstrap your account. People don't like signing up for things, so we make it as implicit as possible.
+
 ### Person
-Represents a team member tracked by the system.
+Represents a team member tracked by the system. Every person has an Account.
 
 ```
 Person {
-  id: UUID
+  id: human-readable slug (e.g., "person:john-smith")
   display_name: string
   handles: [
     { platform: "discord", identifier: "user#1234" },
     { platform: "slack", identifier: "U12345" },
+    { platform: "whatsapp", identifier: "+1..." },
+    { platform: "instagram", identifier: "@john" },
     { platform: "phone", identifier: "+1..." },
   ]
   role: string (optional)
-  preferred_channel: "app_push" | "discord_dm" | "slack_dm" | "sms" (optional)
+  contact_cascade: ["app", "discord", "whatsapp", "instagram", "slack", "sms"]  // ordered list of how to reach them
   created_at: timestamp
 }
 ```
 
-The system must resolve the same person across platforms. A single person may appear as a Discord username, a Slack user, and a voice in a meeting. Handle linking is done initially by manual mapping and later augmented by AI-assisted matching (including voice recognition — see VoiceProfile).
+The system must resolve the same person across platforms. A single person may appear as a Discord username, a Slack user, an Instagram handle, a WhatsApp number, and a voice in a meeting. Handle linking is done initially by manual mapping and later augmented by AI-assisted matching (including voice recognition — see VoiceProfile).
 
-Each person also has a **preferred contact channel** for outbound messages from the AI secretary. The system tracks where each person is most responsive.
+A person's **profile** is the unified view of one human across all platforms — showing all their linked accounts and usernames.
+
+The **contact cascade** defines how the bot tries to reach someone: in-app DM first, then Discord, then WhatsApp, then Instagram, etc. The system tracks where each person is most responsive and can reorder the cascade accordingly.
 
 ### Task
 An actionable work item extracted from conversation.
@@ -130,22 +154,29 @@ An outbound question or message sent by the AI secretary to a team member. This 
 
 ```
 FollowUp {
-  id: UUID
-  trigger_type: "conflict" | "ambiguity" | "missed_deadline" | "unconfirmed_task" | "reassignment" | "scope_change" | "check_in"
-  trigger_id: UUID                    // the Conflict, Task, or Instruction that triggered this
+  id: human-readable (e.g., "followup:john-video-deadline-2026-03-08")
+  trigger_type: "conflict" | "ambiguity" | "missed_deadline" | "unconfirmed_task" | "reassignment" | "scope_change" | "check_in" | "daily_checkin"
+  trigger_id: string                  // the Conflict, Task, or Instruction that triggered this
   target: Person.id                   // who to ask
   question: string                    // the short, clear question to send
   context: string                     // brief background included with the message
-  channel: "app_push" | "discord_dm" | "slack_dm" | "sms"
+  delivery_attempts: [                // tries multiple channels via contact cascade
+    { channel: "app_dm", status: "sent" | "delivered" | "read" | "failed", sent_at: timestamp },
+    { channel: "discord_dm", status: "sent" | "delivered" | "read" | "failed", sent_at: timestamp },
+  ]
   status: "pending" | "sent" | "answered" | "expired"
   response: string (nullable)         // what the person replied
+  response_channel: string (nullable) // which platform they replied on
   response_at: timestamp (nullable)
   created_at: timestamp
-  sent_at: timestamp (nullable)
 }
 ```
 
+The bot tries the person's **contact cascade** — in-app DM first, then Discord, then WhatsApp, then other platforms. All delivery attempts are tracked. The person can respond from **any** platform and the response shows up in the unified conversation view in the app.
+
 **Key constraint**: Messages must be short and clear. The AI is a secretary, not a consultant. "Are you doing the video for 10 PM or 8 AM?" — not a paragraph of analysis.
+
+Includes **daily check-in** type: proactively asks people "what do you think you're expected to do today?" to surface misunderstandings early.
 
 ### VoiceProfile
 A learned voice embedding for a team member, used for automatic speaker identification in recorded conversations.
@@ -183,6 +214,8 @@ ExternalSync {
 The knowledge graph connects these entities:
 
 ```
+Account --[BELONGS_TO]--> Person (each account maps to one person)
+Person --[HAS_ACCOUNT]--> Account (a person can have multiple accounts/logins)
 IngestItem --[PRODUCED]--> Message (one-to-many: a pasted chatlog produces many messages)
 Person --[ASSIGNED_TO]--> Task
 Person --[ASSIGNED_BY]--> Task
@@ -197,7 +230,8 @@ Task --[SUPERSEDED_BY]--> Task
 Task --[SYNCED_TO]--> ExternalSync (pushed to Jira, Azure DevOps, etc.)
 Conflict --[TRIGGERED]--> FollowUp (AI asked someone about this conflict)
 Task --[TRIGGERED]--> FollowUp (deadline reminder, confirmation request, etc.)
-FollowUp --[SENT_TO]--> Person
+FollowUp --[SENT_TO]--> Person (via contact cascade: app → Discord → WhatsApp → etc.)
+FollowUp --[ANSWERED_VIA]--> Platform (which platform the response came from)
 Person --[HAS_VOICE]--> VoiceProfile
 ```
 
