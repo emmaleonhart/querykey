@@ -149,8 +149,32 @@ Instruction {
 }
 ```
 
+### OpenQuestion
+A question the system needs resolved, assigned to a specific person. Each person has a queue of these visible in the app. This is the primary unit of interaction — the bot generates open questions, delivers them via DMs, and people resolve them.
+
+```
+OpenQuestion {
+  id: human-readable (e.g., "q:john-video-deadline")
+  target: Person.id                   // who needs to answer this
+  question: string                    // the short, clear question
+  context: string                     // brief background
+  urgency: "asap" | "by_time" | "end_of_day" | "whenever"
+  urgency_deadline: timestamp (nullable)  // for "by_time" urgency (e.g., "by 8 AM")
+  trigger_type: "conflict" | "ambiguity" | "missed_deadline" | "unconfirmed_task" | "reassignment" | "scope_change" | "daily_checkin"
+  trigger_id: string                  // what generated this question
+  status: "open" | "resolved" | "expired"
+  resolution: string (nullable)       // the answer
+  resolved_by: Person.id (nullable)   // who answered (might be someone else)
+  resolved_via: string (nullable)     // which platform ("app", "discord", "whatsapp", etc.)
+  created_at: timestamp
+  resolved_at: timestamp (nullable)
+}
+```
+
+People can see all their open questions in the app and resolve them proactively. The bot also delivers them via DM based on urgency. Once resolved (by anyone, on any platform), the question disappears from the queue.
+
 ### FollowUp
-An outbound question or message sent by the AI secretary to a team member. This is the core of the conversational agent.
+An outbound delivery attempt for an OpenQuestion. Tracks how and when the bot tried to reach someone.
 
 ```
 FollowUp {

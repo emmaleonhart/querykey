@@ -12,6 +12,10 @@ The system never asks users to change how they communicate. It meets them where 
 
 Jira, Git, Azure DevOps — these tools often become performative work. People spend more time updating tickets and writing status reports than doing the actual work. Secretarybird actively defies this pattern. Nobody should have to manually file what their boss told them to do. The AI handles it.
 
+### Anti-Policing Principle
+
+**This tool is for coordination, not surveillance.** The purpose is to get everyone on the same page so that everyone can look at and verify what they need to do. It is NOT for policing whether people know what they're supposed to be doing. If someone uses it to catch people out or micromanage, they are misusing it. The design should make this kind of misuse difficult and obvious. Information flows to help people coordinate, not to create a paper trail for punishing them.
+
 ### "AI Writes the Code" — Not No-Code
 
 This is not a no-code platform with drag-and-drop workflow builders. The intelligence lives in the AI. OpenClaw does the hard work: parsing unstructured input, resolving entities across platforms, detecting contradictions, generating structured output. The system is smart, not simple.
@@ -157,28 +161,30 @@ This is viable *because* the system can ask. A passive tool at 75% accuracy is u
 
 The key design constraint: the system must always surface its work transparently. Every extraction, every task, every conflict resolution is visible and auditable. Followable calendars, conversation logs, task boards — nothing is hidden. When the AI is wrong, people can see it and correct it.
 
-### How It Works
+### Open Questions
 
-When the AI detects something that needs human input — a contradiction, an ambiguity, a missed deadline, a scope change — it generates a follow-up action:
+The primary unit of interaction is the **open question**. When the AI detects something that needs human input, it creates an open question assigned to the relevant person.
 
-```
-FollowUp {
-  trigger: Conflict | Task | Instruction    // what triggered this
-  target: Person.id                          // who to ask
-  question: string                           // short, clear question
-  context: string                            // brief background for the recipient
-  channel: "app_notification" | "discord" | "slack" | "sms"
-  status: "pending" | "sent" | "answered" | "expired"
-}
-```
+Each person has a queue of open questions visible in the app. They can resolve them proactively by opening the app, or the bot will DM them based on urgency.
+
+**Urgency levels:**
+- **ASAP** — bot DMs you immediately, tries all channels
+- **By [time]** — bot makes sure to ask before that time (e.g., "needs to be known by 8 AM")
+- **End of day** — included in the daily check-in DM
+- **Whenever** — sits in your queue, bot mentions it occasionally
 
 Example flow:
 1. Boss says in a meeting: "Get the video done by 10 PM tonight"
 2. Later, a Slack message from another manager says: "Video needs to be ready by 8 AM tomorrow"
 3. System detects the contradiction
-4. System messages the assignee: "You were asked to finish the video by 10 PM tonight (from the standup meeting) but also by 8 AM tomorrow (from Sarah on Slack). Which one are you going for?"
-5. Person replies: "8 AM tomorrow, Sarah updated the deadline"
-6. System records the resolution, updates the task, logs everything
+4. System creates an open question for the assignee: "You were asked to finish the video by 10 PM tonight (from the standup meeting) but also by 8 AM tomorrow (from Sarah on Slack). Which one are you going for?" — urgency: ASAP
+5. Bot DMs the person on Discord (or app, or wherever they're reachable)
+6. Person replies: "8 AM tomorrow, Sarah updated the deadline"
+7. Question is resolved, task is updated, everything is logged
+
+### Daily Check-ins
+
+The simplest version of this: the bot DMs every person on Discord individually and asks them what they think they're doing that day with the project. Their open questions (end-of-day urgency) get bundled into this check-in. This alone surfaces a huge number of misunderstandings.
 
 ### Message Style
 
