@@ -30,6 +30,7 @@ from backend.integrations.google_suite import GoogleSuiteConnector  # noqa: F401
 from backend.integrations.databases import DatabaseConnector, DatabaseConfig
 from backend.integrations.api_discovery import APIDiscovery
 from backend.integrations.competitor_analysis import CompetitorAnalysis
+from backend.integrations.social_feeds import SocialFeedMonitor
 from backend.pipeline.builder import PipelineBuilder, PipelineDefinition
 from backend.openclaw.bridge import OpenClawBridge
 
@@ -60,6 +61,7 @@ async def lifespan(app: FastAPI):
     _state["pipeline_builder"] = PipelineBuilder()
     _state["api_discovery"] = APIDiscovery()
     _state["competitor_analysis"] = CompetitorAnalysis()
+    _state["social_feed_monitor"] = SocialFeedMonitor("Accelerate Okanagan")
     _state["openclaw_bridge"] = OpenClawBridge()
     _state["active_websockets"] = set()
 
@@ -275,6 +277,8 @@ async def websocket_chat(ws: WebSocket):
                     result = await _handle_pipeline_chat(user_message, context)
                 elif handler == "competitor_analysis":
                     result = await _handle_competitor_chat(user_message, context)
+                elif handler == "social_feeds":
+                    result = await _handle_social_feeds_chat(user_message, context)
                 else:
                     # Default handler uses OpenClaw streaming when available
                     bridge: OpenClawBridge = _state.get("openclaw_bridge")
@@ -346,6 +350,7 @@ def _handle_default_chat(message: str) -> str:
         "API discovery",
         "data pipeline building",
         "competitor analysis & Blue Ocean Strategy",
+        "social feed monitoring (Twitter & Google Reviews)",
     ]
     return (
         f"I received your message: \"{message}\"\n\n"
@@ -411,6 +416,94 @@ async def _handle_competitor_chat(message: str, context: dict) -> str:
         your_company=your_company,
     )
     return analysis.format_report_text(report)
+
+
+async def _handle_social_feeds_chat(message: str, context: dict) -> str:
+    """Handle social feed monitoring requests from chat."""
+    monitor: SocialFeedMonitor = _state["social_feed_monitor"]
+    return await monitor.handle_chat(message, context)
+
+
+# ---------------------------------------------------------------------------
+# Social Feed Monitoring Endpoints
+# ---------------------------------------------------------------------------
+class SocialFeedHeartbeatRequest(BaseModel):
+    """Request body for heartbeat control."""
+    interval_seconds: int = 86400
+
+
+@app.post("/api/social-feeds/fetch", tags=["social-feeds"])
+async def fetch_social_feeds() -> JSONResponse:
+    """Fetch latest Twitter and Google Reviews for the monitored company."""
+    try:
+        monitor: SocialFeedMonitor = _state["social_feed_monitor"]
+        snapshot = await monitor.fetch_feeds()
+        return JSONResponse(content=snapshot.to_dict())
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/social-feeds/data", tags=["social-feeds"])
+async def get_social_feed_data() -> JSONResponse:
+    """Get the most recently stored feed data."""
+    try:
+        monitor: SocialFeedMonitor = _state["social_feed_monitor"]
+        snapshot = monitor.load_feeds()
+        return JSONResponse(content=snapshot.to_dict())
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/social-feeds/report", tags=["social-feeds"])
+async def generate_social_feed_report() -> JSONResponse:
+    """Generate a daily market analysis report from current feed data."""
+    try:
+        monitor: SocialFeedMonitor = _state["social_feed_monitor"]
+        snapshot = await monitor.fetch_feeds()
+        report = monitor.generate_report(snapshot)
+        return JSONResponse(content=report.to_dict())
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/social-feeds/reports", tags=["social-feeds"])
+async def list_social_feed_reports() -> JSONResponse:
+    """List all saved daily reports."""
+    monitor: SocialFeedMonitor = _state["social_feed_monitor"]
+    return JSONResponse(content={"reports": monitor.list_reports()})
+
+
+@app.post("/api/social-feeds/heartbeat/start", tags=["social-feeds"])
+async def start_heartbeat(req: SocialFeedHeartbeatRequest) -> JSONResponse:
+    """Start the heartbeat scheduler for automated daily monitoring."""
+    monitor: SocialFeedMonitor = _state["social_feed_monitor"]
+    started = monitor.start_heartbeat(req.interval_seconds)
+    return JSONResponse(content={
+        "started": started,
+        "interval_seconds": req.interval_seconds,
+        "message": "Heartbeat started" if started else "Heartbeat already running",
+    })
+
+
+@app.post("/api/social-feeds/heartbeat/stop", tags=["social-feeds"])
+async def stop_heartbeat() -> JSONResponse:
+    """Stop the heartbeat scheduler."""
+    monitor: SocialFeedMonitor = _state["social_feed_monitor"]
+    stopped = monitor.stop_heartbeat()
+    return JSONResponse(content={
+        "stopped": stopped,
+        "message": "Heartbeat stopped" if stopped else "Heartbeat was not running",
+    })
+
+
+@app.get("/api/social-feeds/heartbeat/status", tags=["social-feeds"])
+async def heartbeat_status() -> JSONResponse:
+    """Check heartbeat scheduler status."""
+    monitor: SocialFeedMonitor = _state["social_feed_monitor"]
+    return JSONResponse(content={
+        "active": monitor.heartbeat_active,
+        "company": monitor.company,
+    })
 
 
 # ---------------------------------------------------------------------------
