@@ -1,16 +1,20 @@
 # Secretarybird Pivot
 
-A real-time knowledge graph and task extraction system that monitors communication streams — Discord, Slack, phone conversations, chat logs, and social media — and organizes them into structured, actionable task assignments.
+A real-time knowledge graph and task extraction system that takes in messy, unstructured communication — Discord chatlogs, screenshots, voice notes, recorded conversations, pasted text, bot feeds — and extracts structured tasks, assignments, and contradictions from it.
 
-Built with **Flutter** (mobile + desktop) and powered by **OpenClaw**.
+**We don't impose structure. We extract it from the chaos that already exists.**
+
+Small businesses run on informal communication. Tasks get assigned over Discord, in hallway conversations, through voice messages, across group chats. Secretarybird watches all of it and builds a living task board without asking anyone to change how they work.
+
+Built with **Flutter** (mobile, desktop, web). Analysis powered by **OpenClaw**.
 
 ## The Problem
 
-A very large amount of money is lost in businesses due to contradictory or vague verbal instructions. Tasks get assigned informally across meetings, Discord channels, Slack threads, and hallway conversations. People walk away with different understandings of who is doing what. There is no single source of truth for informal task delegation.
+A very large amount of money is lost in businesses due to contradictory or vague verbal instructions. Tasks get assigned informally and people walk away with different understandings of who is doing what. There is no single source of truth for informal task delegation — and nobody is going to start filing Jira tickets for what their boss said in passing.
 
 ## The Solution
 
-Secretarybird watches all communication channels in real time and builds a continuously updated knowledge graph on the server. An AI processes incoming streams of information and extracts:
+Secretarybird accepts any form of communication input and builds a continuously updated knowledge graph on the server. OpenClaw processes the incoming information and extracts:
 
 - **Who** was assigned a task
 - **What** the task is
@@ -20,62 +24,75 @@ Secretarybird watches all communication channels in real time and builds a conti
 
 The result is a Jira-style task board that populates itself automatically from natural conversation, with built-in contradiction detection.
 
-## Information Sources
+## Unstructured Input — Anything Goes
 
-| Source | Method |
+The core design principle is that **any form of input works**. Users should never feel like they need to format something correctly. The system handles:
+
+| Input Type | How It Works |
 |---|---|
-| Discord servers | Bot / webhook integration, real-time message streaming |
-| Slack workspaces | Slack app integration, real-time event API |
-| Verbal conversations | Phone app records and streams audio to server for transcription |
-| Chat logs | Paste or upload text logs for batch processing |
-| Social media posts | Read and ingest posts from configured accounts |
+| Discord bot | Real-time message streaming from monitored channels |
+| Pasted Discord chatlogs | Copy-paste a conversation, AI parses it |
+| Screenshots | Paste or upload a screenshot of a conversation, OCR + AI extracts content |
+| Voice notes | Record a voice memo explaining what someone told you |
+| Recorded conversations | Phone app records meetings/calls, streams audio for transcription |
+| Pasted text | Any freeform text — email forwards, notes, whatever |
+| Slack bot | Real-time message streaming from monitored workspaces |
 
-## Architecture Overview
+A Discord bot recording a channel in real time and a user pasting a screenshot of that same channel are equally valid inputs. The system normalizes everything.
+
+## System Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Flutter Frontend                   │
-│  ┌──────────────┐  ┌─────────────────────────────┐  │
-│  │  Phone App   │  │     Desktop / Web App       │  │
-│  │ - Mic record │  │ - Knowledge graph view      │  │
-│  │ - Graph view │  │ - Task board (Jira-style)   │  │
-│  └──────┬───────┘  │ - Contradiction alerts      │  │
-│         │          │ - Feed management            │  │
-│         │          └─────────────┬───────────────┘  │
-└─────────┼────────────────────────┼──────────────────┘
-          │                        │
-          ▼                        ▼
-┌─────────────────────────────────────────────────────┐
-│                  OpenClaw Backend                     │
-│  ┌────────────┐  ┌─────────────┐  ┌──────────────┐ │
-│  │ Ingest     │  │ AI Pipeline │  │ Knowledge    │ │
-│  │ Service    │  │ - NLP/LLM   │  │ Graph Store  │ │
-│  │ - Discord  │  │ - Entity    │  │ - Entities   │ │
-│  │ - Slack    │  │   extraction│  │ - Tasks      │ │
-│  │ - Audio    │  │ - Task      │  │ - Relations  │ │
-│  │ - Paste    │  │   detection │  │ - Conflicts  │ │
-│  │ - Social   │  │ - Conflict  │  │              │ │
-│  │            │  │   detection │  │              │ │
-│  └────────────┘  └─────────────┘  └──────────────┘ │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│              Secretarybird Mobile / Desktop              │
+│                    (Flutter App)                         │
+│  ┌──────────────────┐  ┌────────────────────────────┐   │
+│  │  Mobile Features  │  │    Shared Features         │   │
+│  │ - Mic recording   │  │ - Knowledge graph view     │   │
+│  │ - Voice notes     │  │ - Task board (Jira-style)  │   │
+│  │ - Push notifs     │  │ - Contradiction alerts     │   │
+│  └────────┬─────────┘  │ - Unstructured import       │   │
+│           │             │   (paste, screenshot, text) │   │
+│           │             └──────────────┬─────────────┘   │
+└───────────┼────────────────────────────┼─────────────────┘
+            │          WebSocket         │
+            ▼                            ▼
+┌─────────────────────────────────────────────────────────┐
+│              Secretarybird Server                         │
+│           (local or cloud deployment)                    │
+│                                                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
+│  │ Ingest       │  │ Knowledge    │  │ Real-time    │  │
+│  │ Service      │  │ Graph Store  │  │ Sync         │  │
+│  │ - Any input  │  │ - Entities   │  │ - WebSocket  │  │
+│  │ - Normalize  │  │ - Tasks      │  │ - Graph diff │  │
+│  │ - OCR        │  │ - Relations  │  │ - Push       │  │
+│  │ - Transcribe │  │ - Conflicts  │  │              │  │
+│  └──────┬───────┘  └──────────────┘  └──────────────┘  │
+│         │                                                │
+│         ▼                                                │
+│  ┌──────────────┐                                        │
+│  │ OpenClaw     │  AI analysis: entity extraction,       │
+│  │ (Analysis)   │  task detection, contradiction         │
+│  │              │  detection, ambiguity scoring           │
+│  └──────────────┘                                        │
+└─────────────────────────────────────────────────────────┘
 ```
 
-## Phone App
+**Secretarybird Server** can run locally on a machine or deployed to the cloud. It handles ingestion, storage, real-time sync, and coordinates with OpenClaw for AI analysis.
 
-The mobile app serves two core functions:
-
-1. **Listen** — Record ambient/meeting audio and stream it to the server for real-time transcription and task extraction
-2. **View** — Display the knowledge graph and task board, browse contradictions, check assignments
+**Secretarybird Mobile** is the Flutter app — runs on phone, desktop, and web. Thin client that streams data to the server and renders the graph.
 
 ## Tech Stack
 
-- **Frontend**: Flutter (iOS, Android, Desktop, Web)
-- **Backend**: OpenClaw
-- **AI/NLP**: LLM-based entity extraction, task detection, contradiction analysis
-- **Audio**: On-device recording, server-side transcription (Whisper or equivalent)
-- **Graph Store**: To be determined — likely a graph database (Neo4j, etc.) or a structured relational model
+- **Frontend**: Flutter (iOS, Android, Desktop, Web) — single codebase
+- **Server**: Secretarybird Server (local or cloud)
+- **AI Analysis**: OpenClaw
+- **Audio**: On-device recording, server-side transcription
 - **Real-time**: WebSocket connections for live feed updates and graph changes
 
 ## Project Status
 
 **Planning phase.** See `/docs` for detailed planning documents.
+
+History from the original secretarybird repo (Electron-based) will be incorporated later. The socket infrastructure from that project is particularly relevant.

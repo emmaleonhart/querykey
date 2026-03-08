@@ -1,5 +1,9 @@
 # Data Model & Knowledge Graph
 
+## Design Principle
+
+The data model must handle the fact that most input is unstructured. A pasted screenshot and a bot feed produce the same downstream entities, but with different confidence levels. The system tracks provenance — every task and instruction can be traced back to the raw input that produced it.
+
 ## Core Entities
 
 ### Person
@@ -53,17 +57,31 @@ extracted → confirmed → in_progress → done
 - `disputed`: Marked as contradictory or contested
 - Tasks can also be manually dismissed/deleted
 
+### IngestItem
+A raw input submitted to the system — could be anything from a bot feed message to a pasted screenshot.
+
+```
+IngestItem {
+  id: UUID
+  input_type: "bot_feed" | "chatlog_paste" | "screenshot" | "voice_note" | "recorded_audio" | "freeform_text"
+  raw_content: bytes | string
+  submitted_by: User.id
+  submitted_at: timestamp
+  source_context: string (optional)   // user-provided label like "Monday standup"
+}
+```
+
 ### Message
-A normalized record of something someone said, across any source.
+A normalized record of something someone said. Extracted from IngestItems — a single IngestItem (like a pasted chatlog) may produce many Messages.
 
 ```
 Message {
   id: UUID
-  source: "discord" | "slack" | "audio" | "paste" | "social"
-  channel: string
+  source_ingest: IngestItem.id        // which input this came from
   author: Person.id
   content: string
-  timestamp: timestamp
+  timestamp: timestamp (nullable)     // not always determinable from unstructured input
+  confidence: float                   // how confident the extraction is
   raw_metadata: object
 }
 ```
@@ -107,6 +125,7 @@ Instruction {
 The knowledge graph connects these entities:
 
 ```
+IngestItem --[PRODUCED]--> Message (one-to-many: a pasted chatlog produces many messages)
 Person --[ASSIGNED_TO]--> Task
 Person --[ASSIGNED_BY]--> Task
 Person --[SAID]--> Message
