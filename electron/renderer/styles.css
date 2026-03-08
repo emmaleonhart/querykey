@@ -713,6 +713,15 @@ body {
   }
 }
 
+/* ── Social Feed Accent ──────────────────────────────────────────────────── */
+.nav-section[data-section="social-feeds"] .nav-section-header {
+  color: #5ba3d9;
+}
+
+.nav-section[data-section="social-feeds"] .nav-section-header:hover {
+  color: var(--gold);
+}
+
 /* ── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   :root {
