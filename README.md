@@ -16,6 +16,7 @@ Secretary Bird Assistant provides an Electron desktop GUI wrapping OpenClaw with
 - **Database Connectivity** - PostgreSQL, MySQL, SQLite, and MongoDB support with schema introspection
 - **API Discovery** - Parse OpenAPI/Swagger specs, store API configs, test endpoints
 - **Competitor Analysis & Blue Ocean Strategy** - Web-scrape competitor websites, build a Strategy Canvas, apply the Four Actions Framework (Eliminate / Reduce / Raise / Create), and surface uncontested market opportunities
+- **Social Feed Monitoring** - Track Twitter/X mentions and Google Reviews for any company, store feeds in JSON, generate daily market analysis reports with sentiment trends, key themes, and action items via an automated heartbeat scheduler
 - **Data Pipeline Builder** - Chain source, transform, and destination steps into reusable pipelines
 
 ## Architecture
@@ -23,7 +24,7 @@ Secretary Bird Assistant provides an Electron desktop GUI wrapping OpenClaw with
 ```
 Electron Desktop App (Secretary Bird themed UI, TypeScript)
         |  WebSocket / IPC
-Python Backend (FastAPI, 35 REST endpoints + streaming chat)
+Python Backend (FastAPI, 43 REST endpoints + streaming chat)
         |
    Core          Integrations          Pipeline    OpenClaw Gateway
    - File Org    - Salesforce          - Builder   - HTTP API (SSE streaming)
@@ -31,6 +32,7 @@ Python Backend (FastAPI, 35 REST endpoints + streaming chat)
    - Data Proc   - Databases                       - Auth token management
                  - API Discovery
                  - Competitor Analysis
+                 - Social Feed Monitor
 ```
 
 ### OpenClaw Integration
@@ -126,11 +128,11 @@ tojo-assistant/
 ├── backend/
 │   ├── server.py             # FastAPI entry (35 REST + 1 WebSocket)
 │   ├── core/                 # File org, Excel checker, data processor
-│   ├── integrations/         # Salesforce, Google Suite, databases, API, competitors
+│   ├── integrations/         # Salesforce, Google Suite, databases, API, competitors, social feeds
 │   ├── pipeline/             # Data pipeline builder
 │   └── openclaw/             # Gateway bridge + WSL utilities
 ├── tests/
-│   ├── backend/              # 9 pytest files
+│   ├── backend/              # 10 pytest files
 │   └── frontend/             # 6 vitest files
 ├── scripts/build.js          # tsc + esbuild build orchestrator
 ├── planning/                 # Architecture + installer docs
@@ -144,10 +146,10 @@ tojo-assistant/
 |-------|-----------|
 | Desktop App | Electron 28+ |
 | Frontend | TypeScript + esbuild (6 modular renderer files) |
-| Backend | Python 3.13 + FastAPI (35 REST endpoints + WebSocket) |
+| Backend | Python 3.13 + FastAPI (43 REST endpoints + WebSocket) |
 | AI Engine | OpenClaw via WSL Gateway HTTP API (LLM-agnostic) |
 | Browser Automation | OpenClaw Browser Relay (CDP protocol) |
-| Testing | pytest (9 files) + vitest (6 files) + GitHub Actions |
+| Testing | pytest (10 files) + vitest (6 files) + GitHub Actions |
 | Installer | electron-builder (NSIS) + PyInstaller (backend) |
 
 ## Hackathon Strategy
@@ -156,8 +158,8 @@ tojo-assistant/
 
 | Category | Points | Our approach |
 |---|---|---|
-| **Technical Complexity & Implementation** | **/15** | **This is the big one.** 9 working skills (including web-scraping competitor analysis), LLM-agnostic architecture via OpenClaw with browser automation, Electron desktop app with TypeScript frontend, full test suite (15 test files), CI/CD pipeline, 35 REST endpoints. We're not demoing a mockup — this is a working product. |
-| Innovation & Creativity | /10 | Blue Ocean Strategy analysis — web-scrape competitors, build a Strategy Canvas, auto-generate the Four Actions Framework. No other hackathon project replaces a business consultant. |
+| **Technical Complexity & Implementation** | **/15** | **This is the big one.** 10 working skills (including web-scraping competitor analysis and social feed monitoring), LLM-agnostic architecture via OpenClaw with browser automation, Electron desktop app with TypeScript frontend, full test suite (16 test files), CI/CD pipeline, 43 REST endpoints. We're not demoing a mockup — this is a working product. |
+| Innovation & Creativity | /10 | Blue Ocean Strategy analysis — web-scrape competitors, build a Strategy Canvas, auto-generate the Four Actions Framework. Social feed monitoring with daily heartbeat reports turns market intelligence into a data pipeline any small business owner can understand. No other hackathon project replaces a business consultant. |
 | Entrepreneurial Value & Business Impact | /10 | The competitor analysis feature alone justifies a subscription. Businesses pay consultants thousands for the kind of strategic output Secretary Bird generates from a URL list. |
 | Design & User Experience | /10 | Secretary Bird themed dark UI with silver-blue accents. Chat-based interface with real-time streaming. System tray integration. One-click installer for non-technical users. |
 | Presentation | /5 |  |
@@ -170,6 +172,7 @@ tojo-assistant/
 - **LLM-agnostic** means the customer saves money — use what you already pay for (OpenAI, Anthropic, local models, anything)
 - **Competitor Analysis** is the killer feature — it doesn't just replace a database person, it replaces a strategy consultant. Give it your competitors' URLs and it delivers a full Blue Ocean Strategy analysis
 - Blue Ocean Strategy is a proven framework used by Fortune 500 companies — Secretary Bird automates it for SMBs who can't afford McKinsey
+- **Social feed monitoring** — tracks Twitter mentions and Google reviews, stores them in JSON, and generates daily market analysis reports with sentiment, themes, and action items. The heartbeat scheduler demonstrates a practical data pipeline that runs itself
 - **Zero-to-working installer** — one `.exe` sets up everything including WSL, OpenClaw, and browser automation
 
 ## License
