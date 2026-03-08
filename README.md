@@ -131,6 +131,8 @@ The Discord bot is the primary interaction surface for many users. It DMs you, y
 
 ## Project Status
 
-**Planning phase.** See `/docs` for detailed planning documents.
+**Planning phase.** See `/docs` for detailed planning documents. See `todo.md` for the full roadmap.
 
-History from the original secretarybird repo (Electron-based) will be incorporated later. The socket infrastructure from that project is particularly relevant.
+## `/secretarybird-old`
+
+The `secretarybird-old/` directory contains the full history of the original secretarybird project (Electron-based, previously called tojo-assistant). It was imported with preserved git history as an archive. The old project has valuable reference material — architecture struggles, socket infrastructure, and lessons learned — but this is a new project with different architecture (Flutter + OpenClaw). The old code is there for reference, not reuse.
