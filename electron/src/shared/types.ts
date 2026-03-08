@@ -112,6 +112,11 @@ export type ActionId =
   | 'analyze-competitors'
   | 'blue-ocean'
   | 'scrape-competitor'
+  | 'view-social-feeds'
+  | 'social-feed-hourly'
+  | 'social-feed-daily'
+  | 'social-feed-weekly'
+  | 'toggle-heartbeat'
   | 'build-pipeline'
   | 'run-pipeline'
   | 'view-logs';

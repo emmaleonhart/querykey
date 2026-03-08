@@ -64,6 +64,73 @@ export async function handleAction(action: string): Promise<void> {
     return;
   }
 
+  // Social feed actions
+  if (action === 'view-social-feeds') {
+    sendUserMessage(
+      'Show me the latest social feeds for Accelerate Okanagan - ' +
+      'recent tweets and Google reviews.',
+    );
+    sendToBackend({
+      type: 'message',
+      content: 'Show social feeds',
+      context: { handler: 'social_feeds' },
+      history: chat.getHistory().slice(-20),
+    });
+    return;
+  }
+
+  if (action === 'social-feed-hourly') {
+    sendUserMessage(
+      'Generate an hourly pulse check from the social feeds.',
+    );
+    sendToBackend({
+      type: 'message',
+      content: 'Show hourly report',
+      context: { handler: 'social_feeds' },
+      history: chat.getHistory().slice(-20),
+    });
+    return;
+  }
+
+  if (action === 'social-feed-daily') {
+    sendUserMessage(
+      'Generate a daily market analysis report from the social feeds.',
+    );
+    sendToBackend({
+      type: 'message',
+      content: 'Show daily report',
+      context: { handler: 'social_feeds' },
+      history: chat.getHistory().slice(-20),
+    });
+    return;
+  }
+
+  if (action === 'social-feed-weekly') {
+    sendUserMessage(
+      'Generate a weekly strategic digest from the social feeds.',
+    );
+    sendToBackend({
+      type: 'message',
+      content: 'Show weekly report',
+      context: { handler: 'social_feeds' },
+      history: chat.getHistory().slice(-20),
+    });
+    return;
+  }
+
+  if (action === 'toggle-heartbeat') {
+    sendUserMessage(
+      'Start all heartbeat monitors (hourly, daily, and weekly).',
+    );
+    sendToBackend({
+      type: 'message',
+      content: 'Start heartbeat all',
+      context: { handler: 'social_feeds' },
+      history: chat.getHistory().slice(-20),
+    });
+    return;
+  }
+
   if (action === 'scrape-competitor') {
     sendUserMessage(
       'I want to scout a specific competitor. ' +
