@@ -1,0 +1,59 @@
+DRAFT 1 - Cold outreach to tech bloggers
+=========================================
+Subject: Secretary Bird Assistant - would love your honest review
+
+Hi [NAME],
+
+I came across your blog/channel and really enjoy your content on [TOPIC]. I'm reaching out because we just launched Secretary Bird Assistant - a desktop business tool that handles file organization, spreadsheet error checking, and competitor analysis using Blue Ocean Strategy.
+
+We'd love to send you a free Pro license in exchange for an honest review. No strings attached - if you hate it, say so!
+
+Would you be interested?
+
+Best,
+Emma
+
+
+DRAFT 2 - Follow up template
+=========================================
+Subject: Re: Secretary Bird Assistant - quick follow up
+
+Hi [NAME],
+
+Just wanted to follow up on my previous email about Secretary Bird Assistant. Totally understand if it's not a fit - just didn't want the email to get buried!
+
+Happy to jump on a quick 10-min call to demo the tool if that's easier.
+
+Thanks,
+Emma
+
+
+DRAFT 3 - Partnership proposal (for bigger influencers)
+=========================================
+Subject: Partnership opportunity - Secretary Bird x [INFLUENCER]
+
+Hi [NAME],
+
+Big fan of your work, especially [SPECIFIC CONTENT].
+
+I'm Emma from Secretary Bird Assistant. We're building a business data tool that [DESCRIPTION].
+
+We'd love to explore a partnership:
+- Sponsored video/post featuring Secretary Bird
+- Exclusive discount code for your audience
+- Revenue share on conversions (negotiable)
+
+Our budget is flexible for the right creator. Would love to chat!
+
+Best,
+Emma Leonhart
+Secretary Bird Assistant
+
+---
+
+NOTES TO SELF:
+- personalize each one DONT just copy paste
+- check their recent content before sending
+- dont email on mondays (low open rates)
+- follow up after 5 business days, not 3
+- track everything in influencer_outreach_tracker.csv

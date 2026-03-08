@@ -1,0 +1,100 @@
+{
+  "name": "tojo-assistant",
+  "version": "1.0.0",
+  "description": "Secretary Bird business assistant powered by OpenClaw",
+  "main": "electron/compiled/main.js",
+  "productName": "Secretary Bird Assistant",
+  "author": {
+    "name": "Team Secretary Bird",
+    "email": "hackathon@tojo-assistant.dev"
+  },
+  "license": "MIT",
+  "scripts": {
+    "compile": "node scripts/build.js",
+    "compile:prod": "node scripts/build.js --production",
+    "start": "npm run compile && electron .",
+    "dev": "npm run compile && electron . --dev",
+    "build": "npm run compile:prod && electron-builder build --win",
+    "test:backend": "pytest tests/ -v",
+    "test:frontend": "vitest run",
+    "test": "vitest run",
+    "package": "npm run compile:prod && electron-builder build --win --publish never",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.5",
+    "@vitest/coverage-v8": "^4.0.18",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.13.3",
+    "esbuild": "^0.27.3",
+    "happy-dom": "^20.8.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "build": {
+    "appId": "dev.tojo-assistant.app",
+    "productName": "Secretary Bird Assistant",
+    "copyright": "Copyright 2026 Team Secretary Bird",
+    "directories": {
+      "output": "dist",
+      "buildResources": "installer"
+    },
+    "files": [
+      "electron/compiled/**/*",
+      "electron/renderer/**/*",
+      "assets/**/*",
+      "!**/__pycache__",
+      "!**/node_modules"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/backend/tojo-backend",
+        "to": "backend/tojo-backend",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "backend",
+        "to": "backend-src",
+        "filter": [
+          "**/*.py",
+          "!__pycache__"
+        ]
+      },
+      {
+        "from": "assets",
+        "to": "assets"
+      },
+      {
+        "from": "requirements.txt",
+        "to": "requirements.txt"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/tojo-avatar.ico",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/tojo-avatar.ico",
+      "uninstallerIcon": "assets/tojo-avatar.ico",
+      "installerHeaderIcon": "assets/tojo-avatar.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Secretary Bird Assistant",
+      "installerSidebar": null,
+      "license": null
+    }
+  }
+}
