@@ -2,11 +2,20 @@
 
 A real-time knowledge graph and task extraction system that takes in messy, unstructured communication — Discord chatlogs, screenshots, voice notes, recorded conversations, pasted text, bot feeds — and extracts structured tasks, assignments, and contradictions from it.
 
-**We don't impose structure. We extract it from the chaos that already exists.**
+**The secretarybird is here to serve you. You don't serve it.**
 
 Small businesses run on informal communication. Tasks get assigned over Discord, in hallway conversations, through voice messages, across group chats. Secretarybird watches all of it and builds a living task board without asking anyone to change how they work.
 
 Built with **Flutter** (mobile, desktop, web). Analysis powered by **OpenClaw**.
+
+## Philosophy
+
+Tools like Jira, Git, and Azure DevOps often become performative work — people spend more time maintaining the tool than doing the actual work. Status updates become theater. Ticket grooming becomes a job in itself.
+
+Secretarybird takes the opposite approach:
+- **The tool serves you, not the other way around.** You never need to fill out a form, file a ticket, or update a status. The system figures it out from your actual communication.
+- **We connect to existing tools, not replace them.** Secretarybird integrates with Git, Jira, Azure DevOps, and other project management tools. It can sync extracted tasks into those systems so teams that need formal tracking get it automatically — without anyone manually entering data.
+- **We are not a no-code solution. We are an "AI writes the code" solution.** The system doesn't give you drag-and-drop workflow builders. It uses AI to do the actual hard work — parsing unstructured input, resolving entities, detecting contradictions, writing the integrations. The intelligence is in the AI, not in a visual editor.
 
 ## The Problem
 
