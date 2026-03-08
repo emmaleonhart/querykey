@@ -74,7 +74,8 @@
       "Bash(python:*)",
       "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && npm run build:ts 2>&1)",
       "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && node scripts/build.js --production 2>&1)",
-      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && find . -name \"*.md\" -type f | grep -v dist | xargs grep -l \"socket\\\\|busy\\\\|EADDRINUSE\" 2>/dev/null)"
+      "Bash(cd /c/Users/Immanuelle/Documents/Github/tojo-assistant && find . -name \"*.md\" -type f | grep -v dist | xargs grep -l \"socket\\\\|busy\\\\|EADDRINUSE\" 2>/dev/null)",
+      "Bash(find /c/Users/Immanuelle/.openclaw -type f 2>/dev/null | xargs file 2>/dev/null)"
     ]
   }
 }
