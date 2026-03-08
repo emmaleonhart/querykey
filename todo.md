@@ -2,7 +2,20 @@
 
 ## Core Behavior
 
-The bot actively DMs people and asks them things like **"what do you think you are expected to do today?"** It surfaces ambiguities, contradictions, and unconfirmed tasks — then asks the relevant people directly. It doesn't need to be perfectly correct. Everything it extracts shows a **confidence/certainty indicator** so people know what the AI is sure about vs guessing at.
+The bot DMs every person on Discord individually and asks them what they think they're doing that day / over that time period with the project. It surfaces ambiguities, contradictions, and unconfirmed tasks — then asks the relevant people directly. It doesn't need to be perfectly correct. Everything it extracts shows a **confidence/certainty indicator** so people know what the AI is sure about vs guessing at.
+
+### Anti-Policing Principle
+
+**This tool is NOT for policing whether people know what they're supposed to be doing.** The purpose is to get everyone on the same page and have it so that everyone can look at and verify what they need. It is a coordination tool, not a surveillance tool. If someone uses it to catch people out or micromanage, they are misusing it. The design should make this kind of misuse difficult and obvious.
+
+### Open Questions System
+
+Each team member has a queue of **open questions** the bot is trying to get resolved. These are things the system needs clarity on — contradictions, ambiguities, unconfirmed assignments, etc.
+
+- Questions have **urgency levels**: "needs to be known by 8 AM", "needs to be known by end of day", "needs to be known ASAP", "whenever you get to it"
+- People can open the app and see all their pending questions and resolve them at their own pace
+- The bot will attempt to get answers via DM on a schedule based on urgency
+- Questions that get resolved (by anyone, on any platform) disappear from the queue
 
 ## Platform Targets
 
@@ -62,6 +75,10 @@ People have **real accounts** on Secretarybird. This is not just a manager tool 
 - [ ] **Conflict** entity — contradictory_tasks, reassignment, deadline_change, scope_change
 - [ ] **Instruction** entity — broader than Task, any directive
 - [ ] **FollowUp** entity — outbound AI questions to team members
+- [ ] **OpenQuestion** entity — per-person queue of things the system needs resolved
+  - Urgency levels: "asap", "by [specific time]", "end of day", "whenever"
+  - Visible in-app as a list the person can work through
+  - Resolved by anyone on any platform → disappears from queue
 - [ ] **VoiceProfile** entity — speaker embeddings for voice recognition
 - [ ] **ExternalSync** entity — tracking tasks pushed to Jira/Azure DevOps/GitHub/etc.
 - [ ] **Context** entity — inferred or user-provided context labels ("Monday standup", "client call", "sprint planning")
@@ -162,16 +179,24 @@ The Discord bot is the primary external interaction surface. First integration t
 
 ## Phase 6 — Conversational Agent (The Secretary)
 
-- [ ] **Proactive daily check-ins** — asks people "what do you think you're expected to do today?" and similar
-- [ ] **Follow-up engine** — detect contradictions, ambiguities, missed deadlines → generate follow-ups
+- [ ] **Proactive daily check-ins** — DMs every person individually on Discord asking what they think they're doing that day with the project
+- [ ] **Open questions queue** — each person has a visible list of things the system needs answered
+  - Urgency levels determine when/how aggressively the bot asks
+  - "ASAP" → bot DMs you right now
+  - "By 8 AM" → bot makes sure to ask before 8 AM
+  - "End of day" → included in daily check-in
+  - "Whenever" → sits in your queue, bot mentions it occasionally
+  - Person can open the app and resolve questions proactively without waiting for a DM
+- [ ] **Follow-up engine** — detect contradictions, ambiguities, missed deadlines → generate open questions
 - [ ] **Outbound messaging** — send follow-ups via in-app DM first, then Discord, WhatsApp, Instagram, Slack, SMS
-- [ ] **Response handling** — record answers, update knowledge graph, resolve conflicts
+- [ ] **Response handling** — record answers, update knowledge graph, resolve open questions
 - [ ] **Epistemic humility** — confidence scores on everything, ask when unsure
   - ~75% correct from data alone
   - ~20% catches own mistakes via follow-up
   - ~5% genuinely wrong
 - [ ] **Transparency** — all AI work is visible and auditable, nothing hidden
 - [ ] **Contextual answers** — "What is John working on?" answered from knowledge graph, or ask John if unsure
+- [ ] **Anti-policing guardrails** — system is for coordination, not surveillance. Design should make micromanagement misuse difficult and obvious.
 
 ## Phase 7 — Team Member Tracking
 
