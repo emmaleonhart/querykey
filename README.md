@@ -68,15 +68,15 @@ The core design principle is that **any form of input works**. Users should neve
 
 | Input Type | How It Works |
 |---|---|
-| Discord bot | Real-time message streaming from monitored channels |
+| **Discord bot** (top priority) | Reads all server messages, DMs people with questions, receives replies. Hourly batch processing by default. |
+| Slack bot | Same model as Discord, for Slack workspaces |
 | Pasted Discord chatlogs | Copy-paste a conversation, AI parses it |
 | Screenshots | Paste or upload a screenshot of a conversation, OCR + AI extracts content |
 | Voice notes | Record a voice memo explaining what someone told you |
 | Recorded conversations | Phone app records meetings/calls, streams audio for transcription |
 | Pasted text | Any freeform text — email forwards, notes, whatever |
-| Slack bot | Real-time message streaming from monitored workspaces |
 
-A Discord bot recording a channel in real time and a user pasting a screenshot of that same channel are equally valid inputs. The system normalizes everything.
+The Discord bot is the primary interaction surface for many users. It DMs you, you reply. No app install required for basic interaction. The Flutter app adds richer features (task boards, calendars, audio recording) on top.
 
 ## System Architecture
 
