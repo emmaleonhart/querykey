@@ -79,13 +79,39 @@ export async function handleAction(action: string): Promise<void> {
     return;
   }
 
-  if (action === 'social-feed-report') {
+  if (action === 'social-feed-hourly') {
+    sendUserMessage(
+      'Generate an hourly pulse check from the social feeds.',
+    );
+    sendToBackend({
+      type: 'message',
+      content: 'Show hourly report',
+      context: { handler: 'social_feeds' },
+      history: chat.getHistory().slice(-20),
+    });
+    return;
+  }
+
+  if (action === 'social-feed-daily') {
     sendUserMessage(
       'Generate a daily market analysis report from the social feeds.',
     );
     sendToBackend({
       type: 'message',
-      content: 'Show report',
+      content: 'Show daily report',
+      context: { handler: 'social_feeds' },
+      history: chat.getHistory().slice(-20),
+    });
+    return;
+  }
+
+  if (action === 'social-feed-weekly') {
+    sendUserMessage(
+      'Generate a weekly strategic digest from the social feeds.',
+    );
+    sendToBackend({
+      type: 'message',
+      content: 'Show weekly report',
       context: { handler: 'social_feeds' },
       history: chat.getHistory().slice(-20),
     });
@@ -94,11 +120,11 @@ export async function handleAction(action: string): Promise<void> {
 
   if (action === 'toggle-heartbeat') {
     sendUserMessage(
-      'Toggle the heartbeat monitor for daily automated social feed analysis.',
+      'Start all heartbeat monitors (hourly, daily, and weekly).',
     );
     sendToBackend({
       type: 'message',
-      content: 'Toggle heartbeat',
+      content: 'Start heartbeat all',
       context: { handler: 'social_feeds' },
       history: chat.getHistory().slice(-20),
     });

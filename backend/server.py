@@ -427,9 +427,14 @@ async def _handle_social_feeds_chat(message: str, context: dict) -> str:
 # ---------------------------------------------------------------------------
 # Social Feed Monitoring Endpoints
 # ---------------------------------------------------------------------------
+class SocialFeedReportRequest(BaseModel):
+    """Request body for report generation."""
+    cadence: str = "daily"  # hourly | daily | weekly
+
+
 class SocialFeedHeartbeatRequest(BaseModel):
     """Request body for heartbeat control."""
-    interval_seconds: int = 86400
+    cadence: str = "daily"  # hourly | daily | weekly
 
 
 @app.post("/api/social-feeds/fetch", tags=["social-feeds"])
@@ -455,13 +460,15 @@ async def get_social_feed_data() -> JSONResponse:
 
 
 @app.post("/api/social-feeds/report", tags=["social-feeds"])
-async def generate_social_feed_report() -> JSONResponse:
-    """Generate a daily market analysis report from current feed data."""
+async def generate_social_feed_report(req: SocialFeedReportRequest) -> JSONResponse:
+    """Generate a market analysis report at the specified cadence (hourly/daily/weekly)."""
     try:
         monitor: SocialFeedMonitor = _state["social_feed_monitor"]
         snapshot = await monitor.fetch_feeds()
-        report = monitor.generate_report(snapshot)
+        report = monitor.generate_report(req.cadence, snapshot)
         return JSONResponse(content=report.to_dict())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -475,34 +482,42 @@ async def list_social_feed_reports() -> JSONResponse:
 
 @app.post("/api/social-feeds/heartbeat/start", tags=["social-feeds"])
 async def start_heartbeat(req: SocialFeedHeartbeatRequest) -> JSONResponse:
-    """Start the heartbeat scheduler for automated daily monitoring."""
+    """Start a heartbeat scheduler for the specified cadence (hourly/daily/weekly)."""
     monitor: SocialFeedMonitor = _state["social_feed_monitor"]
-    started = monitor.start_heartbeat(req.interval_seconds)
+    try:
+        started = monitor.start_heartbeat(req.cadence)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return JSONResponse(content={
         "started": started,
-        "interval_seconds": req.interval_seconds,
-        "message": "Heartbeat started" if started else "Heartbeat already running",
+        "cadence": req.cadence,
+        "message": f"Heartbeat [{req.cadence}] started" if started else f"Heartbeat [{req.cadence}] already running",
+        "all_heartbeats": monitor.heartbeat_status(),
     })
 
 
 @app.post("/api/social-feeds/heartbeat/stop", tags=["social-feeds"])
-async def stop_heartbeat() -> JSONResponse:
-    """Stop the heartbeat scheduler."""
+async def stop_heartbeat(req: Optional[SocialFeedHeartbeatRequest] = None) -> JSONResponse:
+    """Stop heartbeat scheduler(s). Pass cadence to stop one, or omit to stop all."""
     monitor: SocialFeedMonitor = _state["social_feed_monitor"]
-    stopped = monitor.stop_heartbeat()
+    cadence = req.cadence if req else None
+    stopped = monitor.stop_heartbeat(cadence)
     return JSONResponse(content={
         "stopped": stopped,
+        "cadence": cadence or "all",
         "message": "Heartbeat stopped" if stopped else "Heartbeat was not running",
+        "all_heartbeats": monitor.heartbeat_status(),
     })
 
 
 @app.get("/api/social-feeds/heartbeat/status", tags=["social-feeds"])
 async def heartbeat_status() -> JSONResponse:
-    """Check heartbeat scheduler status."""
+    """Check heartbeat scheduler status for all cadences."""
     monitor: SocialFeedMonitor = _state["social_feed_monitor"]
     return JSONResponse(content={
         "active": monitor.heartbeat_active,
         "company": monitor.company,
+        "heartbeats": monitor.heartbeat_status(),
     })
 
 
