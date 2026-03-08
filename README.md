@@ -135,4 +135,4 @@ The Discord bot is the primary interaction surface for many users. It DMs you, y
 
 ## `/secretarybird-old`
 
-The `secretarybird-old/` directory contains the full history of the original secretarybird project (Electron-based, previously called tojo-assistant). It was imported with preserved git history as an archive. The old project has valuable reference material — architecture struggles, socket infrastructure, and lessons learned — but this is a new project with different architecture (Flutter + OpenClaw). The old code is there for reference, not reuse.
+The `secretarybird-old/` directory contains the full history of the original secretarybird project (Electron-based, previously called tojo-assistant). It was imported with preserved git history as an archive. This is a new project with different frontend architecture (Flutter instead of Electron), but some of the old work is directly relevant — particularly the backend OpenClaw integration and the socket communication issues with WSL, which will likely recur in Flutter just as they did in Electron. The old code is reference material, but the backend/OpenClaw pieces are important to keep in mind.
