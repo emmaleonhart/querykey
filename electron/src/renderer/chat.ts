@@ -144,7 +144,6 @@ export function clearChat(onQuickActionsBound: () => void): void {
         <button class="quick-action-btn" data-action="check-spreadsheet">Check a spreadsheet</button>
         <button class="quick-action-btn" data-action="analyze-data">Analyze data</button>
         <button class="quick-action-btn" data-action="analyze-competitors">Analyze competitors</button>
-        <button class="quick-action-btn" data-action="build-pipeline">Build a pipeline</button>
       </div>
     </div>
   `;

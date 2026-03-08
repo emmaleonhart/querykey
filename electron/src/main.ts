@@ -12,6 +12,11 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as http from 'http';
 import { spawn, execSync, ChildProcess } from 'child_process';
+
+// Shared HTTP agent with keep-alive to avoid socket exhaustion / TIME_WAIT buildup.
+// Without this, every health check creates a new TCP socket that lingers in TIME_WAIT
+// for 2-4 minutes on Windows, eventually blocking ports 8000 and 18789.
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 4 });
 import { IPC_CHANNELS, BackendStatus, FileDialogOptions, OpenClawStatus } from './shared/types';
 
 // ── Paths ──────────────────────────────────────────────────────────────────────
@@ -79,7 +84,8 @@ function handleBackendOutput(data: Buffer): void {
 async function startBackend(): Promise<void> {
   // Check if backend is already running (stale process or external)
   const alreadyRunning = await new Promise<boolean>((resolve) => {
-    const req = http.get('http://127.0.0.1:8000/health', (res) => {
+    const req = http.get('http://127.0.0.1:8000/health', { agent: httpAgent }, (res) => {
+      res.resume(); // drain response to free socket back to pool
       resolve(res.statusCode === 200);
     });
     req.on('error', () => resolve(false));
@@ -176,7 +182,8 @@ function startBackendHealthCheck(): void {
       return;
     }
 
-    const req = http.get('http://127.0.0.1:8000/health', (res) => {
+    const req = http.get('http://127.0.0.1:8000/health', { agent: httpAgent }, (res) => {
+      res.resume(); // drain response to free socket back to pool
       if (res.statusCode === 200 && !backendReady) {
         console.log('[backend] Health check detected running backend');
         backendReady = true;
@@ -232,7 +239,8 @@ function findWSLDistro(): string | null {
 
 function isOpenClawGatewayRunning(): Promise<boolean> {
   return new Promise((resolve) => {
-    const req = http.get('http://127.0.0.1:18789/', (res) => {
+    const req = http.get('http://127.0.0.1:18789/', { agent: httpAgent }, (res) => {
+      res.resume(); // drain response to free socket back to pool
       resolve(res.statusCode === 200);
     });
     req.on('error', () => resolve(false));
@@ -532,7 +540,7 @@ function registerIPC(): void {
     }
     try {
       return await new Promise<OpenClawStatus>((resolve) => {
-        const req = http.get('http://127.0.0.1:8000/api/openclaw/status', (res) => {
+        const req = http.get('http://127.0.0.1:8000/api/openclaw/status', { agent: httpAgent }, (res) => {
           let body = '';
           res.on('data', (chunk: Buffer) => (body += chunk));
           res.on('end', () => {
@@ -632,4 +640,6 @@ app.on('before-quit', () => {
   (app as unknown as { isQuitting: boolean }).isQuitting = true;
   stopBackend();
   stopOpenClawGateway();
+  // Destroy keep-alive sockets so they don't linger in TIME_WAIT
+  httpAgent.destroy();
 });

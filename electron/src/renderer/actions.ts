@@ -22,58 +22,20 @@ const ACTION_MESSAGES: Partial<Record<ActionId, string>> = {
   'check-spreadsheet': 'Please check a spreadsheet for errors. I will select a file.',
   'analyze-data': 'I would like to analyze some data. What format is it in?',
   'export-report': 'Please export a report from the current data.',
-  'connect-salesforce': 'I would like to connect to Salesforce. Please guide me through the setup.',
-  'connect-gsheets': 'I would like to connect to Google Sheets.',
-  'connect-database': 'I would like to connect to a database. What connection details are needed?',
-  'build-pipeline': 'I would like to build a data pipeline. Please help me configure the steps.',
-  'run-pipeline': 'Please run the configured data pipeline.',
-  'view-logs': 'Show me the recent pipeline execution logs.',
+  // Integrations (disabled - not yet implemented)
+  // 'connect-salesforce': 'I would like to connect to Salesforce. Please guide me through the setup.',
+  // 'connect-gsheets': 'I would like to connect to Google Sheets.',
+  // 'connect-database': 'I would like to connect to a database. What connection details are needed?',
+  // Pipeline (disabled - not yet implemented)
+  // 'build-pipeline': 'I would like to build a data pipeline. Please help me configure the steps.',
+  // 'run-pipeline': 'Please run the configured data pipeline.',
+  // 'view-logs': 'Show me the recent pipeline execution logs.',
 };
 
 export async function handleAction(action: string): Promise<void> {
   const api = window.tojoAPI;
 
-  // File/folder pickers
-  if (action === 'select-file') {
-    if (api) {
-      const filePath = await api.selectFile();
-      if (filePath) sendUserMessage(`I selected this file: ${filePath}`);
-    }
-    return;
-  }
-
-  if (action === 'select-folder') {
-    if (api) {
-      const folderPath = await api.selectFolder();
-      if (folderPath) sendUserMessage(`I selected this folder: ${folderPath}`);
-    }
-    return;
-  }
-
-  // Actions that open a picker first
-  if (action === 'organize-files' && api) {
-    const folderPath = await api.selectFolder();
-    if (folderPath) {
-      sendUserMessage(`Please organize the files in this folder: ${folderPath}`);
-      return;
-    }
-  }
-
-  if (action === 'check-spreadsheet' && api) {
-    const filePath = await api.selectFile({
-      title: 'Select Spreadsheet',
-      filters: [
-        { name: 'Spreadsheets', extensions: ['xlsx', 'xls', 'csv'] },
-        { name: 'All Files', extensions: ['*'] },
-      ],
-    });
-    if (filePath) {
-      sendUserMessage(`Please check this spreadsheet for errors: ${filePath}`);
-      return;
-    }
-  }
-
-  // Competitor analysis actions
+  // Competitor analysis actions (Strategy - top priority)
   if (action === 'analyze-competitors') {
     sendUserMessage(
       'I would like to run a competitor analysis with Blue Ocean Strategy. ' +
@@ -114,6 +76,46 @@ export async function handleAction(action: string): Promise<void> {
       history: chat.getHistory().slice(-20),
     });
     return;
+  }
+
+  // File/folder pickers
+  if (action === 'select-file') {
+    if (api) {
+      const filePath = await api.selectFile();
+      if (filePath) sendUserMessage(`I selected this file: ${filePath}`);
+    }
+    return;
+  }
+
+  if (action === 'select-folder') {
+    if (api) {
+      const folderPath = await api.selectFolder();
+      if (folderPath) sendUserMessage(`I selected this folder: ${folderPath}`);
+    }
+    return;
+  }
+
+  // Actions that open a picker first
+  if (action === 'organize-files' && api) {
+    const folderPath = await api.selectFolder();
+    if (folderPath) {
+      sendUserMessage(`Please organize the files in this folder: ${folderPath}`);
+      return;
+    }
+  }
+
+  if (action === 'check-spreadsheet' && api) {
+    const filePath = await api.selectFile({
+      title: 'Select Spreadsheet',
+      filters: [
+        { name: 'Spreadsheets', extensions: ['xlsx', 'xls', 'csv'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    });
+    if (filePath) {
+      sendUserMessage(`Please check this spreadsheet for errors: ${filePath}`);
+      return;
+    }
   }
 
   // Default: send the mapped message
