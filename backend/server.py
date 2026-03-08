@@ -30,6 +30,7 @@ from backend.integrations.google_suite import GoogleSuiteConnector  # noqa: F401
 from backend.integrations.databases import DatabaseConnector, DatabaseConfig
 from backend.integrations.api_discovery import APIDiscovery
 from backend.integrations.competitor_analysis import CompetitorAnalysis
+from backend.integrations.social_feeds import SocialFeedMonitor
 from backend.pipeline.builder import PipelineBuilder, PipelineDefinition
 from backend.openclaw.bridge import OpenClawBridge
 
@@ -60,6 +61,7 @@ async def lifespan(app: FastAPI):
     _state["pipeline_builder"] = PipelineBuilder()
     _state["api_discovery"] = APIDiscovery()
     _state["competitor_analysis"] = CompetitorAnalysis()
+    _state["social_feed_monitor"] = SocialFeedMonitor("Accelerate Okanagan")
     _state["openclaw_bridge"] = OpenClawBridge()
     _state["active_websockets"] = set()
 
@@ -275,6 +277,8 @@ async def websocket_chat(ws: WebSocket):
                     result = await _handle_pipeline_chat(user_message, context)
                 elif handler == "competitor_analysis":
                     result = await _handle_competitor_chat(user_message, context)
+                elif handler == "social_feeds":
+                    result = await _handle_social_feeds_chat(user_message, context)
                 else:
                     # Default handler uses OpenClaw streaming when available
                     bridge: OpenClawBridge = _state.get("openclaw_bridge")
@@ -346,6 +350,7 @@ def _handle_default_chat(message: str) -> str:
         "API discovery",
         "data pipeline building",
         "competitor analysis & Blue Ocean Strategy",
+        "social feed monitoring (Twitter & Google Reviews)",
     ]
     return (
         f"I received your message: \"{message}\"\n\n"
@@ -411,6 +416,109 @@ async def _handle_competitor_chat(message: str, context: dict) -> str:
         your_company=your_company,
     )
     return analysis.format_report_text(report)
+
+
+async def _handle_social_feeds_chat(message: str, context: dict) -> str:
+    """Handle social feed monitoring requests from chat."""
+    monitor: SocialFeedMonitor = _state["social_feed_monitor"]
+    return await monitor.handle_chat(message, context)
+
+
+# ---------------------------------------------------------------------------
+# Social Feed Monitoring Endpoints
+# ---------------------------------------------------------------------------
+class SocialFeedReportRequest(BaseModel):
+    """Request body for report generation."""
+    cadence: str = "daily"  # hourly | daily | weekly
+
+
+class SocialFeedHeartbeatRequest(BaseModel):
+    """Request body for heartbeat control."""
+    cadence: str = "daily"  # hourly | daily | weekly
+
+
+@app.post("/api/social-feeds/fetch", tags=["social-feeds"])
+async def fetch_social_feeds() -> JSONResponse:
+    """Fetch latest Twitter and Google Reviews for the monitored company."""
+    try:
+        monitor: SocialFeedMonitor = _state["social_feed_monitor"]
+        snapshot = await monitor.fetch_feeds()
+        return JSONResponse(content=snapshot.to_dict())
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/social-feeds/data", tags=["social-feeds"])
+async def get_social_feed_data() -> JSONResponse:
+    """Get the most recently stored feed data."""
+    try:
+        monitor: SocialFeedMonitor = _state["social_feed_monitor"]
+        snapshot = monitor.load_feeds()
+        return JSONResponse(content=snapshot.to_dict())
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/social-feeds/report", tags=["social-feeds"])
+async def generate_social_feed_report(req: SocialFeedReportRequest) -> JSONResponse:
+    """Generate a market analysis report at the specified cadence (hourly/daily/weekly)."""
+    try:
+        monitor: SocialFeedMonitor = _state["social_feed_monitor"]
+        snapshot = await monitor.fetch_feeds()
+        report = monitor.generate_report(req.cadence, snapshot)
+        return JSONResponse(content=report.to_dict())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/social-feeds/reports", tags=["social-feeds"])
+async def list_social_feed_reports() -> JSONResponse:
+    """List all saved daily reports."""
+    monitor: SocialFeedMonitor = _state["social_feed_monitor"]
+    return JSONResponse(content={"reports": monitor.list_reports()})
+
+
+@app.post("/api/social-feeds/heartbeat/start", tags=["social-feeds"])
+async def start_heartbeat(req: SocialFeedHeartbeatRequest) -> JSONResponse:
+    """Start a heartbeat scheduler for the specified cadence (hourly/daily/weekly)."""
+    monitor: SocialFeedMonitor = _state["social_feed_monitor"]
+    try:
+        started = monitor.start_heartbeat(req.cadence)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return JSONResponse(content={
+        "started": started,
+        "cadence": req.cadence,
+        "message": f"Heartbeat [{req.cadence}] started" if started else f"Heartbeat [{req.cadence}] already running",
+        "all_heartbeats": monitor.heartbeat_status(),
+    })
+
+
+@app.post("/api/social-feeds/heartbeat/stop", tags=["social-feeds"])
+async def stop_heartbeat(req: Optional[SocialFeedHeartbeatRequest] = None) -> JSONResponse:
+    """Stop heartbeat scheduler(s). Pass cadence to stop one, or omit to stop all."""
+    monitor: SocialFeedMonitor = _state["social_feed_monitor"]
+    cadence = req.cadence if req else None
+    stopped = monitor.stop_heartbeat(cadence)
+    return JSONResponse(content={
+        "stopped": stopped,
+        "cadence": cadence or "all",
+        "message": "Heartbeat stopped" if stopped else "Heartbeat was not running",
+        "all_heartbeats": monitor.heartbeat_status(),
+    })
+
+
+@app.get("/api/social-feeds/heartbeat/status", tags=["social-feeds"])
+async def heartbeat_status() -> JSONResponse:
+    """Check heartbeat scheduler status for all cadences."""
+    monitor: SocialFeedMonitor = _state["social_feed_monitor"]
+    return JSONResponse(content={
+        "active": monitor.heartbeat_active,
+        "company": monitor.company,
+        "heartbeats": monitor.heartbeat_status(),
+    })
 
 
 # ---------------------------------------------------------------------------
