@@ -12,9 +12,9 @@ The system never asks users to change how they communicate. It meets them where 
 
 Jira, Git, Azure DevOps — these tools often become performative work. People spend more time updating tickets and writing status reports than doing the actual work. Secretarybird actively defies this pattern. Nobody should have to manually file what their boss told them to do. The AI handles it.
 
-### Anti-Policing Principle
+### We Serve You — The Mission
 
-**This tool is for coordination, not surveillance.** The purpose is to get everyone on the same page so that everyone can look at and verify what they need to do. It is NOT for policing whether people know what they're supposed to be doing. If someone uses it to catch people out or micromanage, they are misusing it. The design should make this kind of misuse difficult and obvious. Information flows to help people coordinate, not to create a paper trail for punishing them.
+The point of Secretarybird is specifically that we serve you as a secretary and conform to your workflow. The tool adapts to how you already work — it doesn't impose a new way of working on you. This means the system is for **coordination**, not surveillance. The purpose is to get everyone on the same page so that everyone can look at and verify what they need. Information flows to help people coordinate, not to create a paper trail against them.
 
 ### "AI Writes the Code" — Not No-Code
 

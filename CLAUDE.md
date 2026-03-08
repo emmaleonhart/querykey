@@ -31,7 +31,7 @@ AI secretary that ingests unstructured input (Discord chats, voice notes, screen
 - **Cross-platform identity**: Same person tracked across Discord, Slack, WhatsApp, Instagram, phone, voice — single Person entity with multiple handles.
 - **Proactive engagement**: Bot DMs every person individually on Discord, asks what they think they're doing that day.
 - **Open questions**: Each person has a queue of things the system needs answered, with urgency levels (ASAP, by [time], end of day, whenever).
-- **Anti-policing**: This is a coordination tool, NOT a surveillance tool. Design makes micromanagement misuse difficult and obvious.
+- **We serve you**: The tool conforms to your workflow, not the other way around. Coordination tool, not surveillance.
 
 # currentDate
 Today's date is 2026-03-08.

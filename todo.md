@@ -4,9 +4,9 @@
 
 The bot DMs every person on Discord individually and asks them what they think they're doing that day / over that time period with the project. It surfaces ambiguities, contradictions, and unconfirmed tasks — then asks the relevant people directly. It doesn't need to be perfectly correct. Everything it extracts shows a **confidence/certainty indicator** so people know what the AI is sure about vs guessing at.
 
-### Anti-Policing Principle
+### We Serve You — The Mission
 
-**This tool is NOT for policing whether people know what they're supposed to be doing.** The purpose is to get everyone on the same page and have it so that everyone can look at and verify what they need. It is a coordination tool, not a surveillance tool. If someone uses it to catch people out or micromanage, they are misusing it. The design should make this kind of misuse difficult and obvious.
+Secretarybird exists to serve you as a secretary and conform to your workflow. The tool adapts to how you already work. The purpose is to get everyone on the same page so that everyone can look at and verify what they need. It is a coordination tool — information flows to help people coordinate, not to create a paper trail against them.
 
 ### Open Questions System
 
