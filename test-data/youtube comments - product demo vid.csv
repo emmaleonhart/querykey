@@ -1,0 +1,16 @@
+author,comment,likes,timestamp,is_reply
+TechReviewerMax,"This is actually impressive for a v1 product. The file organizer alone is worth it.",34,2026-03-01T14:20:00Z,false
+SkepticalSally,"Another AI tool that will be dead in 6 months. Pass.",8,2026-03-01T15:02:00Z,false
+SecretaryBirdTeam,"@SkepticalSally We appreciate the skepticism! We're here to stay. Check back in 6 months 😊",12,2026-03-01T15:30:00Z,true
+ProductivityNerd,"Wait the Blue Ocean canvas auto-generates from scraped data?? That's insane",56,2026-03-01T16:45:00Z,false
+ExcelGuru2026,"The spreadsheet checker caught errors that even I missed and I've been doing Excel for 15 years. Humbling.",89,2026-03-02T09:00:00Z,false
+RandomSpammer,"FREE GIFT CARDS click my profile!!!",0,2026-03-02T03:12:00Z,false
+SmallBizOwner,"How much does this cost? Couldn't find pricing on the website",23,2026-03-02T11:30:00Z,false
+SecretaryBirdTeam,"@SmallBizOwner It's free during beta! We'll announce pricing before launch. Thanks for your interest!",15,2026-03-02T12:00:00Z,true
+LinuxUser42,"Does this work on Linux or is it Windows only?",17,2026-03-03T08:22:00Z,false
+MacBookMary,"Same question but for Mac ^",11,2026-03-03T08:45:00Z,true
+FirstTimeWatcher,"Just subscribed! This looks exactly like what my consulting firm needs",7,2026-03-03T14:00:00Z,false
+DataScienceDude,"The data processing pipeline looks basic compared to Apache Airflow but I guess this is for non-technical users",4,2026-03-04T10:15:00Z,false
+GratefulUser123,"Used this for a client project yesterday. They thought I had a whole team behind me lol. Just me and Secretary Bird",45,2026-03-05T16:30:00Z,false
+UIDesignerCritique,"Honest feedback: the UI looks like it was designed by a backend developer. Functionality is great though. Maybe hire a designer?",28,2026-03-06T11:00:00Z,false
+BotAccount99382,"great video very informative I learned a lot please check my channel for more content like this thank you",0,2026-03-06T22:44:00Z,false
