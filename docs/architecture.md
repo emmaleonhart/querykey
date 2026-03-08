@@ -2,11 +2,30 @@
 
 ## Design Philosophy
 
-**We don't impose structure. We extract it.**
+**The secretarybird is here to serve you. You don't serve it.**
 
 Small businesses communicate in messy, informal ways — and that's fine. Secretarybird accepts any form of input and makes sense of it. A pasted screenshot of a Discord conversation is just as valid as a bot monitoring that channel in real time. A voice note saying "hey, John told me to redo the invoices" is just as valid as a recorded meeting transcript.
 
 The system never asks users to change how they communicate. It meets them where they are.
+
+### Anti-Performative Work
+
+Jira, Git, Azure DevOps — these tools often become performative work. People spend more time updating tickets and writing status reports than doing the actual work. Secretarybird actively defies this pattern. Nobody should have to manually file what their boss told them to do. The AI handles it.
+
+### "AI Writes the Code" — Not No-Code
+
+This is not a no-code platform with drag-and-drop workflow builders. The intelligence lives in the AI. OpenClaw does the hard work: parsing unstructured input, resolving entities across platforms, detecting contradictions, generating structured output. The system is smart, not simple.
+
+### External Tool Integration
+
+Secretarybird connects to existing project management tools rather than replacing them:
+
+- **Git** — link extracted tasks to repos, branches, commits
+- **Jira** — sync tasks into Jira projects automatically
+- **Azure DevOps** — sync tasks into boards and work items
+- **Other PM tools** — extensible integration layer
+
+Teams that need formal tracking in these systems get it for free — populated by AI from real conversations, not by humans doing data entry.
 
 ## Two Deployable Components
 
@@ -94,6 +113,19 @@ OpenClaw is the AI analysis engine. It is separate from the Secretarybird Server
 - Store the knowledge graph (that's the Secretarybird Server)
 - Handle real-time sync (that's WebSocket on the server)
 - Manage users or permissions (that's the server)
+
+## External Tool Sync
+
+Secretarybird can push extracted tasks into existing project management systems. This is a one-way or two-way sync depending on the tool:
+
+| Tool | Sync Direction | What Syncs |
+|---|---|---|
+| **Jira** | Bi-directional | Tasks → Jira issues; Jira status changes → task updates |
+| **Azure DevOps** | Bi-directional | Tasks → work items; status changes sync back |
+| **Git** (GitHub, GitLab, etc.) | Read + link | Link tasks to repos/branches/PRs; read commit activity |
+| **Trello, Asana, etc.** | Push | Tasks → cards/tasks in those systems |
+
+The key: nobody manually creates tickets. Secretarybird extracts them from conversation and pushes them into whatever system the team already uses. If the team doesn't use any formal tool, the built-in task board is sufficient.
 
 ## Real-time Sync
 

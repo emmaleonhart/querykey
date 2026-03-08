@@ -120,6 +120,22 @@ Instruction {
 }
 ```
 
+### ExternalSync
+Tracks tasks that have been pushed to external project management tools.
+
+```
+ExternalSync {
+  id: UUID
+  task_id: Task.id
+  platform: "jira" | "azure_devops" | "github" | "gitlab" | "trello" | "asana"
+  external_id: string               // the ID in the external system (e.g., PROJ-123)
+  external_url: string              // link to the item in the external tool
+  sync_direction: "push" | "bidirectional"
+  last_synced_at: timestamp
+  status_in_external: string        // the status as reported by the external tool
+}
+```
+
 ## Graph Relationships
 
 The knowledge graph connects these entities:
@@ -136,6 +152,7 @@ Conflict --[AFFECTS]--> Task
 Instruction --[CONFLICTS_WITH]--> Instruction
 Task --[DEPENDS_ON]--> Task (optional, if detected)
 Task --[SUPERSEDED_BY]--> Task
+Task --[SYNCED_TO]--> ExternalSync (pushed to Jira, Azure DevOps, etc.)
 ```
 
 ## Contradiction Detection Logic
