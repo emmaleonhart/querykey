@@ -1,5 +1,9 @@
 # Secretarybird Pivot — Master TODO
 
+## Core Behavior
+
+The bot actively DMs people and asks them things like **"what do you think you are expected to do today?"** It surfaces ambiguities, contradictions, and unconfirmed tasks — then asks the relevant people directly. It doesn't need to be perfectly correct. Everything it extracts shows a **confidence/certainty indicator** so people know what the AI is sure about vs guessing at.
+
 ## Platform Targets
 
 Primary framework: **Flutter** (single codebase).
@@ -26,11 +30,22 @@ Current focus: **Windows Desktop**.
 - [ ] Choose and configure state management (Riverpod, Bloc, etc.)
 - [ ] Choose local database (Hive, Isar, Drift/SQLite)
 
-## Phase 1 — Core Data Model
+## Phase 1 — Accounts & Core Data Model
 
-Implements the entities from `docs/data-model.md`.
+Implements the entities from `docs/data-model.md`. Uses **Apache Jena Fuseki** as the graph/triple store (already known well). Node IDs should have **human-readable aliases** — not just opaque UUIDs.
 
-- [ ] **Person** entity — display name, handles (Discord/Slack/phone), role, preferred channel
+### User Accounts
+
+People have **real accounts** on Secretarybird. This is not just a manager tool — everyone on the team uses it.
+
+- [ ] **Account system** — users have logins on the app
+  - Initial account creation via **Discord OAuth** (since Discord bot is first)
+  - Future: create account from any platform the bot contacts you on (WhatsApp, Instagram, etc.)
+  - Goal: low friction. If the bot DMs you somewhere, you can sign up from there.
+  - People shouldn't have to go out of their way to sign up
+- [ ] **Person profile** — tracks all of a person's accounts and usernames across platforms
+  - Discord username, Slack ID, WhatsApp number, Instagram handle, phone, email, etc.
+  - Profile is the unified view of one human across all platforms
 - [ ] **Cross-platform identity resolution** — same person across Discord, Slack, phone, voice
   - Manual handle linking first
   - AI-assisted matching later
@@ -94,11 +109,23 @@ The core differentiator. Accept anything, normalize it.
 - [ ] **Recorded conversation** — streaming transcription + speaker diarization
 - [ ] **Normalization** — all inputs → common IngestItem format before AI pipeline
 
-## Phase 4 — Discord Bot (Top Priority Integration)
+## Phase 4 — In-App Messaging & Discord Bot
 
-The Discord bot is the primary interaction surface for many users. First integration to build.
+### App-Internal DM System
+
+The app has its own built-in messaging system between the bot and each user. This is the **primary** channel.
+
+- [ ] **In-app conversation view** — chat thread between you and the bot within the app
+- [ ] **Unified inbox** — see all your conversations with the bot regardless of which platform the message came from (app, Discord, WhatsApp, etc.) in one threaded view
+- [ ] **Multi-channel delivery** — when the bot needs to reach you, it tries the app first, then falls back to Discord, then other platforms. Tries multiple ways to contact you.
+- [ ] **Response aggregation** — your reply from any platform shows up in the same conversation in the app
+
+### Discord Bot (Top Priority External Integration)
+
+The Discord bot is the primary external interaction surface. First integration to build.
 
 - [ ] **Bot setup** — Discord bot application, permissions, OAuth
+- [ ] **Account creation via Discord** — replying to the bot or interacting with it can create your Secretarybird account
 - [ ] **Channel monitoring** — read every message in monitored channels
 - [ ] **DM interaction** — bot DMs people with follow-up questions, task confirmations, contradiction alerts
   - People reply to DMs → responses recorded as follow-up answers
@@ -110,15 +137,24 @@ The Discord bot is the primary interaction surface for many users. First integra
 - [ ] **Multi-person DMs** — can DM multiple people simultaneously about different things
 - [ ] **Server → knowledge graph** — parsed messages feed into the knowledge graph
 
+### Future Messaging Platforms
+
+- [ ] **WhatsApp** — bot DMs people via WhatsApp Business API
+- [ ] **Instagram** — bot DMs people via Instagram DM API
+- [ ] **Slack** — same model as Discord
+- [ ] Any platform the bot messages you on → you can create an account from there
+
 ## Phase 5 — Calendar & Scheduling
 
-- [ ] **Calendar view** in Flutter app
+- [ ] **Calendar view** in Flutter app — shows all tasks and events in the UI
 - [ ] **Task vs Event distinction** in the UI
   - Tasks: shown as items with optional deadlines, can be reordered/moved freely
   - Events: shown as time blocks on the calendar, fixed in time
   - Visual distinction between the two
-- [ ] **Followable calendars** — subscribable calendars generated from extracted deadlines and events
-  - Team members can subscribe and see AI-extracted schedule update in real time
+  - **Confidence indicators** — every extracted task/event shows how certain the AI is
+- [ ] **Subscribable iCal feed** — standard .ics calendar that any calendar app (Google Calendar, Outlook, Apple Calendar) can subscribe to
+  - Updates in real time as the AI extracts new events and deadlines
+  - Per-person calendar feeds
 - [ ] **Proactive reminders** — notifications before deadlines hit
 - [ ] **Scheduled check-ins** — periodic "how's X going?" messages
 - [ ] **Deadline extraction** — AI pulls dates/times from unstructured input and creates events or task deadlines
@@ -126,8 +162,9 @@ The Discord bot is the primary interaction surface for many users. First integra
 
 ## Phase 6 — Conversational Agent (The Secretary)
 
+- [ ] **Proactive daily check-ins** — asks people "what do you think you're expected to do today?" and similar
 - [ ] **Follow-up engine** — detect contradictions, ambiguities, missed deadlines → generate follow-ups
-- [ ] **Outbound messaging** — send follow-ups via Discord DM, app push, Slack DM, SMS
+- [ ] **Outbound messaging** — send follow-ups via in-app DM first, then Discord, WhatsApp, Instagram, Slack, SMS
 - [ ] **Response handling** — record answers, update knowledge graph, resolve conflicts
 - [ ] **Epistemic humility** — confidence scores on everything, ask when unsure
   - ~75% correct from data alone
@@ -138,11 +175,12 @@ The Discord bot is the primary interaction surface for many users. First integra
 
 ## Phase 7 — Team Member Tracking
 
-- [ ] **Person management UI** — add/edit team members
-- [ ] **Cross-platform identity linking** — link Discord username, Slack ID, phone number, email to one Person
-  - Same person may appear as "john_dev#1234" on Discord, "U12345" on Slack, and a voice in a meeting
+- [ ] **Person profile page** — view a person's profile showing all their linked accounts and usernames across platforms
+- [ ] **Cross-platform identity linking** — link Discord username, Slack ID, WhatsApp number, Instagram handle, phone number, email to one Person
+  - Same person may appear as "john_dev#1234" on Discord, "U12345" on Slack, "@john" on Instagram, and a voice in a meeting
   - Manual linking first, AI-assisted matching later
 - [ ] **Preferred contact channel** — track where each person is most responsive
+- [ ] **Contact cascade** — when reaching out, try app → Discord → WhatsApp → Instagram → etc.
 - [ ] **Workload view** — what's assigned to each person, deadlines, status
 - [ ] **Voice profile enrollment** — collect voice samples for speaker identification
   - Initial samples from onboarding or manually tagged recordings
@@ -180,7 +218,7 @@ The Discord bot is the primary interaction surface for many users. First integra
 
 From `docs/architecture.md` — decisions still needed:
 
-- [ ] Graph database choice (Neo4j vs PostgreSQL vs hybrid)
+- [x] Graph store: **Apache Jena Fuseki** (decided — already well-known)
 - [ ] Speaker diarization / voice embedding model selection
 - [ ] Multi-language conversation handling
 - [ ] Privacy and data retention policies (especially audio + voice embeddings)
