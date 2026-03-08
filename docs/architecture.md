@@ -27,7 +27,7 @@ Secretarybird connects to existing project management tools rather than replacin
 
 Teams that need formal tracking in these systems get it for free — populated by AI from real conversations, not by humans doing data entry.
 
-## Two Deployable Components
+## Three Deployable Components
 
 ### 1. Secretarybird Server
 
@@ -37,6 +37,8 @@ The backend. Runs locally on a user's machine or deployed to the cloud. Handles:
 - Storing the knowledge graph
 - Real-time WebSocket sync with all connected clients
 - Coordinating with OpenClaw for AI analysis
+- Outbound messaging (dispatching follow-ups to people via Discord DM, app push, etc.)
+- Batch processing on a schedule (hourly by default)
 
 The server is where the knowledge graph lives. Clients are thin — they send data in and render the graph out.
 
@@ -44,7 +46,22 @@ The server is where the knowledge graph lives. Clients are thin — they send da
 
 **Cloud mode**: Server runs on cloud infrastructure. Good for distributed teams, always-on monitoring (Discord/Slack bots), and mobile access from anywhere.
 
-### 2. Secretarybird Mobile (Flutter App)
+### 2. Discord Bot (Top Priority)
+
+The Discord bot is the primary interaction surface for many users. It is the first integration to build.
+
+**What it does:**
+- Sits on a server and reads every message in monitored channels
+- DMs people directly with follow-up questions, task confirmations, contradiction alerts
+- Can DM multiple people simultaneously about different things
+- Receives replies to its DMs and records them as follow-up responses
+- People can also message *it* — ask it questions, give it instructions, report status
+
+**Processing model**: Not everything needs real-time processing. The bot collects messages continuously but processes them in **hourly batches** by default. This is sufficient for most teams and keeps OpenClaw costs manageable. Critical events (explicit contradictions, direct messages to the bot) can be processed immediately.
+
+**Why Discord first**: A large number of small teams and communities already live on Discord. The bot meets them where they are. No app install required for basic interaction — the bot DMs you, you reply. That's it.
+
+### 3. Secretarybird Mobile (Flutter App)
 
 Single Flutter codebase targeting:
 - **iOS** and **Android** (phone/tablet)
@@ -57,6 +74,8 @@ All platforms share the same core UI. Mobile gets additional capabilities:
 - Push notifications
 - Background audio streaming
 
+The Flutter app provides richer features than Discord alone (task boards, knowledge graph visualization, audio recording, calendars), but the Discord bot is sufficient for basic interaction.
+
 ## Unstructured Input Pipeline
 
 The core differentiator. The ingest service accepts anything and normalizes it.
@@ -65,7 +84,8 @@ The core differentiator. The ingest service accepts anything and normalizes it.
 
 | Input | Processing | Notes |
 |---|---|---|
-| **Live bot feed** (Discord/Slack) | Direct text ingestion | Real-time, structured, easiest to process |
+| **Discord bot** | Reads all channel messages, DMs people, receives replies | Top priority. Hourly batch processing, immediate for DMs to the bot |
+| **Slack bot** | Same as Discord bot but for Slack workspaces | Second priority after Discord |
 | **Pasted chatlog** | AI parses conversation format, extracts speakers + messages | Handles Discord, Slack, iMessage, WhatsApp, etc. formats |
 | **Screenshot** | OCR extracts text → AI parses as chatlog | Works for any messaging app screenshot |
 | **Voice note** | Transcription → AI processes as text | User records a note about something they were told |
