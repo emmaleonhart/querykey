@@ -1,127 +1,162 @@
 # Architecture Plan
 
-## System Components
+## Design Philosophy
 
-### 1. Flutter Frontend
+**We don't impose structure. We extract it.**
 
-Single codebase targeting mobile (iOS/Android) and desktop/web.
+Small businesses communicate in messy, informal ways — and that's fine. Secretarybird accepts any form of input and makes sense of it. A pasted screenshot of a Discord conversation is just as valid as a bot monitoring that channel in real time. A voice note saying "hey, John told me to redo the invoices" is just as valid as a recorded meeting transcript.
 
-**Mobile-specific features:**
-- Microphone access and audio recording
-- Background audio streaming to server
-- Push notifications for contradiction alerts and new task assignments
+The system never asks users to change how they communicate. It meets them where they are.
 
-**Shared features (mobile + desktop):**
-- Knowledge graph visualization (interactive node-edge view)
-- Task board view (Jira-style kanban: unassigned, assigned, in progress, done)
-- Contradiction/conflict view with side-by-side comparison of conflicting instructions
-- Feed management (connect/disconnect sources, view raw feed history)
-- Person directory (who is tracked, their assignments, workload)
+## Two Deployable Components
 
-### 2. OpenClaw Backend
+### 1. Secretarybird Server
 
-The server handles all heavy processing. The Flutter app is a thin client that streams data and renders the graph.
+The backend. Runs locally on a user's machine or deployed to the cloud. Handles:
 
-#### 2.1 Ingest Service
+- Ingesting and normalizing all input (text, audio, images)
+- Storing the knowledge graph
+- Real-time WebSocket sync with all connected clients
+- Coordinating with OpenClaw for AI analysis
 
-Responsible for connecting to external communication sources and normalizing incoming messages into a common format.
+The server is where the knowledge graph lives. Clients are thin — they send data in and render the graph out.
 
-**Common message format:**
+**Local mode**: Server runs on the user's machine. Good for privacy-sensitive environments, solo use, or small teams that want to keep everything on-premise.
+
+**Cloud mode**: Server runs on cloud infrastructure. Good for distributed teams, always-on monitoring (Discord/Slack bots), and mobile access from anywhere.
+
+### 2. Secretarybird Mobile (Flutter App)
+
+Single Flutter codebase targeting:
+- **iOS** and **Android** (phone/tablet)
+- **Desktop** (macOS, Windows, Linux)
+- **Web**
+
+All platforms share the same core UI. Mobile gets additional capabilities:
+- Microphone recording (meetings, conversations)
+- Voice note capture
+- Push notifications
+- Background audio streaming
+
+## Unstructured Input Pipeline
+
+The core differentiator. The ingest service accepts anything and normalizes it.
+
+### Input Types
+
+| Input | Processing | Notes |
+|---|---|---|
+| **Live bot feed** (Discord/Slack) | Direct text ingestion | Real-time, structured, easiest to process |
+| **Pasted chatlog** | AI parses conversation format, extracts speakers + messages | Handles Discord, Slack, iMessage, WhatsApp, etc. formats |
+| **Screenshot** | OCR extracts text → AI parses as chatlog | Works for any messaging app screenshot |
+| **Voice note** | Transcription → AI processes as text | User records a note about something they were told |
+| **Recorded conversation** | Streaming transcription + speaker diarization | Phone app streams audio chunks to server |
+| **Pasted freeform text** | AI extracts whatever structure exists | Email forwards, meeting notes, anything |
+
+### Normalization
+
+All inputs get normalized into a common internal format before hitting the AI pipeline:
+
 ```
-{
-  "source": "discord" | "slack" | "audio" | "paste" | "social",
-  "channel": string,        // channel/thread/meeting identifier
-  "author": string,          // who said it
-  "timestamp": ISO 8601,
-  "content": string,         // raw text (or transcription for audio)
-  "raw_metadata": object     // source-specific metadata
+IngestItem {
+  id: UUID
+  input_type: "bot_feed" | "chatlog_paste" | "screenshot" | "voice_note" | "recorded_audio" | "freeform_text"
+  raw_content: bytes | string       // the original input
+  extracted_messages: [              // AI-extracted after processing
+    {
+      speaker: string               // best-effort speaker identification
+      content: string               // what was said
+      timestamp: timestamp | null   // if determinable
+    }
+  ]
+  submitted_by: User.id             // who submitted this input
+  submitted_at: timestamp
+  source_context: string            // user-provided context ("this is from our Monday standup")
 }
 ```
 
-**Source adapters:**
+The key insight: bot feeds produce `extracted_messages` directly (structured input). Everything else goes through AI extraction first (unstructured → structured). But once normalized, the downstream pipeline treats them identically.
 
-| Adapter | Connection Method | Notes |
-|---|---|---|
-| Discord | Discord bot via gateway websocket | Monitors configured servers/channels |
-| Slack | Slack app via Events API | Monitors configured workspaces/channels |
-| Audio | WebSocket stream from phone app | Raw audio → server-side transcription |
-| Paste | REST endpoint | User pastes text, server processes it |
-| Social | Polling or API integration | Platform-dependent |
+## OpenClaw Integration
 
-#### 2.2 AI Pipeline
+OpenClaw is the AI analysis engine. It is separate from the Secretarybird Server. The server sends normalized data to OpenClaw and receives structured analysis back.
 
-Processes normalized messages through a series of LLM-based analysis steps:
+**What OpenClaw does:**
+- Entity extraction (people, projects, deadlines)
+- Task detection (implicit and explicit assignments)
+- Attribution (who assigned what to whom)
+- Contradiction detection (compare against existing graph state)
+- Ambiguity scoring (how vague is this instruction)
+- Chatlog parsing (turn raw pasted text into structured messages)
+- OCR text interpretation (make sense of screenshot extractions)
 
-1. **Entity extraction** — Identify people, projects, deadlines, and other named entities
-2. **Task detection** — Determine if a message contains an implicit or explicit task assignment
-3. **Attribution** — Who assigned the task, who is it assigned to
-4. **Contradiction detection** — Compare new tasks/instructions against existing graph state to flag conflicts
-5. **Ambiguity scoring** — Rate how vague or unclear an instruction is
+**What OpenClaw does NOT do:**
+- Store the knowledge graph (that's the Secretarybird Server)
+- Handle real-time sync (that's WebSocket on the server)
+- Manage users or permissions (that's the server)
 
-This pipeline runs on every incoming message (or batch of messages for paste/social). It updates the knowledge graph with new nodes/edges or flags conflicts.
+## Real-time Sync
 
-#### 2.3 Knowledge Graph Store
+WebSocket connections between Secretarybird Server and all connected Flutter clients.
 
-The core data structure. Stores:
+Flow:
+1. New input arrives (bot message, pasted text, audio chunk, etc.)
+2. Server normalizes the input
+3. Server sends to OpenClaw for analysis
+4. OpenClaw returns extracted entities, tasks, contradictions
+5. Server updates the knowledge graph
+6. Server computes a graph diff
+7. Diff is broadcast to all connected clients via WebSocket
+8. Clients apply the diff to their local graph view
 
-- **People** — team members, their roles, communication handles across platforms
-- **Tasks** — extracted assignments with status, assignee, source message, deadline
-- **Instructions** — raw directives that may or may not be tasks
-- **Relationships** — who assigned what to whom, which messages relate to which tasks
-- **Conflicts** — pairs of contradictory instructions with explanation of the contradiction
-- **Timeline** — full history of graph mutations for audit trail
+For audio streaming, the flow is continuous — audio chunks stream in, transcription happens incrementally, and the graph updates as new content is recognized.
 
-**Storage options to evaluate:**
-- Neo4j (native graph DB, good for traversal queries)
-- PostgreSQL with JSONB + recursive CTEs (simpler ops, good enough for most graph queries)
-- A hybrid approach (relational for tasks/people, graph DB for relationship traversal)
-
-#### 2.4 Real-time Sync
-
-WebSocket connections between server and all connected Flutter clients. When the graph updates:
-
-1. Server processes new message through AI pipeline
-2. Graph store is updated
-3. Diff is broadcast to all connected clients via WebSocket
-4. Clients update their local graph view in real time
-
-### 3. Audio Pipeline (Detail)
-
-The phone app's audio recording feature is one of the most complex subsystems.
+## Audio Pipeline
 
 ```
-Phone mic → local audio buffer → WebSocket stream → Server
-                                                      │
-                                          ┌───────────┴───────────┐
-                                          │ Transcription Service │
-                                          │ (Whisper / equivalent)│
-                                          └───────────┬───────────┘
-                                                      │
-                                              Normalized text
-                                                      │
-                                              AI Pipeline
-                                                      │
-                                              Graph Update
+Phone mic
+    │
+    ▼
+Local audio buffer (Flutter app)
+    │
+    ▼ WebSocket stream (audio chunks)
+    │
+Secretarybird Server
+    │
+    ├─→ Transcription service (Whisper or equivalent)
+    │       │
+    │       ▼
+    │   Raw transcript with speaker segments
+    │       │
+    │       ▼
+    ├─→ OpenClaw analysis
+    │       │
+    │       ▼
+    │   Extracted tasks, entities, contradictions
+    │       │
+    │       ▼
+    └─→ Knowledge graph update → WebSocket broadcast
 ```
 
-**Considerations:**
-- Audio should be streamed in chunks, not recorded and uploaded as a whole file
-- Server-side VAD (voice activity detection) to segment speakers
-- Speaker diarization to attribute statements to specific people
-- Transcription must be near real-time for the live graph update experience
-- Privacy: need clear user consent model; audio can be discarded after transcription or retained per policy
+Voice notes follow a simpler path: record → upload → transcribe → analyze. No streaming needed.
 
-## Deployment
+**Speaker diarization**: For recorded conversations, the system needs to identify who is speaking. This is hard but important for attribution. Initial approach can be manual tagging ("that was John") with AI-assisted suggestions over time.
 
-- Backend runs on OpenClaw infrastructure
-- Flutter app distributed via app stores (mobile) and as a web/desktop app
-- Graph data lives server-side; clients cache a local subset for offline viewing
+## Deployment Options
+
+| Mode | Server Location | Bot Monitoring | Best For |
+|---|---|---|---|
+| **Local** | User's machine | Only while running | Solo users, privacy-first, small teams |
+| **Cloud** | Cloud VM/container | Always-on | Distributed teams, 24/7 Discord/Slack monitoring |
+| **Hybrid** | Cloud server, local processing | Always-on | Teams that want always-on but sensitive data stays local |
 
 ## Open Questions
 
-- Exact graph database choice
+- Exact graph database choice (Neo4j vs PostgreSQL vs hybrid)
 - Speaker diarization model/service selection
 - How to handle multi-language conversations
-- Privacy and data retention policy details
-- Rate limiting / cost management for LLM calls on high-volume feeds
+- Privacy and data retention policies (especially for audio)
+- Rate limiting / cost management for OpenClaw calls on high-volume feeds
 - How to handle encrypted or private channels (permissions model)
+- Offline mode behavior for the Flutter app
+- How much history to port from the original secretarybird repo (socket layer is priority)
