@@ -125,6 +125,18 @@ This is the core differentiator. Secretarybird is not a passive dashboard — it
 
 The best way to know what someone thinks they're supposed to do is to ask them. No amount of passive monitoring replaces a direct question. A good secretary doesn't just file papers — they follow up, clarify, and make sure everyone is on the same page.
 
+### Epistemic Humility
+
+The AI is designed to be epistemically humble. It does not pretend to know things it doesn't. When extraction confidence is low, it asks rather than guesses.
+
+Expected accuracy from data feeds alone: **~75%**. The remaining ~25% breaks down as:
+- **~20%**: Wrong, but the system detects its own uncertainty and asks a clarifying question → gets to the right answer
+- **~5%**: Genuinely wrong, and doesn't catch it
+
+This is viable *because* the system can ask. A passive tool at 75% accuracy is unreliable. An active agent at 75% accuracy that catches most of its own mistakes through follow-up questions is a useful secretary.
+
+The key design constraint: the system must always surface its work transparently. Every extraction, every task, every conflict resolution is visible and auditable. Followable calendars, conversation logs, task boards — nothing is hidden. When the AI is wrong, people can see it and correct it.
+
 ### How It Works
 
 When the AI detects something that needs human input — a contradiction, an ambiguity, a missed deadline, a scope change — it generates a follow-up action:
@@ -181,6 +193,10 @@ Secretarybird sends proactive notifications based on:
 - **Resolution requests** — ask for clarification on ambiguous instructions
 
 Notifications go through the Flutter app (push notifications), or through integrated channels (Discord DM, Slack DM) depending on where the person is most reachable.
+
+### Followable Calendars
+
+The system generates calendars from extracted deadlines, assignments, and scheduling information. These are followable — team members can subscribe and see their AI-extracted schedule update in real time. This is another surface where the AI's work is transparent and auditable.
 
 ## Voice Learning
 

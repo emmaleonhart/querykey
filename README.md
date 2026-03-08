@@ -45,6 +45,19 @@ The AI sends **short, simple messages**. The goal is not to explain things. The 
 
 It acts like a good secretary — concise, organized, never the center of attention. It asks "Are you doing X or Y?" not "Based on my analysis of the situational context, I've identified a potential discrepancy..."
 
+### Epistemic Humility
+
+The AI does not need to be perfect. It needs to know when it's not sure.
+
+Expected accuracy model:
+- **~75%** — correctly extracted from data feeds, no follow-up needed
+- **~20%** — extracted incorrectly, but the system recognizes the uncertainty and asks a clarifying question, getting to the right answer
+- **~5%** — genuine errors where the system is wrong and doesn't catch it
+
+This is a success. The reason the system can tolerate imperfect extraction is precisely because it has the ability to ask. A passive tool that's wrong 25% of the time is useless. An active secretary that's wrong 25% of the time but catches most of its mistakes by asking? That's a good secretary.
+
+Everything the system records is visible and auditable. All context is provided in places where people can view it — followable calendars, task boards, conversation logs. Nothing is hidden. If the AI got something wrong, anyone can see it and correct it.
+
 ### Voice Learning
 
 Secretarybird learns the voices of team members. Over time, it identifies who is speaking in recorded meetings and conversations without manual tagging. This makes verbal instruction capture seamless — record a conversation, and the system knows who said what.

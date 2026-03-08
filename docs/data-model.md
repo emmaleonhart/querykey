@@ -4,6 +4,8 @@
 
 The data model must handle the fact that most input is unstructured. A pasted screenshot and a bot feed produce the same downstream entities, but with different confidence levels. The system tracks provenance — every task and instruction can be traced back to the raw input that produced it.
 
+**Epistemic humility is built into the data model.** Confidence scores exist on most extracted entities. When confidence is low, the system triggers follow-up questions rather than silently recording uncertain data as fact. Everything is auditable — every extraction links back to its source, every follow-up links to what triggered it, and every resolution is logged.
+
 ## Core Entities
 
 ### Person
