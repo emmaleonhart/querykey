@@ -1,7 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(cd \"C:\\\\Users\\\\Immanuelle\\\\Documents\\\\Github\\\\secretarybird-pivot\\\\server\" && go mod tidy 2>&1)",
+      "Bash(echo Dart not found:*)",
+      "Bash(tail:*)",
+      "Bash(export PATH=\"$PATH:/c/Program Files/Go/bin\" && go version 2>&1)",
+      "Bash(export PATH=\"$PATH:/c/Program Files/Go/bin\" && cd \"C:\\\\Users\\\\Immanuelle\\\\Documents\\\\Github\\\\secretarybird-pivot\\\\server\" && go mod tidy 2>&1)",
+      "Bash(export PATH=\"$PATH:/c/Program Files/Go/bin\" && cd \"C:\\\\Users\\\\Immanuelle\\\\Documents\\\\Github\\\\secretarybird-pivot\\\\server\" && go build ./cmd/secretarybird/ 2>&1)",
+      "Bash(cd C:\\\\Users\\\\Immanuelle\\\\Documents\\\\Github\\\\secretarybird-pivot:*)",
+      "Bash(cd \"C:\\\\Users\\\\Immanuelle\\\\Documents\\\\Github\\\\secretarybird-pivot\" && git push 2>&1)",
+      "Bash(tr:*)",
+      "Bash(wsl:*)",
+      "Bash(curl:*)"
     ]
   }
 }
