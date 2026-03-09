@@ -1,7 +1,7 @@
 @echo off
-title Secretarybird Server
+title Secretarybird
 echo ========================================
-echo   Secretarybird - Go Server
+echo   Secretarybird
 echo   AI secretary for team coordination
 echo ========================================
 echo.
@@ -11,7 +11,6 @@ cd /d "%~dp0"
 REM --- Check for Go ---
 where go >NUL 2>NUL
 if errorlevel 1 (
-    REM Try the default install path
     if exist "C:\Program Files\Go\bin\go.exe" (
         set "PATH=%PATH%;C:\Program Files\Go\bin"
     ) else (
@@ -23,41 +22,66 @@ if errorlevel 1 (
 )
 echo [OK] Go found:
 go version
+
+REM --- Check for Flutter ---
+where flutter >NUL 2>NUL
+if errorlevel 1 (
+    echo [ERROR] Flutter is not installed or not in PATH.
+    pause
+    exit /b 1
+)
+echo [OK] Flutter found:
+flutter --version 2>NUL | findstr /C:"Flutter"
 echo.
 
-REM --- Build the server ---
-echo [1/2] Building server...
-cd server
+REM --- Build the Go server ---
+echo [1/3] Building Go server...
+cd /d "%~dp0server"
 go build -o secretarybird.exe ./cmd/secretarybird/
 if errorlevel 1 (
-    echo [ERROR] Build failed.
+    echo [ERROR] Server build failed.
     pause
     exit /b 1
 )
 echo [OK] Built server\secretarybird.exe
 echo.
 
-REM --- Show configuration ---
-echo [2/2] Starting server...
+REM --- Get Flutter dependencies ---
+echo [2/3] Getting Flutter dependencies...
+cd /d "%~dp0app"
+call flutter pub get >NUL 2>NUL
+echo [OK] Flutter dependencies ready
 echo.
-echo   Server:   http://127.0.0.1:8000
-echo   Health:   http://127.0.0.1:8000/health
-echo   Status:   http://127.0.0.1:8000/api/status
+
+REM --- Start the Go server in background ---
+echo [3/3] Starting...
+echo.
+echo   Server:    http://127.0.0.1:8000
+echo   Health:    http://127.0.0.1:8000/health
 echo   WebSocket: ws://127.0.0.1:8000/ws/chat
 echo.
-echo   OpenClaw gateway expected at http://127.0.0.1:18789
-echo   Start it in WSL with: openclaw gateway
-echo.
-echo   Set DISCORD_TOKEN to enable the Discord bot.
-echo   Set FUSEKI_URL to connect to Apache Jena Fuseki.
-echo.
-echo   Press Ctrl+C to stop.
+echo   OpenClaw:  start in WSL with "openclaw gateway"
+echo   Discord:   set DISCORD_TOKEN env var to enable
 echo ========================================
 echo.
 
-REM --- Run ---
-secretarybird.exe
+cd /d "%~dp0server"
+start "Secretarybird Server" /min secretarybird.exe
 
+REM --- Wait a moment for the server to start ---
+timeout /t 2 /nobreak >NUL
+
+REM --- Launch Flutter app ---
+echo Launching Flutter app (Windows)...
+echo Close the app window to stop everything.
 echo.
-echo Server stopped.
+cd /d "%~dp0app"
+call flutter run -d windows
+
+REM --- When Flutter exits, kill the server ---
+echo.
+echo Stopping server...
+taskkill /fi "WINDOWTITLE eq Secretarybird Server" >NUL 2>NUL
+taskkill /im secretarybird.exe /f >NUL 2>NUL
+echo Done.
 pause
