@@ -20,6 +20,10 @@ AI secretary that ingests unstructured input (Discord chats, voice notes, screen
 - **Architecture**: See `docs/architecture.md`
 - **Roadmap**: See `todo.md`
 
+### Development Data (`dev_scheduling/`)
+Provisional directory for agent data during development. Committed to the repo so GitHub Actions can write to it.
+- `dev_scheduling/receipts/discord/` — JSON message logs extracted by the Discord bot via GitHub Actions
+
 ### Key Design Decisions
 - **User accounts**: People have real logins on Secretarybird. Initial signup via Discord OAuth. Future: sign up from any platform the bot contacts you on.
 - **Node IDs**: Human-readable aliases, not just opaque UUIDs.
