@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
+
+const defaultOutputDir = "dev_scheduling/receipts/discord"
 
 // ChannelMessages holds all messages for one channel.
 type ChannelMessages struct {
@@ -42,6 +45,14 @@ func main() {
 		log.Fatal("Set DISCORD_TOKEN or DISCORD_KEY environment variable")
 	}
 
+	outDir := os.Getenv("DUMP_OUTPUT_DIR")
+	if outDir == "" {
+		outDir = defaultOutputDir
+	}
+	if err := os.MkdirAll(outDir, 0755); err != nil {
+		log.Fatalf("Failed to create output dir %s: %v", outDir, err)
+	}
+
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
 		log.Fatalf("Failed to create session: %v", err)
@@ -73,18 +84,18 @@ func main() {
 				log.Printf("Skipping guild %s: %v", g.ID, err)
 				continue
 			}
-			dumpGuild(dg, guild)
+			dumpGuild(dg, guild, outDir)
 		}
 		return
 	}
 
 	log.Printf("Found %d guild(s) via state cache", len(guilds))
 	for _, g := range guilds {
-		dumpGuild(dg, g)
+		dumpGuild(dg, g, outDir)
 	}
 }
 
-func dumpGuild(dg *discordgo.Session, guild *discordgo.Guild) {
+func dumpGuild(dg *discordgo.Session, guild *discordgo.Guild, outDir string) {
 	log.Printf("Processing guild: %s (%s)", guild.Name, guild.ID)
 
 	channels, err := dg.GuildChannels(guild.ID)
@@ -124,8 +135,8 @@ func dumpGuild(dg *discordgo.Session, guild *discordgo.Guild) {
 		dump.Channels = append(dump.Channels, cm)
 	}
 
-	// Write JSON file
-	filename := fmt.Sprintf("messages_%s.json", guild.ID)
+	// Write JSON file into the output directory
+	filename := filepath.Join(outDir, fmt.Sprintf("messages_%s.json", guild.ID))
 	data, err := json.MarshalIndent(dump, "", "  ")
 	if err != nil {
 		log.Printf("  Failed to marshal JSON: %v", err)
