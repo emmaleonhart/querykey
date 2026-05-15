@@ -1,0 +1,11 @@
+# Personal chat-log corpus — context for the QueryKey pivot.
+# These exports (Discord DMs, Claude/Grok/ChatGPT conversations, voice
+# transcripts, etc.) contain private/personal information about real people
+# and must NEVER be committed. They are a corpus to read selectively, not a
+# spec. Only this directory's README is tracked.
+/chat/*
+!/chat/README.md
+
+# Scheduler runtime (durable cron lock/state) — never commit.
+.claude/scheduled_tasks.lock
+.claude/scheduled_tasks.json
