@@ -1,5 +1,11 @@
 # Why Go: How the Server Rewrite Solves the Socket Problem
 
+> **Framing note (2026-05).** This document is about the Go server rewrite at
+> the heart of QueryKey. It compares the current server to the *original*
+> secretarybird codebase (the predecessor archived in `secretarybird-old/`).
+> References to "secretarybird" below are historical and refer to that
+> earlier project, not to QueryKey.
+
 ## The Old Architecture Was Broken
 
 The original secretarybird (tojo-assistant) had a **three-process, two-socket chain** that constantly broke:

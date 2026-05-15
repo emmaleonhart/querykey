@@ -1,5 +1,15 @@
 # Architecture Plan
 
+> **Framing note (2026-05).** This document was written for the earlier
+> "Secretarybird" team-coordination framing of the project. QueryKey is now a
+> local-first social network / personal relationship manager (PRM) — see
+> `README.md` and `CLAUDE.md`. Most of the architecture described here carries
+> over almost unchanged: the ingestion pipeline, OpenClaw integration, graph
+> store, audio pipeline, and real-time WebSocket sync all still apply. Read
+> "team member" / "everyone on the team" as "person in your contact graph",
+> and read "Secretarybird Server" as "QueryKey Server". A deeper rewrite of
+> this doc is on the roadmap; until then, this note is the bridge.
+
 ## Design Philosophy
 
 **The secretarybird is here to serve you. You don't serve it.**

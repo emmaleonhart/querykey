@@ -1,5 +1,12 @@
 # Data Model & Knowledge Graph
 
+> **Framing note (2026-05).** This document was written for the earlier
+> "Secretarybird" team-coordination framing. QueryKey is now a local-first
+> social network / PRM (see `README.md` and `CLAUDE.md`). The entities below
+> — Person, Handle, Task, Event, Message, Conflict, FollowUp, etc. — carry
+> over almost unchanged. Read "team member" / "everyone on the team" as
+> "person in your contact graph".
+
 ## Design Principle
 
 The data model must handle the fact that most input is unstructured. A pasted screenshot and a bot feed produce the same downstream entities, but with different confidence levels. The system tracks provenance — every task and instruction can be traced back to the raw input that produced it.
@@ -13,7 +20,7 @@ Node IDs should have **human-readable aliases**, not just opaque UUIDs. UUIDs ca
 ## Core Entities
 
 ### Account
-People have **real accounts** on Secretarybird. This is not just a manager tool — everyone on the team has a login.
+People have **real accounts** on QueryKey. In personal/PRM mode there is one account (yours); in shared/team mode, everyone you coordinate with has one. Either way, accounts are real — not just admin rows in a manager tool.
 
 ```
 Account {
