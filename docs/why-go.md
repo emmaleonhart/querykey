@@ -1,10 +1,13 @@
 # Why Go: How the Server Rewrite Solves the Socket Problem
 
-> **Framing note (2026-05).** This document is about the Go server rewrite at
-> the heart of QueryKey. It compares the current server to the *original*
-> secretarybird codebase (the predecessor archived in `secretarybird-old/`).
-> References to "secretarybird" below are historical and refer to that
-> earlier project, not to QueryKey.
+> **Framing note (updated 2026-05).** Read this as **"why not the old
+> Electron + Python + WSL-socket stack"** — that argument still holds.
+> But **Go is no longer the target: the server language is now Rust**,
+> and the current Go `server/` is deprecated (kept compilable until the
+> Rust rewrite supersedes it). The earlier prototype this doc compares
+> against has been deleted from the tree; its salvage analysis now
+> lives in [`versions-comparison.md`](versions-comparison.md). Mentions
+> of the old project name below are historical, not QueryKey.
 
 ## The Old Architecture Was Broken
 

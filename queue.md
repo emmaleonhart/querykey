@@ -222,9 +222,14 @@ for ergonomic editing as items are completed.)
 - [x] 4. Write `docs/versions-comparison.md` — done (commit ca3394c).
 - [x] 5. Delete `secretarybird-old/` — done; recoverable from git
       history. No hackathon refs remain in the tracked tree.
-- [ ] 6. Reframe `README.md`
-- [ ] 7. Reframe `CLAUDE.md`
-- [ ] 8. Reframe `todo.md`
+- [x] 6. Reframe `README.md` — done (commit 2fbe9a9): Q/K/V origin,
+      rationalist/PRM/CRM/JIRA framing, markdown model, Rust target,
+      Gemma agent, stale refs fixed.
+- [x] 7. Reframe `CLAUDE.md` — done (commit a6a5bd2): Secretarybird
+      lineage removed, Rust/Gemma framing, workflow rules kept.
+- [x] 8. Reframe `todo.md` — done: personal-first rewrite, phase
+      skeleton kept, team mode demoted to optional Phase 8, Rust/Gemma/
+      markdown folded in. Also corrected `docs/why-go.md` framing note.
 - [ ] 9. Verify / lightly update `site/index.html`
 - [ ] 10. Commit and push each step
 
