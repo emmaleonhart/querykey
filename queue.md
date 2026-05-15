@@ -215,9 +215,10 @@ notes, chat logs, and prior conversations.
 (Same as the recovery dump's "What needs to happen next", repeated here
 for ergonomic editing as items are completed.)
 
-- [ ] 1. Create `chat/` with explanatory README
-- [ ] 2. Create `queue.md` (← this file; mark done once committed)
-- [ ] 3. Delete `cleanvibe_examples/` and `README_cleanvibe.md`
+- [x] 1. Create `chat/` with explanatory README — done; corpus moved
+      in from life-planning, bodies gitignored (commit 99c9dcb).
+- [x] 2. Create `queue.md` (← this file; committed in prior session).
+- [x] 3. Delete `cleanvibe_examples/` and `README_cleanvibe.md` — done.
 - [ ] 4. Write `docs/versions-comparison.md`
 - [ ] 5. Delete `secretarybird-old/`
 - [ ] 6. Reframe `README.md`
