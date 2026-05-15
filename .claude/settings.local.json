@@ -12,7 +12,10 @@
       "Bash(cd \"C:\\\\Users\\\\Immanuelle\\\\Documents\\\\Github\\\\secretarybird-pivot\" && git push 2>&1)",
       "Bash(tr:*)",
       "Bash(wsl:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\ambie\\\\Documents\\\\Github\\\\querykey\" -Force | Select-Object Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"DIR\"}else{\"FILE\"}}} | Format-Table -AutoSize)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\ambie\\\\Documents\\\\Github\\\\querykey\\\\cleanvibe_examples\" -Recurse -Force | Where-Object { $_.Name -match \"\\\\.\\(toml|yaml|yml|json|lock\\)$|pubspec|Cargo|package|pyproject\" } | Select-Object FullName)",
+      "Bash(findstr /E \"v[0-9]|old|legacy|archive|pivot\")"
     ]
   }
 }
