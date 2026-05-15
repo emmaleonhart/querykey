@@ -18,7 +18,10 @@
       "Bash(findstr /E \"v[0-9]|old|legacy|archive|pivot\")",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\ambie\\\\Documents\\\\Github\\\\querykey\" -Directory)",
       "Bash(Select-Object Name)",
-      "PowerShell(wc *)"
+      "PowerShell(wc *)",
+      "PowerShell(ls \"C:\\\\Users\\\\ambie\\\\Documents\\\\Github\\\\querykey\" | Where-Object { $_.PSIsContainer })",
+      "Bash(xargs -I {} head -5 {})",
+      "Bash(xargs grep *)"
     ]
   }
 }
