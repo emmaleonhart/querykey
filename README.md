@@ -6,6 +6,8 @@ An AI secretary that actively manages your team's communication. It ingests mess
 
 Built with **Flutter** (mobile, desktop, web). Analysis powered by **OpenClaw**.
 
+🌐 **Website: <https://querykey.emmaleonhart.com>**
+
 ## Philosophy
 
 Tools like Jira, Git, and Azure DevOps often become performative work — people spend more time maintaining the tool than doing the actual work. Status updates become theater. Ticket grooming becomes a job in itself.
