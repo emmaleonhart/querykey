@@ -219,8 +219,9 @@ for ergonomic editing as items are completed.)
       in from life-planning, bodies gitignored (commit 99c9dcb).
 - [x] 2. Create `queue.md` (← this file; committed in prior session).
 - [x] 3. Delete `cleanvibe_examples/` and `README_cleanvibe.md` — done.
-- [ ] 4. Write `docs/versions-comparison.md`
-- [ ] 5. Delete `secretarybird-old/`
+- [x] 4. Write `docs/versions-comparison.md` — done (commit ca3394c).
+- [x] 5. Delete `secretarybird-old/` — done; recoverable from git
+      history. No hackathon refs remain in the tracked tree.
 - [ ] 6. Reframe `README.md`
 - [ ] 7. Reframe `CLAUDE.md`
 - [ ] 8. Reframe `todo.md`
