@@ -1,44 +1,70 @@
 # QueryKey — Master TODO
 
-> **Status of this file.** QueryKey is a local-first social network / PRM you
-> run from your own desktop. The roadmap below grew out of an earlier
-> team-coordination framing ("Secretarybird") and most of the phases still
-> apply — the entity model, ingestion pipeline, AI bridge, calendar layer, and
-> audio pipeline carry over almost unchanged. Items written as "everyone on
-> the team" or "every team member" should be read as "every person in your
-> contact graph" under the QueryKey framing.
+> **Status of this file.** QueryKey is a **rationalist social network**
+> that doubles as a local-first PRM / lightweight CRM / JIRA-style task
+> tracker, for one person, run from your own desktop. The phase
+> skeleton below is preserved from an earlier prototype's roadmap, but
+> the framing is now **personal-first**: a single owner and the people
+> in *their* life. Multi-person / shared ("team") behavior is **not the
+> spine** of the product — it is an explicitly optional, deprioritized
+> later phase (Phase 8). Anything that reads as "the team" means "the
+> people in your contact graph."
+>
+> Authoritative near-term plan: [`queue.md`](queue.md). Settled
+> decisions (do not relitigate): **Flutter** UI; **Rust** server
+> target (current Go server deprecated, no rewrite this round);
+> **model-agnostic local agent, Gemma default** (OpenClaw is today's
+> bridge, an implementation detail).
 
 ## Core Behavior
 
-QueryKey watches the unstructured streams of how you actually communicate —
-chat logs, pasted conversations, screenshots, voice notes — and uses local AI
-to build a private model of the people and commitments in your life. It
-surfaces ambiguities, contradictions, and unconfirmed commitments — then asks
-*you* (or, where appropriate, the relevant person) to clarify. It doesn't need
-to be perfectly correct. Everything it extracts shows a **confidence/certainty
-indicator** so you know what the AI is sure about vs guessing at.
+QueryKey watches the unstructured streams of how you actually
+communicate — chat logs, pasted conversations, screenshots, voice
+notes — and uses a local AI agent to build a private model of the
+people and commitments in your life. It surfaces ambiguities,
+contradictions, and unconfirmed commitments — then asks *you* (or,
+where appropriate, the relevant person) to clarify. It doesn't need to
+be perfectly correct. Everything it extracts shows a
+**confidence/certainty indicator** so you know what the agent is sure
+about vs. guessing at.
+
+**Why "QueryKey":** Q / K / V of a transformer attention matrix — your
+life is the *values*, the agent computes *queries* against *keys* built
+from your notes and logs. See `README.md`.
 
 ### We Serve You — The Mission
 
-QueryKey exists to serve you and conform to your workflow. The tool adapts to
-how you already work. The purpose is to help you keep up with the people in
-your life — coordination and care, not surveillance. The privacy that matters
-is not just yours: it's the privacy of the people you talk about too.
+QueryKey exists to serve you and conform to your workflow. The tool
+adapts to how you already work; you never reformat your life to fit a
+form. The purpose is to help you keep up with the people in your life —
+care and coordination, not surveillance. The privacy that matters is
+not just yours: it's the privacy of the people you talk about too.
+
+### Your Data Is Markdown On Your Disk
+
+Tasks, events, and notes are intended to live as **plain markdown
+files** on your machine that you can read and edit by hand. The agent
+operates *on* those files; it does not lock your life inside an app
+database. **The on-disk format is an open design question** (see
+`queue.md` open decisions): frontmatter vs. org-style vs. plain bullets.
+Document the model before writing ingestion code; do not implement the
+on-disk model this round.
 
 ### Open Questions System
 
-You (and, in shared/team modes, each person) have a queue of **open questions**
-the system is trying to get resolved. These are things QueryKey needs clarity
-on — contradictions, ambiguities, unconfirmed commitments, etc.
+You have a queue of **open questions** the system is trying to get
+resolved — contradictions, ambiguities, unconfirmed commitments.
 
-- Questions have **urgency levels**: "needs to be known by 8 AM", "needs to be known by end of day", "needs to be known ASAP", "whenever you get to it"
-- You can open the app and see all pending questions and resolve them at your own pace
-- QueryKey will attempt to get answers via DM (in-app, then Discord, etc.) on a schedule based on urgency
-- Questions that get resolved (anywhere, on any platform) disappear from the queue
+- Questions have **urgency levels**: "needs to be known by 8 AM", "by
+  end of day", "ASAP", "whenever you get to it"
+- Open the app and see all pending questions; resolve them at your pace
+- QueryKey attempts to get answers via DM (in-app, then Discord, etc.)
+  on a schedule based on urgency
+- Questions resolved anywhere, on any platform, disappear from the queue
 
 ## Platform Targets
 
-Primary framework: **Flutter** (single codebase).
+Primary framework: **Flutter** (single codebase, locked in).
 Current focus: **Windows Desktop**.
 
 | Platform | Priority | Status |
@@ -60,226 +86,268 @@ Current focus: **Windows Desktop**.
 - [ ] Set up testing infrastructure (unit, widget, integration)
 - [ ] Set up CI (GitHub Actions — lint, test, build)
 - [ ] Choose and configure state management (Riverpod, Bloc, etc.)
-- [ ] Choose local database (Hive, Isar, Drift/SQLite)
+- [ ] Choose local store (see Phase 1 — graph store is an open decision)
 
-## Phase 1 — Accounts & Core Data Model
+## Phase 1 — Account & Core Data Model
 
-Implements the entities from `docs/data-model.md`. Uses **Apache Jena Fuseki** as the graph/triple store (already known well). Node IDs should have **human-readable aliases** — not just opaque UUIDs.
+Implements the entities from `docs/data-model.md`. Node IDs should have
+**human-readable aliases** — not just opaque UUIDs.
 
-### User Accounts
+> **Graph store is an OPEN decision.** Apache Jena Fuseki was the prior
+> pick (and a Fuseki client stub exists), but given the local-first /
+> single-user reorientation, an embedded triple/RDF store or just
+> SQLite + application-level relations may be a better fit. Decide
+> before building real persistence. (queue.md open decisions.)
 
-People have **real accounts** on QueryKey. In personal/PRM mode there is one account (yours); in shared/team mode, everyone you coordinate with has one. Either way, accounts are real — not just admin rows in a manager tool.
+### Account
 
-- [ ] **Account system** — users have logins on the app
-  - Initial account creation via **Discord OAuth** (since Discord bot is first)
-  - Future: create account from any platform the bot contacts you on (WhatsApp, Instagram, etc.)
-  - Goal: low friction. If the bot DMs you somewhere, you can sign up from there.
-  - People shouldn't have to go out of their way to sign up
-- [ ] **Person profile** — tracks all of a person's accounts and usernames across platforms
-  - Discord username, Slack ID, WhatsApp number, Instagram handle, phone, email, etc.
-  - Profile is the unified view of one human across all platforms
-- [ ] **Cross-platform identity resolution** — same person across Discord, Slack, phone, voice
-  - Manual handle linking first
-  - AI-assisted matching later
-- [ ] **Task** entity — title, description, status flow (extracted → confirmed → in_progress → done / disputed), assigned_to, assigned_by, deadline, confidence, ambiguity_score, source audit trail
+Personal mode has **one account: yours.** It is a real account, not an
+admin row. (Multi-account / others-have-logins is Phase 8, optional.)
+
+- [ ] **Single-owner account** — your login on the app
+  - Convenience bootstrap via **Discord OAuth** (Discord is the first
+    ingest surface)
+  - Low friction: if the bot reaches you somewhere, you can sign in there
+- [ ] **Person profile** — tracks one person's accounts/usernames across
+  platforms (Discord, Slack, WhatsApp, Instagram, phone, email, …);
+  the unified view of one human
+- [ ] **Cross-platform identity resolution** — same person across
+  Discord, Slack, phone, voice. Manual handle linking first; AI-assisted
+  matching later
+- [ ] **Task** entity — title, description, status flow (extracted →
+  confirmed → in_progress → done / disputed), related_person,
+  origin, deadline, confidence, ambiguity_score, source audit trail
 - [ ] **Event** entity — distinct from Task
-  - Events have a **duration** (start time + end time), are time-fixed
+  - Events have a **duration** (start + end), are time-fixed
   - Tasks have an optional **deadline**, are time-flexible
-  - Events: "1 PM sync meeting" — can't move without asking someone
-  - Tasks: "Refactor the query engine" — do it whenever, just finish by Friday
+  - Rule of thumb: if you can move it to tomorrow without asking
+    anyone's permission, it's a task
   - Grey area: milestones (zero-duration time markers)
-  - Rule of thumb: if you can move it to tomorrow without asking permission, it's a task
-- [ ] **IngestItem** entity — raw input container (bot_feed, chatlog_paste, screenshot, voice_note, recorded_audio, freeform_text)
-- [ ] **Message** entity — normalized record of something said, with confidence score
-- [ ] **Conflict** entity — contradictory_tasks, reassignment, deadline_change, scope_change
+- [ ] **IngestItem** entity — raw input container (bot_feed,
+  chatlog_paste, screenshot, voice_note, recorded_audio, freeform_text)
+- [ ] **Message** entity — normalized record of something said, with
+  confidence score
+- [ ] **Conflict** entity — contradictory_tasks, reassignment,
+  deadline_change, scope_change
 - [ ] **Instruction** entity — broader than Task, any directive
-- [ ] **FollowUp** entity — outbound AI questions to team members
-- [ ] **OpenQuestion** entity — per-person queue of things the system needs resolved
-  - Urgency levels: "asap", "by [specific time]", "end of day", "whenever"
-  - Visible in-app as a list the person can work through
-  - Resolved by anyone on any platform → disappears from queue
+- [ ] **FollowUp** entity — outbound agent questions
+- [ ] **OpenQuestion** entity — your queue of things to resolve
+  - Urgency: "asap", "by [time]", "end of day", "whenever"
+  - Resolved anywhere → disappears from the queue
 - [ ] **VoiceProfile** entity — speaker embeddings for voice recognition
-- [ ] **ExternalSync** entity — tracking tasks pushed to Jira/Azure DevOps/GitHub/etc.
-- [ ] **Context** entity — inferred or user-provided context labels ("Monday standup", "client call", "sprint planning")
-  - AI should guess contexts from content when not provided
-  - Contexts help group related tasks/events/messages
+- [ ] **ExternalSync** entity — tasks pushed to Jira/Azure DevOps/GitHub
+- [ ] **Context** entity — inferred or user-provided context labels
+  ("client call", "sprint planning"); agent guesses contexts from content
 - [ ] Graph relationships between all entities (see `docs/data-model.md`)
 
-## Phase 2 — OpenClaw Integration
+## Phase 2 — Local AI Agent Integration
 
-OpenClaw is the AI analysis engine. It does the hard work so the user doesn't have to.
+The local AI agent does the hard work so you don't have to. It is
+**model-agnostic** — default **Gemma**, switchable to other local (or
+optionally hosted) models. *Today's bridge is OpenClaw via a WSL
+gateway under `server/internal/openclaw/`; treat it as an
+implementation detail behind a model-agnostic interface, to be
+superseded by the Rust rewrite. Callers must never name a model.*
 
-- [ ] **OpenClaw API client** — connect to OpenClaw service
-- [ ] **Entity extraction** — people, projects, deadlines from unstructured text
-- [ ] **Task detection** — implicit and explicit assignments
-  - "Get the video done by tonight" → Task(assigned_to=you, deadline=tonight)
-  - "We should probably look into that" → Instruction(is_task=false, ambiguity=high)
-- [ ] **Event detection** — things with fixed times
-  - "Meeting at 3 PM tomorrow" → Event(start=3PM tomorrow)
-  - "Demo on Friday at 2" → Event(start=Friday 2PM)
-- [ ] **Context inference** — guess what context/project a message belongs to
-- [ ] **Attribution** — who assigned what to whom
-- [ ] **Contradiction detection** — compare new input against existing graph
+- [ ] **Agent client** — model-agnostic interface to the local agent
+- [ ] **Entity extraction** — people, projects, deadlines from text
+- [ ] **Task detection** — implicit and explicit
+  - "Get the video done by tonight" → Task(deadline=tonight)
+  - "We should probably look into that" → Instruction(is_task=false,
+    ambiguity=high)
+- [ ] **Event detection** — fixed-time things ("Meeting at 3 PM tomorrow")
+- [ ] **Context inference** — guess the context/project for a message
+- [ ] **Attribution** — who said / asked what
+- [ ] **Contradiction detection** — compare new input vs. existing graph
 - [ ] **Ambiguity scoring** — how vague is this instruction?
-- [ ] **Follow-up question generation** — what to ask whom
+- [ ] **Follow-up question generation** — what to ask, of whom
 - [ ] **Message composition** — short, secretary-style outbound messages
-  - **CRITICAL: OpenClaw must not be wordy.** It's a secretary, not a consultant.
+  - **CRITICAL: the agent must not be wordy.** Secretary, not consultant.
   - Good: "Are you doing the video for 10 PM or 8 AM?"
-  - Bad: "Based on my analysis of your recent communications, I've identified a scheduling discrepancy..."
-  - Messages are short, clear, direct. Ask a question and listen.
-- [ ] **Chatlog parsing** — turn raw pasted text into structured messages
+  - Bad: "Based on my analysis of your recent communications, I've
+    identified a scheduling discrepancy…"
+- [ ] **Chatlog parsing** — raw pasted text → structured messages
 - [ ] **OCR text interpretation** — make sense of screenshot extractions
 
 ## Phase 3 — Unstructured Input Pipeline
 
 The core differentiator. Accept anything, normalize it.
 
-- [ ] **Freeform text input** — paste any text, AI extracts structure
-  - Email forwards, meeting notes, random text, anything
-  - User can optionally provide a context label ("this is from our Monday standup")
-- [ ] **Chatlog paste** — paste a Discord/Slack/iMessage/WhatsApp conversation
-  - AI identifies speakers, messages, timestamps
-  - Handles various chatlog formats
-- [ ] **Screenshot input** — OCR extracts text, AI parses as chatlog
+- [ ] **Freeform text input** — paste any text, agent extracts structure
+  (email forwards, meeting notes, anything; optional context label)
+- [ ] **Chatlog paste** — Discord/Slack/iMessage/WhatsApp conversation;
+  agent identifies speakers, messages, timestamps; handles varied formats
+- [ ] **Screenshot input** — OCR extracts text, agent parses as chatlog
 - [ ] **Voice note** — record a memo, transcribe, extract
-- [ ] **Recorded conversation** — streaming transcription + speaker diarization
-- [ ] **Normalization** — all inputs → common IngestItem format before AI pipeline
+- [ ] **Recorded conversation** — streaming transcription + diarization
+- [ ] **Normalization** — all inputs → common IngestItem format
+- [ ] **Markdown reconciliation** — extracted structure round-trips to
+  the on-disk markdown task model (pending that format decision)
 
-## Phase 4 — In-App Messaging & Discord Bot
+## Phase 4 — In-App Messaging & Discord
 
-### App-Internal DM System
+### App-Internal DM System (primary channel)
 
-The app has its own built-in messaging system between the bot and each user. This is the **primary** channel.
+- [ ] **In-app conversation view** — your chat thread with the agent
+- [ ] **Unified inbox** — all conversations with the agent across
+  platforms (app, Discord, WhatsApp, …) in one threaded view
+- [ ] **Multi-channel delivery** — agent tries the app first, then
+  Discord, then other platforms
+- [ ] **Response aggregation** — your reply from any platform shows up
+  in the same conversation
 
-- [ ] **In-app conversation view** — chat thread between you and the bot within the app
-- [ ] **Unified inbox** — see all your conversations with the bot regardless of which platform the message came from (app, Discord, WhatsApp, etc.) in one threaded view
-- [ ] **Multi-channel delivery** — when the bot needs to reach you, it tries the app first, then falls back to Discord, then other platforms. Tries multiple ways to contact you.
-- [ ] **Response aggregation** — your reply from any platform shows up in the same conversation in the app
+### Discord (first external ingest surface)
 
-### Discord Bot (Top Priority External Integration)
-
-The Discord bot is the primary external interaction surface. First integration to build.
-
-- [ ] **Bot setup** — Discord bot application, permissions, OAuth
-- [ ] **Account creation via Discord** — replying to the bot or interacting with it can create your QueryKey account
-- [ ] **Channel monitoring** — read every message in monitored channels
-- [ ] **DM interaction** — bot DMs people with follow-up questions, task confirmations, contradiction alerts
-  - People reply to DMs → responses recorded as follow-up answers
-  - People can message the bot directly — ask questions, give instructions, report status
-- [ ] **Message logging** — log ALL messages on the server
-- [ ] **Hourly batch processing** — collect messages continuously, process in hourly batches by default
-  - Critical events (explicit contradictions, direct DMs to bot) processed immediately
-  - Keeps OpenClaw costs manageable
-- [ ] **Multi-person DMs** — can DM multiple people simultaneously about different things
-- [ ] **Server → knowledge graph** — parsed messages feed into the knowledge graph
+- [ ] **Bot setup** — Discord application, permissions, OAuth
+- [ ] **Account bootstrap via Discord** — interacting with the bot can
+  create/sign in your account
+- [ ] **Channel monitoring** — read messages in monitored channels/DMs
+- [ ] **DM interaction** — bot DMs people with follow-ups, confirmations,
+  contradiction alerts; replies recorded as follow-up answers
+- [ ] **Message logging** — log messages from monitored surfaces
+- [ ] **Hourly batch processing** — collect continuously, process hourly
+  by default; critical events (explicit contradictions, direct DMs)
+  processed immediately; keeps agent cost manageable
+- [ ] **Surface → knowledge graph** — parsed messages feed the graph
 
 ### Future Messaging Platforms
 
-- [ ] **WhatsApp** — bot DMs people via WhatsApp Business API
-- [ ] **Instagram** — bot DMs people via Instagram DM API
-- [ ] **Slack** — same model as Discord
-- [ ] Any platform the bot messages you on → you can create an account from there
+- [ ] **WhatsApp** (Business API), **Instagram** (DM API), **Slack**
+- [ ] Any platform the bot reaches you on → you can sign in from there
 
 ## Phase 5 — Calendar & Scheduling
 
-- [ ] **Calendar view** in Flutter app — shows all tasks and events in the UI
+- [ ] **Calendar view** in the Flutter app — all tasks and events
 - [ ] **Task vs Event distinction** in the UI
-  - Tasks: shown as items with optional deadlines, can be reordered/moved freely
-  - Events: shown as time blocks on the calendar, fixed in time
-  - Visual distinction between the two
-  - **Confidence indicators** — every extracted task/event shows how certain the AI is
-- [ ] **Subscribable iCal feed** — standard .ics calendar that any calendar app (Google Calendar, Outlook, Apple Calendar) can subscribe to
-  - Updates in real time as the AI extracts new events and deadlines
-  - Per-person calendar feeds
-- [ ] **Proactive reminders** — notifications before deadlines hit
-- [ ] **Scheduled check-ins** — periodic "how's X going?" messages
-- [ ] **Deadline extraction** — AI pulls dates/times from unstructured input and creates events or task deadlines
-- [ ] **Context-aware scheduling** — AI infers what project/context a deadline belongs to
+  - Tasks: items with optional deadlines, reorderable
+  - Events: fixed time blocks
+  - **Confidence indicators** on every extracted task/event
+- [ ] **Subscribable iCal feed** — standard `.ics` any calendar app can
+  subscribe to; updates in real time as the agent extracts events
+- [ ] **Proactive reminders** — notifications before deadlines
+- [ ] **Scheduled check-ins** — periodic "how's X going?" prompts
+- [ ] **Deadline extraction** — dates/times from unstructured input
+- [ ] **Context-aware scheduling** — infer the project/context
 
 ## Phase 6 — Conversational Agent (The Secretary)
 
-- [ ] **Proactive daily check-ins** — DMs every person individually on Discord asking what they think they're doing that day with the project
-- [ ] **Open questions queue** — each person has a visible list of things the system needs answered
-  - Urgency levels determine when/how aggressively the bot asks
-  - "ASAP" → bot DMs you right now
-  - "By 8 AM" → bot makes sure to ask before 8 AM
-  - "End of day" → included in daily check-in
-  - "Whenever" → sits in your queue, bot mentions it occasionally
-  - Person can open the app and resolve questions proactively without waiting for a DM
-- [ ] **Follow-up engine** — detect contradictions, ambiguities, missed deadlines → generate open questions
-- [ ] **Outbound messaging** — send follow-ups via in-app DM first, then Discord, WhatsApp, Instagram, Slack, SMS
-- [ ] **Response handling** — record answers, update knowledge graph, resolve open questions
-- [ ] **Epistemic humility** — confidence scores on everything, ask when unsure
-  - ~75% correct from data alone
-  - ~20% catches own mistakes via follow-up
-  - ~5% genuinely wrong
-- [ ] **Transparency** — all AI work is visible and auditable, nothing hidden
-- [ ] **Contextual answers** — "What is John working on?" answered from knowledge graph, or ask John if unsure
-- [ ] **Anti-policing guardrails** — system is for coordination, not surveillance. Design should make micromanagement misuse difficult and obvious.
+- [ ] **Proactive daily check-in** — a single daily prompt to *you*
+  about what you're working on / who you owe a reply (not blasting a
+  team; that's Phase 8)
+- [ ] **Open questions queue** — your visible list; urgency drives how
+  aggressively the agent asks
+  - "ASAP" → asks now; "By 8 AM" → before 8 AM; "End of day" → in the
+    daily check-in; "Whenever" → sits in the queue
+- [ ] **Follow-up engine** — contradictions, ambiguities, missed
+  deadlines → open questions
+- [ ] **Outbound messaging** — in-app DM first, then Discord, WhatsApp,
+  Instagram, Slack, SMS
+- [ ] **Response handling** — record answers, update graph, resolve
+  open questions
+- [ ] **Epistemic humility** — confidence scores on everything; ask
+  when unsure (~75% from data, ~20% caught via follow-up, ~5% wrong)
+- [ ] **Transparency** — all agent work visible and auditable
+- [ ] **Contextual answers** — "What is X working on?" from the graph,
+  or ask X if unsure
+- [ ] **Anti-surveillance guardrails** — this is for care and
+  coordination, not policing; make misuse hard and obvious
 
-## Phase 7 — Team Member Tracking
+## Phase 7 — People Tracking
 
-- [ ] **Person profile page** — view a person's profile showing all their linked accounts and usernames across platforms
-- [ ] **Cross-platform identity linking** — link Discord username, Slack ID, WhatsApp number, Instagram handle, phone number, email to one Person
-  - Same person may appear as "john_dev#1234" on Discord, "U12345" on Slack, "@john" on Instagram, and a voice in a meeting
-  - Manual linking first, AI-assisted matching later
-- [ ] **Preferred contact channel** — track where each person is most responsive
-- [ ] **Contact cascade** — when reaching out, try app → Discord → WhatsApp → Instagram → etc.
-- [ ] **Workload view** — what's assigned to each person, deadlines, status
-- [ ] **Voice profile enrollment** — collect voice samples for speaker identification
-  - Initial samples from onboarding or manually tagged recordings
-  - Improves over time as more audio is processed
+- [ ] **Person profile page** — all of a person's linked accounts
+  across platforms
+- [ ] **Cross-platform identity linking** — Discord/Slack/WhatsApp/
+  Instagram/phone/email → one Person (manual first, AI-assisted later)
+- [ ] **Preferred contact channel** — where each person is responsive
+- [ ] **Contact cascade** — app → Discord → WhatsApp → Instagram → …
+- [ ] **Commitment view** — what you owe each person / they owe you,
+  deadlines, status
+- [ ] **Voice profile enrollment** — voice samples for speaker ID;
+  improves as more audio is processed
 
-## Phase 8 — External Tool Sync
+## Phase 8 — Shared / Multi-Person Mode (OPTIONAL, deprioritized)
 
-- [ ] **Jira** — bi-directional sync (tasks → Jira issues, status changes sync back)
-- [ ] **Azure DevOps** — bi-directional sync (tasks → work items)
-- [ ] **Git (GitHub, GitLab)** — read + link (link tasks to repos/branches/PRs)
+> Not the spine of the product. QueryKey is **not** a team-coordination
+> tool you are forced to adopt. This phase exists only if the
+> rationalist-social-network angle is later exposed to other people.
+> Whether/how that happens (federated? local-only? selective node
+> sharing?) is an unresolved **product** question — decide before any
+> networking code (queue.md open decisions).
+
+- [ ] Others can have real accounts
+- [ ] Multi-person DMs (bot DMs several people about different things)
+- [ ] Shared open-questions resolution across people
+- [ ] Cloud / hybrid run modes for always-on multi-person use
+
+## Phase 9 — External Tool Sync
+
+- [ ] **Jira** — bi-directional (tasks → issues, status syncs back)
+- [ ] **Azure DevOps** — bi-directional (tasks → work items)
+- [ ] **Git (GitHub, GitLab)** — read + link tasks to repos/branches/PRs
 - [ ] **Trello, Asana, etc.** — push (tasks → cards)
-- [ ] Nobody manually creates tickets. AI extracts from conversation and pushes.
+- [ ] You don't manually create tickets — the agent extracts and pushes
+- [ ] Is external sync still desired, and in what tier? (open question)
 
-## Phase 9 — Audio Pipeline
+## Phase 10 — Audio Pipeline
 
 - [ ] **On-device recording** (Flutter app mic)
-- [ ] **Audio streaming** — WebSocket stream audio chunks to server
+- [ ] **Audio streaming** — WebSocket audio chunks to the server
 - [ ] **Server-side transcription** (Whisper or equivalent)
-- [ ] **Speaker diarization** — identify who is speaking using VoiceProfiles
-- [ ] **Voice note capture** — simpler path: record → upload → transcribe → analyze
+- [ ] **Speaker diarization** — who is speaking, via VoiceProfiles
+- [ ] **Voice note capture** — record → upload → transcribe → analyze
+- [ ] Voice-profile / diarization model selection (open decision)
 
-## Phase 10 — Server & Real-time
+## Phase 11 — Server & Real-time
 
-- [ ] **QueryKey Server** — ingestion, knowledge graph storage, real-time sync, OpenClaw coordination
-- [ ] **Local mode** — server on user's machine (privacy-first)
-- [ ] **Cloud mode** — always-on for distributed teams
-- [ ] **Hybrid mode** — always-on with local processing option
-- [ ] **WebSocket sync** — real-time graph diffs broadcast to all connected clients
-- [ ] **GraphDiff format** — added_nodes, updated_nodes, added_edges, removed_edges, new_conflicts, resolved_conflicts
-- [ ] **Batch processing scheduler** — hourly by default, configurable
+> **Target language: Rust.** The current `server/` is Go and is
+> **deprecated** (kept compilable until the Rust rewrite supersedes it;
+> no rewrite this round). The Go OpenClaw/WSL bridge is the reference
+> implementation for re-solving the local-agent bridge in Rust.
+
+- [ ] **QueryKey Server (Rust, target)** — ingestion, knowledge graph,
+  real-time sync, local-agent coordination
+- [ ] **Local mode** — server on your machine (privacy-first; the default)
+- [ ] **Cloud / hybrid modes** — only relevant alongside Phase 8
+- [ ] **WebSocket sync** — real-time graph diffs to connected clients
+- [ ] **GraphDiff format** — added/updated nodes, added/removed edges,
+  new/resolved conflicts
+- [ ] **Batch processing scheduler** — hourly default, configurable
+- [ ] **Single-binary distribution** — trivial install is a feature,
+  not a nicety (see `docs/versions-comparison.md`)
 
 ---
 
-## Open Questions
+## Open Decisions
 
-From `docs/architecture.md` — decisions still needed:
+See `queue.md` for the canonical list. Highlights:
 
-- [x] Graph store: **Apache Jena Fuseki** (decided — already well-known)
+- [ ] **Graph store** — Fuseki (prior pick) vs. embedded store vs.
+  SQLite + app relations, given local-first/single-user
+- [ ] **On-disk markdown task format** — frontmatter / org-style / bullets
+- [ ] **Whether/how the rationalist-social-network angle is exposed to
+  other users** — federated? local-only? selective sharing? (product)
+- [ ] Server language is **Rust** (resolved); Go server deprecated
+- [ ] AI is a **model-agnostic local agent, Gemma default** (resolved)
 - [ ] Speaker diarization / voice embedding model selection
 - [ ] Multi-language conversation handling
-- [ ] Privacy and data retention policies (especially audio + voice embeddings)
-- [ ] Rate limiting / cost management for OpenClaw on high-volume feeds
+- [ ] Privacy and data retention (especially audio + voice embeddings)
+- [ ] Rate/cost management for the agent on high-volume feeds
 - [ ] Encrypted/private channel handling (permissions model)
-- [ ] Offline mode behavior for Flutter app
-- [ ] How much to port from original secretarybird repo (socket layer is priority)
-- [ ] Outbound message rate limiting (don't spam people with too many follow-ups)
-- [ ] AI autonomy level (auto-resolve obvious contradictions vs always ask human?)
-- [ ] Voice enrollment UX (how to collect samples without friction)
-- [ ] Per-person outbound channel selection (app, Discord, Slack, SMS)
+- [ ] Offline mode behavior for the Flutter app
+- [ ] Outbound message rate limiting (don't over-DM people)
+- [ ] Agent autonomy level (auto-resolve obvious contradictions vs ask?)
+- [ ] Voice enrollment UX (collect samples without friction)
+- [ ] Per-person outbound channel selection
 
 ---
 
 ## Notes
 
-- **Testing**: Follow cleanvibe practices — tests for every feature, run before commit.
-- **Commits**: Early and often, with clear "why" messages per CLAUDE.md.
-- **OpenClaw tone**: Secretary, not consultant. Short, direct, never wordy.
-- **Task vs Event**: Tasks are flexible in time (optional deadline). Events are fixed in time (start + end). If you can move it without asking permission, it's a task.
+- **Testing**: tests for every feature; run before commit.
+- **Commits**: early and often, with clear "why" messages per `CLAUDE.md`.
+- **Agent tone**: secretary, not consultant. Short, direct, never wordy.
+- **Task vs Event**: tasks are time-flexible (optional deadline); events
+  are time-fixed (start + end). If you can move it without asking
+  permission, it's a task.
+- **Settled, do not relitigate**: Flutter UI; Rust server target;
+  model-agnostic local agent with Gemma default.
