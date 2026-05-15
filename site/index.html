@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="QueryKey — a social network you run locally from your own desktop. PRM elements, local AI agents, privacy-respecting.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="QueryKey">
+  <meta property="og:description" content="A social network you run locally from your own desktop. PRM elements, local AI agents, privacy-respecting.">
+  <meta property="og:url" content="https://querykey.emmaleonhart.com/">
+  <title>QueryKey</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --bg:#07070c; --bg-card:#11111b; --border:#1d1d2c; --border-hover:#34344e;
+      --text:#d4d4e0; --text-strong:#f0f0f6; --text-mute:#8c8caa; --text-faint:#5d5d78;
+      --accent:#8b9bff; --accent-bright:#b0bcff; --accent-soft:rgba(139,155,255,.10);
+      --accent-glow:rgba(139,155,255,.28);
+      --serif:'Instrument Serif','Times New Roman',serif;
+      --sans:'Inter','Segoe UI',system-ui,sans-serif;
+      --mono:'JetBrains Mono','Consolas',monospace;
+    }
+    html{scroll-behavior:smooth}
+    body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;
+      display:flex;flex-direction:column;position:relative;overflow-x:hidden;
+      -webkit-font-smoothing:antialiased;letter-spacing:-.005em}
+    .aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+    .aurora::before,.aurora::after{content:'';position:absolute;border-radius:50%;
+      filter:blur(90px);opacity:.5;mix-blend-mode:screen}
+    .aurora::before{width:680px;height:680px;top:-260px;left:-120px;
+      background:radial-gradient(circle,rgba(139,155,255,.30) 0%,transparent 70%);
+      animation:drift1 24s ease-in-out infinite alternate}
+    .aurora::after{width:600px;height:600px;top:-160px;right:-90px;
+      background:radial-gradient(circle,rgba(103,232,249,.16) 0%,transparent 70%);
+      animation:drift2 28s ease-in-out infinite alternate}
+    @keyframes drift1{to{transform:translate(120px,70px) scale(1.15)}}
+    @keyframes drift2{to{transform:translate(-90px,110px) scale(1.1)}}
+    .topbar{position:relative;z-index:2;display:flex;align-items:center;
+      justify-content:space-between;gap:16px;padding:20px 28px;
+      border-bottom:1px solid var(--border)}
+    .topbar a{font-family:var(--mono);font-size:.82rem;font-weight:500;
+      text-decoration:none;transition:color .2s}
+    .topbar .home{color:var(--text-mute)}
+    .topbar .home:hover{color:var(--accent-bright)}
+    .topbar .gh{display:inline-flex;align-items:center;gap:8px;color:var(--accent);
+      padding:8px 15px;border:1px solid var(--border-hover);border-radius:8px;
+      background:var(--accent-soft)}
+    .topbar .gh:hover{color:var(--accent-bright);border-color:var(--accent);
+      background:rgba(139,155,255,.16)}
+    .topbar .gh svg{width:15px;height:15px;fill:currentColor}
+    main{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;
+      justify-content:center;max-width:680px;width:100%;margin:0 auto;
+      padding:80px 28px 96px}
+    .eyebrow{display:inline-flex;align-items:center;gap:9px;align-self:flex-start;
+      font-family:var(--mono);font-size:.7rem;font-weight:500;text-transform:uppercase;
+      letter-spacing:1.6px;color:var(--accent-bright);margin-bottom:26px;
+      padding:6px 13px 6px 11px;background:rgba(139,155,255,.06);
+      border:1px solid rgba(139,155,255,.18);border-radius:999px}
+    .eyebrow::before{content:'';width:6px;height:6px;border-radius:50%;
+      background:var(--accent-bright);box-shadow:0 0 12px var(--accent-glow);
+      animation:pulse 2.4s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    h1{font-size:clamp(2.6rem,7vw,3.8rem);font-weight:700;letter-spacing:-1.4px;
+      line-height:1.02;margin-bottom:22px;
+      background:linear-gradient(120deg,#fff 0%,#b0bcff 60%,#8b9bff 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .lede{font-size:1.18rem;line-height:1.65;color:var(--text);max-width:600px;
+      margin-bottom:20px}
+    .lede em{font-family:var(--serif);font-style:italic;font-size:1.1em;color:#c8c8e0}
+    .note{font-size:.98rem;line-height:1.7;color:var(--text-mute);max-width:600px;
+      margin-bottom:38px}
+    .links{display:flex;flex-wrap:wrap;gap:12px}
+    .links a{font-family:var(--mono);font-size:.84rem;font-weight:500;
+      text-decoration:none;color:var(--accent);padding:10px 18px;
+      border:1px solid var(--border-hover);border-radius:8px;
+      background:rgba(255,255,255,.012);transition:all .2s}
+    .links a:hover{color:var(--accent-bright);border-color:var(--accent);
+      background:var(--accent-soft);transform:translateY(-1px)}
+    footer{position:relative;z-index:2;padding:24px 28px;
+      border-top:1px solid var(--border);font-family:var(--mono);
+      font-size:.72rem;letter-spacing:1px;color:var(--text-faint)}
+    @media(max-width:600px){
+      .topbar{padding:16px 18px}main{padding:56px 20px 72px}
+      h1{font-size:2.3rem;letter-spacing:-.8px}.lede{font-size:1.05rem}
+    }
+    @media(prefers-reduced-motion:reduce){.aurora::before,.aurora::after,.eyebrow::before{animation:none}}
+  </style>
+</head>
+<body>
+  <div class="aurora" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="home" href="https://emmaleonhart.com">&larr; emmaleonhart.com</a>
+    <a class="gh" href="https://github.com/EmmaLeonhart/querykey">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </header>
+
+  <main>
+    <span class="eyebrow">QueryKey &mdash; early</span>
+    <h1>QueryKey</h1>
+    <p class="lede">A social network you run locally from your own desktop. QueryKey has the elements of a <em>personal relationship manager</em> and uses local AI agents to help you keep up with the people in your life &mdash; while respecting your privacy and theirs.</p>
+    <p class="note">Built on a local-first ingest &rarr; knowledge-graph engine. The project is early and mid-pivot from its earlier <em>Secretarybird</em> form; the repository has the honest, up-to-date status.</p>
+    <div class="links">
+      <a href="https://github.com/EmmaLeonhart/querykey">View source on GitHub</a>
+      <a href="https://emmaleonhart.com/projects/">All projects</a>
+    </div>
+  </main>
+
+  <footer>querykey.emmaleonhart.com</footer>
+</body>
+</html>
