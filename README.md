@@ -1,140 +1,149 @@
-# Secretarybird Pivot
+# QueryKey
 
-An AI secretary that actively manages your team's communication. It ingests messy, unstructured input — verbal instructions, Discord chats, voice notes, screenshots, recorded meetings — extracts structured tasks and contradictions, and then **conversationally follows up with people** to verify understanding, resolve conflicts, and keep everyone aligned.
-
-**The secretarybird is here to serve you. You don't serve it.**
-
-Built with **Flutter** (mobile, desktop, web). Analysis powered by **OpenClaw**.
+**A social network you run locally from your own desktop.** QueryKey has the
+elements of a personal relationship manager (PRM) and uses local AI agents to
+help you keep up with the people in your life — while respecting your privacy
+and the privacy of everyone you talk to.
 
 🌐 **Website: <https://querykey.emmaleonhart.com>**
 
-## Philosophy
+> **Status: early, and mid-pivot.** This repository is a pivot of a pivot. The
+> long-term product is **QueryKey** (personal, local-first, relationship-centric).
+> The code you'll find here is still largely the **Secretarybird** engine it grew
+> out of — a team-coordination AI secretary — being repurposed toward the
+> QueryKey vision. Most modules, the Go module path, and the Flutter app are
+> still named `secretarybird`. Renaming and re-pointing are in progress; treat
+> the "Secretarybird" naming as the current state of the code, not the goal.
 
-Tools like Jira, Git, and Azure DevOps often become performative work — people spend more time maintaining the tool than doing the actual work. Status updates become theater. Ticket grooming becomes a job in itself.
+---
 
-Secretarybird takes the opposite approach:
-- **The tool serves you, not the other way around.** You never need to fill out a form, file a ticket, or update a status. The system figures it out from your actual communication.
-- **We connect to existing tools, not replace them.** Secretarybird integrates with Git, Jira, Azure DevOps, and other project management tools. It can sync extracted tasks into those systems so teams that need formal tracking get it automatically — without anyone manually entering data.
-- **We are not a no-code solution. We are an "AI writes the code" solution.** The system doesn't give you drag-and-drop workflow builders. It uses AI to do the actual hard work — parsing unstructured input, resolving entities, detecting contradictions, writing the integrations. The intelligence is in the AI, not in a visual editor.
+## What QueryKey is (the vision)
 
-## The Problem
+QueryKey runs on *your* machine. It watches the messy, unstructured streams of
+how you actually communicate — chat logs, pasted conversations, screenshots,
+voice notes — and uses local AI to build a private model of the people and
+commitments in your life. It then helps you, proactively and quietly, keep
+those relationships in good standing.
 
-A very large amount of money is lost in businesses due to contradictory or vague verbal instructions. Tasks get assigned informally and people walk away with different understandings of who is doing what. There is no single source of truth for informal task delegation — and nobody is going to start filing Jira tickets for what their boss said in passing.
+The principles it inherits and keeps:
 
-The best way to know what someone thinks they're supposed to do is to ask them. No tool does this today.
+- **Local-first for privacy.** The server runs on your own machine. Nothing has
+  to leave your desktop. The privacy that matters is not just yours — it's the
+  privacy of the people you talk about too.
+- **The tool serves you.** You never reformat your life to fit a form. You
+  communicate the way you already do; the system meets you there.
+- **AI does the hard work, and admits when it's unsure.** Extraction carries
+  confidence scores. When the system isn't sure, it asks instead of guessing
+  silently. Everything it records is visible and auditable — nothing hidden.
+- **A relationship knowledge graph, not a dashboard to maintain.** People,
+  conversations, commitments, and the links between them are stored as a graph
+  you own.
 
-## The Solution
+The PRM / social-network framing (people-first instead of team-task-first) is
+the *direction*; the current code still expresses the older team-secretary
+framing. See **Status** below for what is real today versus planned.
 
-Secretarybird is an AI secretary. It doesn't just passively organize — it **actively engages with your team**.
+## Lineage — the pivot of a pivot
 
-**Ingest**: It accepts any form of communication input (verbal, text, screenshots, bot feeds) and builds a continuously updated knowledge graph.
+1. **tojo-assistant / Secretary Bird Assistant** — an Electron desktop app +
+   Python FastAPI backend talking to OpenClaw over WSL. Archived under
+   [`secretarybird-old/`](secretarybird-old/) with its full git history. Kept
+   as reference for the OpenClaw/WSL integration and the WSL socket issues that
+   recur in every iteration — not maintained.
+2. **Secretarybird** — a rewrite to a Flutter app + Go server: an AI secretary
+   that ingests unstructured team communication, extracts tasks and
+   contradictions via OpenClaw, and follows up with people. This is what the
+   current `app/` and `server/` code actually implements.
+3. **QueryKey** — repointing that same ingest → extract → knowledge-graph →
+   follow-up engine away from team coordination and toward a personal,
+   local-first social/PRM tool. This is the current pivot, in progress.
 
-**Extract**: OpenClaw processes incoming information and extracts who was assigned what, when, by whom, and flags contradictions and ambiguities.
+## Architecture (what's actually in the tree)
 
-**Follow up**: This is the differentiator. Secretarybird **talks to people**. When it detects a contradiction — "in this conversation you were told to finish the video by 10 PM, but in this other one you were told 8 AM" — it messages the relevant person and asks which one they're planning to follow. It asks simple questions, listens, records the answers, and exchanges information between team members.
+| Component | Stack | Where |
+|---|---|---|
+| Desktop/mobile app | Flutter (Dart `sdk ^3.10.8`); `provider`, `web_socket_channel`, `http`, `uuid`, `intl` | [`app/`](app/) |
+| Server | Go 1.23 (`discordgo`, `gorilla/websocket`, `google/uuid`); module `github.com/secretarybird/server` | [`server/`](server/) |
+| AI engine | **OpenClaw** via a local gateway running in WSL Ubuntu (port `18789`) | `server/internal/openclaw/` |
+| Knowledge graph | Apache Jena **Fuseki** triple store (planned; client is currently a stub) | `server/internal/graph/` |
+| Ingest surface | Discord bot (DM-first, hourly batch) + pasted text / screenshots / voice notes | `server/internal/discord/`, `server/internal/ingest/` |
+| Real-time | WebSocket hub | `server/internal/ws/` |
 
-**Notify**: It sends notifications based on scheduling, deadlines, and extracted commitments. It doesn't wait for someone to check a dashboard.
+Local endpoints when running: server `http://127.0.0.1:8000`, health
+`/health`, WebSocket `ws://127.0.0.1:8000/ws/chat`, OpenClaw gateway
+`http://127.0.0.1:18789`.
 
-**Verify**: The primary purpose is **verifiability of verbal instructions**. When your boss tells you something in passing, the system captures it, confirms it with you, and creates a clear record that both parties can reference.
+## Status — what works today
 
-### How It Communicates
+This is early. Roughly: planning and data models are complete; the AI bridge
+is functional; most product behavior is scaffolding.
 
-The AI sends **short, simple messages**. The goal is not to explain things. The goal is to:
-- Ask a clear question
-- Listen to the answer
-- Record it
-- Pass relevant information between team members
+**Working / functional**
+- OpenClaw bridge: detects/auto-starts the WSL gateway, streams completions,
+  retries, health-polls.
+- Data models: the full entity set (Person, Handle, Task, Event, Message,
+  Conflict, Instruction, OpenQuestion, FollowUp, VoiceProfile, …) defined in
+  both Go and Dart, and aligned.
+- Config loading, REST route/handler skeleton, WebSocket connection layer
+  (auto-reconnect, streaming protocol), Flutter navigation shell with Chat /
+  Tasks / Ingest screens, Discord bot connection + message buffering.
 
-It acts like a good secretary — concise, organized, never the center of attention. It asks "Are you doing X or Y?" not "Based on my analysis of the situational context, I've identified a potential discrepancy..."
+**Scaffolded / partial**
+- Ingestion pipeline (accepts input, calls OpenClaw; result parsing is basic).
+- Fuseki graph store (ping/dataset-ensure only; no real SPARQL yet).
+- WebSocket hub (clients tracked; graph-diff broadcast minimal).
+- Discord bot (connected and buffering; no follow-up or contradiction logic).
 
-### Epistemic Humility
+**Planned / not started**
+- The follow-up engine (detect contradiction → open question → message the
+  person), conflict resolution, daily check-ins.
+- Calendar/scheduling, the audio/voice pipeline, external tool sync.
+- The QueryKey re-frame itself: PRM/social-network model, the rename off
+  "Secretarybird", and the personal (single-user, relationship-centric)
+  reorientation of the engine.
 
-The AI does not need to be perfect. It needs to know when it's not sure.
+See [`todo.md`](todo.md) for the full 10-phase roadmap.
 
-Expected accuracy model:
-- **~75%** — correctly extracted from data feeds, no follow-up needed
-- **~20%** — extracted incorrectly, but the system recognizes the uncertainty and asks a clarifying question, getting to the right answer
-- **~5%** — genuine errors where the system is wrong and doesn't catch it
+## Running it
 
-This is a success. The reason the system can tolerate imperfect extraction is precisely because it has the ability to ask. A passive tool that's wrong 25% of the time is useless. An active secretary that's wrong 25% of the time but catches most of its mistakes by asking? That's a good secretary.
+Windows + WSL is the current target. Prerequisites:
 
-Everything the system records is visible and auditable. All context is provided in places where people can view it — followable calendars, task boards, conversation logs. Nothing is hidden. If the AI got something wrong, anyone can see it and correct it.
+- **Go** (1.23+) — `winget install GoLang.Go`
+- **Flutter** (Dart SDK 3.10.8+) on `PATH`
+- **WSL Ubuntu** with **OpenClaw** installed (for AI features; the server runs
+  without it, but AI chat/extraction needs the gateway)
 
-### Voice Learning
+Then, from the repo root:
 
-Secretarybird learns the voices of team members. Over time, it identifies who is speaking in recorded meetings and conversations without manual tagging. This makes verbal instruction capture seamless — record a conversation, and the system knows who said what.
+```bat
+!run.bat
+```
 
-## Unstructured Input — Anything Goes
+That script builds the Go server, runs `flutter pub get`, starts the OpenClaw
+gateway in WSL, launches the server, and runs the Flutter app on Windows
+(`flutter run -d windows`). Closing the app window tears everything back down.
 
-The core design principle is that **any form of input works**. Users should never feel like they need to format something correctly. The system handles:
+`!runClaude.bat` just opens Claude Code at the repo root.
 
-| Input Type | How It Works |
+## Repository layout
+
+| Path | What it is |
 |---|---|
-| **Discord bot** (top priority) | Reads all server messages, DMs people with questions, receives replies. Hourly batch processing by default. |
-| Slack bot | Same model as Discord, for Slack workspaces |
-| Pasted Discord chatlogs | Copy-paste a conversation, AI parses it |
-| Screenshots | Paste or upload a screenshot of a conversation, OCR + AI extracts content |
-| Voice notes | Record a voice memo explaining what someone told you |
-| Recorded conversations | Phone app records meetings/calls, streams audio for transcription |
-| Pasted text | Any freeform text — email forwards, notes, whatever |
+| [`app/`](app/) | Flutter app (Dart) — desktop-first; Chat / Tasks / Ingest screens |
+| [`server/`](server/) | Go server — ingest, OpenClaw bridge, WebSocket, (planned) graph store |
+| [`docs/`](docs/) | `architecture.md`, `data-model.md`, `why-go.md` — design and entity model |
+| [`dev_scheduling/`](dev_scheduling/) | Dev-time agent data (`receipts/discord/`), committed so CI can write to it |
+| [`secretarybird-old/`](secretarybird-old/) | Archive of the original Electron/Python project (with history); reference only |
+| [`todo.md`](todo.md) | 10-phase roadmap |
+| `CLAUDE.md` | Workflow rules and architecture decisions for working in this repo |
+| `README_cleanvibe.md` | cleanvibe scaffolding placeholder |
+| `!run.bat`, `!runClaude.bat` | Windows run scripts |
 
-The Discord bot is the primary interaction surface for many users. It DMs you, you reply. No app install required for basic interaction. The Flutter app adds richer features (task boards, calendars, audio recording) on top.
+## A note on the name
 
-## System Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│              Secretarybird Mobile / Desktop              │
-│                    (Flutter App)                         │
-│  ┌──────────────────┐  ┌────────────────────────────┐   │
-│  │  Mobile Features  │  │    Shared Features         │   │
-│  │ - Mic recording   │  │ - Knowledge graph view     │   │
-│  │ - Voice notes     │  │ - Task board (Jira-style)  │   │
-│  │ - Push notifs     │  │ - Contradiction alerts     │   │
-│  └────────┬─────────┘  │ - Unstructured import       │   │
-│           │             │   (paste, screenshot, text) │   │
-│           │             └──────────────┬─────────────┘   │
-└───────────┼────────────────────────────┼─────────────────┘
-            │          WebSocket         │
-            ▼                            ▼
-┌─────────────────────────────────────────────────────────┐
-│              Secretarybird Server                         │
-│           (local or cloud deployment)                    │
-│                                                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │ Ingest       │  │ Knowledge    │  │ Real-time    │  │
-│  │ Service      │  │ Graph Store  │  │ Sync         │  │
-│  │ - Any input  │  │ - Entities   │  │ - WebSocket  │  │
-│  │ - Normalize  │  │ - Tasks      │  │ - Graph diff │  │
-│  │ - OCR        │  │ - Relations  │  │ - Push       │  │
-│  │ - Transcribe │  │ - Conflicts  │  │              │  │
-│  └──────┬───────┘  └──────────────┘  └──────────────┘  │
-│         │                                                │
-│         ▼                                                │
-│  ┌──────────────┐                                        │
-│  │ OpenClaw     │  AI analysis: entity extraction,       │
-│  │ (Analysis)   │  task detection, contradiction         │
-│  │              │  detection, ambiguity scoring           │
-│  └──────────────┘                                        │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Secretarybird Server** can run locally on a machine or deployed to the cloud. It handles ingestion, storage, real-time sync, outbound messaging, and coordinates with OpenClaw for AI analysis.
-
-**Secretarybird Mobile** is the Flutter app — runs on phone, desktop, and web. Where team members receive questions, view the live task feed, and record conversations.
-
-## Tech Stack
-
-- **Frontend**: Flutter (iOS, Android, Desktop, Web) — single codebase
-- **Server**: Secretarybird Server (local or cloud)
-- **AI Analysis**: OpenClaw
-- **Audio**: On-device recording, server-side transcription
-- **Real-time**: WebSocket connections for live feed updates and graph changes
-
-## Project Status
-
-**Planning phase.** See `/docs` for detailed planning documents. See `todo.md` for the full roadmap.
-
-## `/secretarybird-old`
-
-The `secretarybird-old/` directory contains the full history of the original secretarybird project (Electron-based, previously called tojo-assistant). It was imported with preserved git history as an archive. This is a new project with different frontend architecture (Flutter instead of Electron), but some of the old work is directly relevant — particularly the backend OpenClaw integration and the socket communication issues with WSL, which will likely recur in Flutter just as they did in Electron. The old code is reference material, but the backend/OpenClaw pieces are important to keep in mind.
+The website and product are **QueryKey**. The codebase still says
+**Secretarybird** in most places (Go module `github.com/secretarybird/server`,
+the Flutter package, window titles, the OpenClaw system prompt). That's
+expected for now — the pivot is ongoing and the rename has not been done. If
+you're reading the code, mentally substitute: *Secretarybird is the engine,
+QueryKey is where it's going.*
