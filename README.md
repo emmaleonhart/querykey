@@ -1,9 +1,16 @@
 # QueryKey
 
-**A social network you run locally from your own desktop.** QueryKey has the
-elements of a personal relationship manager (PRM) and uses local AI agents to
-help you keep up with the people in your life — while respecting your privacy
-and the privacy of everyone you talk to.
+**A rationalist social network you run locally from your own desktop** — and,
+underneath, a personal relationship manager (PRM), a lightweight CRM, and a
+JIRA-style task tracker for your own life. QueryKey uses a local AI agent to
+help you keep up with the people and commitments in your life, while
+respecting your privacy and the privacy of everyone you talk to.
+
+> **The name.** "QueryKey" comes from the **Q / K / V** (query, key, value)
+> projections in a transformer's attention matrix. Your day, relationships,
+> and tasks are the *values*; the local agent attends over them by computing
+> *queries* from your current intent against *keys* built from your notes,
+> chat logs, and prior conversations.
 
 🌐 **Website: <https://querykey.emmaleonhart.com>**
 
@@ -34,18 +41,25 @@ Principles:
 - **A relationship knowledge graph, not a dashboard to maintain.** People,
   conversations, commitments, and the links between them are stored as a graph
   you own.
+- **Your data is plain markdown on your disk.** Tasks, events, and notes are
+  intended to live as markdown files you can open and edit in any editor —
+  the AI operates *on* those files; it does not lock your life inside an
+  app database. (On-disk format is still being designed — see `queue.md`.)
+- **Rationalist by disposition.** Confidence scores, "I'm not sure, want me
+  to ask?", and an auditable record are the central UX, not a footnote.
 
-The PRM / social-network framing (people-first) is the *direction*; the engine
-is still being reoriented toward it. See **Status** below for what is real
-today versus planned.
+It is **PRM + lightweight CRM + JIRA-style task tracker in one**, for one
+person: the people-first social-network framing is the *direction*; the
+engine is still being reoriented toward it. See **Status** below for what is
+real today versus planned.
 
 ## Architecture (what's actually in the tree)
 
 | Component | Stack | Where |
 |---|---|---|
 | Desktop/mobile app | Flutter (Dart `sdk ^3.10.8`); `provider`, `web_socket_channel`, `http`, `uuid`, `intl` | [`app/`](app/) |
-| Server | Go 1.23 (`discordgo`, `gorilla/websocket`, `google/uuid`) | [`server/`](server/) |
-| AI engine | **OpenClaw** via a local gateway running in WSL Ubuntu (port `18789`) | `server/internal/openclaw/` |
+| Server | Go 1.23 (`discordgo`, `gorilla/websocket`, `google/uuid`) — **deprecated; the target language is Rust** (no rewrite yet) | [`server/`](server/) |
+| AI engine | A **model-agnostic local agent** (default model: **Gemma**; switchable). *Today's implementation:* OpenClaw via a local WSL gateway (port `18789`) — an implementation detail to be superseded by the Rust rewrite | `server/internal/openclaw/` |
 | Knowledge graph | Apache Jena **Fuseki** triple store (planned; client is currently a stub) | `server/internal/graph/` |
 | Ingest surface | Discord bot (DM-first, hourly batch) + pasted text / screenshots / voice notes | `server/internal/discord/`, `server/internal/ingest/` |
 | Real-time | WebSocket hub | `server/internal/ws/` |
@@ -81,8 +95,13 @@ is functional; most product behavior is scaffolding.
 - Calendar/scheduling, the audio/voice pipeline, external tool sync.
 - The full QueryKey re-frame: the PRM / social-network model and the personal
   (single-user, relationship-centric) reorientation of the engine.
+- **Server rewrite in Rust** (the Go server is deprecated; not started).
+- **Local-first markdown task model** (on-disk format not yet designed).
+- Making the local agent genuinely model-agnostic with **Gemma** as the
+  default (OpenClaw is today's bridge, to be superseded).
 
-See [`todo.md`](todo.md) for the full roadmap.
+See [`queue.md`](queue.md) for the authoritative near-term plan and
+[`todo.md`](todo.md) for the full phased roadmap.
 
 ## Running it
 
@@ -111,9 +130,10 @@ gateway in WSL, launches the server, and runs the Flutter app on Windows
 |---|---|
 | [`app/`](app/) | Flutter app (Dart) — desktop-first; Chat / Tasks / Ingest screens |
 | [`server/`](server/) | Go server — ingest, OpenClaw bridge, WebSocket, (planned) graph store |
-| [`docs/`](docs/) | `architecture.md`, `data-model.md`, `why-go.md` — design and entity model |
+| [`docs/`](docs/) | `architecture.md`, `data-model.md`, `versions-comparison.md`, `why-go.md` — design, entity model, history |
+| [`chat/`](chat/) | Vision corpus (chat-log exports); gitignored except its README — private context, not a spec |
 | [`dev_scheduling/`](dev_scheduling/) | Dev-time agent data (`receipts/discord/`), committed so CI can write to it |
-| [`todo.md`](todo.md) | Roadmap |
+| [`queue.md`](queue.md) | Authoritative near-term plan / recovery dump |
+| [`todo.md`](todo.md) | Full phased roadmap |
 | `CLAUDE.md` | Workflow rules and architecture decisions for working in this repo |
-| `README_cleanvibe.md` | cleanvibe scaffolding placeholder |
 | `!run.bat`, `!runClaude.bat` | Windows run scripts |
