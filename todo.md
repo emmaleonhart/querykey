@@ -1,21 +1,40 @@
-# Secretarybird Pivot — Master TODO
+# QueryKey — Master TODO
+
+> **Status of this file.** QueryKey is a local-first social network / PRM you
+> run from your own desktop. The roadmap below grew out of an earlier
+> team-coordination framing ("Secretarybird") and most of the phases still
+> apply — the entity model, ingestion pipeline, AI bridge, calendar layer, and
+> audio pipeline carry over almost unchanged. Items written as "everyone on
+> the team" or "every team member" should be read as "every person in your
+> contact graph" under the QueryKey framing.
 
 ## Core Behavior
 
-The bot DMs every person on Discord individually and asks them what they think they're doing that day / over that time period with the project. It surfaces ambiguities, contradictions, and unconfirmed tasks — then asks the relevant people directly. It doesn't need to be perfectly correct. Everything it extracts shows a **confidence/certainty indicator** so people know what the AI is sure about vs guessing at.
+QueryKey watches the unstructured streams of how you actually communicate —
+chat logs, pasted conversations, screenshots, voice notes — and uses local AI
+to build a private model of the people and commitments in your life. It
+surfaces ambiguities, contradictions, and unconfirmed commitments — then asks
+*you* (or, where appropriate, the relevant person) to clarify. It doesn't need
+to be perfectly correct. Everything it extracts shows a **confidence/certainty
+indicator** so you know what the AI is sure about vs guessing at.
 
 ### We Serve You — The Mission
 
-Secretarybird exists to serve you as a secretary and conform to your workflow. The tool adapts to how you already work. The purpose is to get everyone on the same page so that everyone can look at and verify what they need. It is a coordination tool — information flows to help people coordinate, not to create a paper trail against them.
+QueryKey exists to serve you and conform to your workflow. The tool adapts to
+how you already work. The purpose is to help you keep up with the people in
+your life — coordination and care, not surveillance. The privacy that matters
+is not just yours: it's the privacy of the people you talk about too.
 
 ### Open Questions System
 
-Each team member has a queue of **open questions** the bot is trying to get resolved. These are things the system needs clarity on — contradictions, ambiguities, unconfirmed assignments, etc.
+You (and, in shared/team modes, each person) have a queue of **open questions**
+the system is trying to get resolved. These are things QueryKey needs clarity
+on — contradictions, ambiguities, unconfirmed commitments, etc.
 
 - Questions have **urgency levels**: "needs to be known by 8 AM", "needs to be known by end of day", "needs to be known ASAP", "whenever you get to it"
-- People can open the app and see all their pending questions and resolve them at their own pace
-- The bot will attempt to get answers via DM on a schedule based on urgency
-- Questions that get resolved (by anyone, on any platform) disappear from the queue
+- You can open the app and see all pending questions and resolve them at your own pace
+- QueryKey will attempt to get answers via DM (in-app, then Discord, etc.) on a schedule based on urgency
+- Questions that get resolved (anywhere, on any platform) disappear from the queue
 
 ## Platform Targets
 
@@ -49,7 +68,7 @@ Implements the entities from `docs/data-model.md`. Uses **Apache Jena Fuseki** a
 
 ### User Accounts
 
-People have **real accounts** on Secretarybird. This is not just a manager tool — everyone on the team uses it.
+People have **real accounts** on QueryKey. In personal/PRM mode there is one account (yours); in shared/team mode, everyone you coordinate with has one. Either way, accounts are real — not just admin rows in a manager tool.
 
 - [ ] **Account system** — users have logins on the app
   - Initial account creation via **Discord OAuth** (since Discord bot is first)
@@ -142,7 +161,7 @@ The app has its own built-in messaging system between the bot and each user. Thi
 The Discord bot is the primary external interaction surface. First integration to build.
 
 - [ ] **Bot setup** — Discord bot application, permissions, OAuth
-- [ ] **Account creation via Discord** — replying to the bot or interacting with it can create your Secretarybird account
+- [ ] **Account creation via Discord** — replying to the bot or interacting with it can create your QueryKey account
 - [ ] **Channel monitoring** — read every message in monitored channels
 - [ ] **DM interaction** — bot DMs people with follow-up questions, task confirmations, contradiction alerts
   - People reply to DMs → responses recorded as follow-up answers
@@ -229,7 +248,7 @@ The Discord bot is the primary external interaction surface. First integration t
 
 ## Phase 10 — Server & Real-time
 
-- [ ] **Secretarybird Server** — ingestion, knowledge graph storage, real-time sync, OpenClaw coordination
+- [ ] **QueryKey Server** — ingestion, knowledge graph storage, real-time sync, OpenClaw coordination
 - [ ] **Local mode** — server on user's machine (privacy-first)
 - [ ] **Cloud mode** — always-on for distributed teams
 - [ ] **Hybrid mode** — always-on with local processing option
