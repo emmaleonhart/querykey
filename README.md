@@ -7,13 +7,9 @@ and the privacy of everyone you talk to.
 
 🌐 **Website: <https://querykey.emmaleonhart.com>**
 
-> **Status: early, and mid-pivot.** This repository is a pivot of a pivot. The
-> long-term product is **QueryKey** (personal, local-first, relationship-centric).
-> The code you'll find here is still largely the **Secretarybird** engine it grew
-> out of — a team-coordination AI secretary — being repurposed toward the
-> QueryKey vision. Most modules, the Go module path, and the Flutter app are
-> still named `secretarybird`. Renaming and re-pointing are in progress; treat
-> the "Secretarybird" naming as the current state of the code, not the goal.
+> **Status: early.** The QueryKey vision below is the target; the codebase is
+> an in-progress engine being built and reoriented toward it. See **Status**
+> for what is real today versus planned.
 
 ---
 
@@ -25,7 +21,7 @@ voice notes — and uses local AI to build a private model of the people and
 commitments in your life. It then helps you, proactively and quietly, keep
 those relationships in good standing.
 
-The principles it inherits and keeps:
+Principles:
 
 - **Local-first for privacy.** The server runs on your own machine. Nothing has
   to leave your desktop. The privacy that matters is not just yours — it's the
@@ -39,31 +35,16 @@ The principles it inherits and keeps:
   conversations, commitments, and the links between them are stored as a graph
   you own.
 
-The PRM / social-network framing (people-first instead of team-task-first) is
-the *direction*; the current code still expresses the older team-secretary
-framing. See **Status** below for what is real today versus planned.
-
-## Lineage — the pivot of a pivot
-
-1. **tojo-assistant / Secretary Bird Assistant** — an Electron desktop app +
-   Python FastAPI backend talking to OpenClaw over WSL. Archived under
-   [`secretarybird-old/`](secretarybird-old/) with its full git history. Kept
-   as reference for the OpenClaw/WSL integration and the WSL socket issues that
-   recur in every iteration — not maintained.
-2. **Secretarybird** — a rewrite to a Flutter app + Go server: an AI secretary
-   that ingests unstructured team communication, extracts tasks and
-   contradictions via OpenClaw, and follows up with people. This is what the
-   current `app/` and `server/` code actually implements.
-3. **QueryKey** — repointing that same ingest → extract → knowledge-graph →
-   follow-up engine away from team coordination and toward a personal,
-   local-first social/PRM tool. This is the current pivot, in progress.
+The PRM / social-network framing (people-first) is the *direction*; the engine
+is still being reoriented toward it. See **Status** below for what is real
+today versus planned.
 
 ## Architecture (what's actually in the tree)
 
 | Component | Stack | Where |
 |---|---|---|
 | Desktop/mobile app | Flutter (Dart `sdk ^3.10.8`); `provider`, `web_socket_channel`, `http`, `uuid`, `intl` | [`app/`](app/) |
-| Server | Go 1.23 (`discordgo`, `gorilla/websocket`, `google/uuid`); module `github.com/secretarybird/server` | [`server/`](server/) |
+| Server | Go 1.23 (`discordgo`, `gorilla/websocket`, `google/uuid`) | [`server/`](server/) |
 | AI engine | **OpenClaw** via a local gateway running in WSL Ubuntu (port `18789`) | `server/internal/openclaw/` |
 | Knowledge graph | Apache Jena **Fuseki** triple store (planned; client is currently a stub) | `server/internal/graph/` |
 | Ingest surface | Discord bot (DM-first, hourly batch) + pasted text / screenshots / voice notes | `server/internal/discord/`, `server/internal/ingest/` |
@@ -98,11 +79,10 @@ is functional; most product behavior is scaffolding.
 - The follow-up engine (detect contradiction → open question → message the
   person), conflict resolution, daily check-ins.
 - Calendar/scheduling, the audio/voice pipeline, external tool sync.
-- The QueryKey re-frame itself: PRM/social-network model, the rename off
-  "Secretarybird", and the personal (single-user, relationship-centric)
-  reorientation of the engine.
+- The full QueryKey re-frame: the PRM / social-network model and the personal
+  (single-user, relationship-centric) reorientation of the engine.
 
-See [`todo.md`](todo.md) for the full 10-phase roadmap.
+See [`todo.md`](todo.md) for the full roadmap.
 
 ## Running it
 
@@ -133,17 +113,7 @@ gateway in WSL, launches the server, and runs the Flutter app on Windows
 | [`server/`](server/) | Go server — ingest, OpenClaw bridge, WebSocket, (planned) graph store |
 | [`docs/`](docs/) | `architecture.md`, `data-model.md`, `why-go.md` — design and entity model |
 | [`dev_scheduling/`](dev_scheduling/) | Dev-time agent data (`receipts/discord/`), committed so CI can write to it |
-| [`secretarybird-old/`](secretarybird-old/) | Archive of the original Electron/Python project (with history); reference only |
-| [`todo.md`](todo.md) | 10-phase roadmap |
+| [`todo.md`](todo.md) | Roadmap |
 | `CLAUDE.md` | Workflow rules and architecture decisions for working in this repo |
 | `README_cleanvibe.md` | cleanvibe scaffolding placeholder |
 | `!run.bat`, `!runClaude.bat` | Windows run scripts |
-
-## A note on the name
-
-The website and product are **QueryKey**. The codebase still says
-**Secretarybird** in most places (Go module `github.com/secretarybird/server`,
-the Flutter package, window titles, the OpenClaw system prompt). That's
-expected for now — the pivot is ongoing and the rename has not been done. If
-you're reading the code, mentally substitute: *Secretarybird is the engine,
-QueryKey is where it's going.*
