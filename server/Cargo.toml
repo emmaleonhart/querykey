@@ -30,6 +30,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1"
 thiserror = "1"
 async-trait = "0.1"
+toml = { version = "0.8", default-features = false, features = ["parse"] }
 
 # Loca / SutraDB graph store. Optional so the crate always builds even
 # without the sibling SutraDB checkout. Enable with: --features loca
