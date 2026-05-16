@@ -590,6 +590,21 @@ between peers) + discovery + the agent-drafted card↔graph projection
 (the PRM it would draw from now exists). Only loose end: R7-0's
 branch delete, handed to the user.
 
+---
+
+## Direction (2026-05-16) — social layer parked, PRM is the priority
+
+**User decision:** put the P2P / social layer **aside**. The card
+*format* + *local* layer (Round 7) is a good stopping point; the
+remaining social work is the **P2P transport**, which is an
+unresolved *design* question, not just unbuilt code — do **not**
+barrel a transport on a guess. The **PRM structure is the better
+thing to work on** and is where effort should go next: the social
+card is only ever a selective window into a graph the PRM builds, so
+deepening the PRM compounds; the social layer can wait for a real
+transport decision. Future sessions: prioritize PRM/vault/graph
+structure over anything P2P until the user reopens the social track.
+
 ## Notes for future sessions
 
 - The user dictates long stream-of-consciousness messages via voice. Do
@@ -611,3 +626,7 @@ branch delete, handed to the user.
   *format* is now built (Round 7) — the one real open design question
   is now the **P2P transport** (what actually moves a card between
   peers) + discovery; the format deliberately does not assume it.
+- **Priority (2026-05-16): PRM structure > social layer.** The P2P
+  track is parked pending a transport *design* decision; barrel PRM/
+  vault/graph structure until the user reopens social. See "Direction
+  (2026-05-16)" above.
