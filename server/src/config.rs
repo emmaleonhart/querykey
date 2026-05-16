@@ -14,7 +14,10 @@ pub struct Config {
     pub openclaw_agent_id: String,
     pub openclaw_token: String,
 
-    // Loca / SutraDB graph store (embedded; derived from markdown).
+    // Canonical markdown vault (the store of record).
+    pub vault_dir: String,
+
+    // Loca / SutraDB graph store (embedded; DERIVED from the vault).
     // Replaces the old Fuseki URL/dataset. Path to the .sdb directory.
     pub loca_db_path: String,
 
@@ -37,6 +40,7 @@ impl Config {
             openclaw_gateway_url: env_or("OPENCLAW_GATEWAY_URL", "http://127.0.0.1:18789"),
             openclaw_agent_id: env_or("OPENCLAW_AGENT_ID", "main"),
             openclaw_token: std::env::var("OPENCLAW_GATEWAY_TOKEN").unwrap_or_default(),
+            vault_dir: env_or("VAULT_DIR", "./vault"),
             loca_db_path: env_or("LOCA_DB_PATH", "./querykey.sdb"),
             discord_token: std::env::var("DISCORD_TOKEN").unwrap_or_default(),
             discord_guild_ids: Vec::new(),

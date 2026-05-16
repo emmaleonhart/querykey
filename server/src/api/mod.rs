@@ -19,6 +19,7 @@ use crate::ws::{ws_handler, Hub};
 pub struct AppState {
     pub bridge: Arc<Bridge>,
     pub graph: Arc<dyn GraphStore>,
+    pub vault: Arc<crate::vault::Vault>,
     pub hub: Arc<Hub>,
     pub pipeline: Arc<Pipeline>,
 }
@@ -101,57 +102,84 @@ async fn ingest(
     }
 }
 
+// Reads come from the canonical vault (full fidelity — no lossy
+// graph reconstruction). Writes go to the vault first, then project
+// into the derived graph (best-effort; the graph is rebuildable).
+
 async fn list_persons(State(s): State<Arc<AppState>>) -> Json<Value> {
-    let persons = s.graph.get_all_persons().await.unwrap_or_default();
-    Json(json!({ "persons": persons }))
+    Json(json!({ "persons": s.vault.list_persons() }))
 }
 
 async fn create_person(
     State(s): State<Arc<AppState>>,
     Json(p): Json<Person>,
 ) -> Json<Value> {
-    match s.graph.store_person(&p).await {
-        Ok(()) => Json(serde_json::to_value(p).unwrap()),
-        Err(e) => Json(json!({ "error": e.to_string() })),
+    if let Err(e) = s.vault.upsert_person(&p) {
+        return Json(json!({ "error": e.to_string() }));
     }
+    let _ = s.graph.store_person(&p).await; // derived projection
+    Json(serde_json::to_value(p).unwrap())
 }
 
 async fn person_tasks(
     State(s): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Json<Value> {
-    let tasks = s.graph.get_tasks_for_person(&id).await.unwrap_or_default();
-    Json(json!({ "tasks": tasks }))
+    Json(json!({ "tasks": s.vault.tasks_for_person(&id) }))
 }
 
 async fn list_tasks(State(s): State<Arc<AppState>>) -> Json<Value> {
-    let tasks = s.graph.get_all_tasks().await.unwrap_or_default();
-    Json(json!({ "tasks": tasks }))
+    Json(json!({ "tasks": s.vault.list_tasks() }))
 }
 
 async fn create_task(
     State(s): State<Arc<AppState>>,
     Json(t): Json<Task>,
 ) -> Json<Value> {
-    match s.graph.store_task(&t).await {
-        Ok(()) => Json(serde_json::to_value(t).unwrap()),
-        Err(e) => Json(json!({ "error": e.to_string() })),
+    if let Err(e) = s.vault.upsert_task(&t) {
+        return Json(json!({ "error": e.to_string() }));
     }
+    let _ = s.graph.store_task(&t).await; // derived projection
+    Json(serde_json::to_value(t).unwrap())
+}
+
+#[derive(Deserialize)]
+struct TaskPatch {
+    status: Option<crate::models::TaskStatus>,
+    title: Option<String>,
+    description: Option<String>,
 }
 
 async fn update_task(
-    State(_s): State<Arc<AppState>>,
+    State(s): State<Arc<AppState>>,
     Path(id): Path<String>,
-    Json(_body): Json<Value>,
+    Json(patch): Json<TaskPatch>,
 ) -> Json<Value> {
-    // Honest: mutation is the canonical-markdown write path, which is
-    // not built yet (the derived graph is read-only/rebuildable, and
-    // loka has no SPARQL UPDATE writer — see R4-2). Not faking success.
-    Json(json!({
-        "id": id,
-        "status": "not_implemented",
-        "detail": "task mutation goes through the canonical markdown write path (docs/markdown-schema.md), not yet implemented"
-    }))
+    // Real mutation now: the vault is canonical. Read the markdown,
+    // apply the patch, write it back, re-project into the graph.
+    let uuid = match uuid::Uuid::parse_str(&id) {
+        Ok(u) => u,
+        Err(_) => return Json(json!({ "error": format!("bad task id: {id}") })),
+    };
+    let mut task = match s.vault.get_task(&uuid) {
+        Some(t) => t,
+        None => return Json(json!({ "error": "task not found" })),
+    };
+    if let Some(st) = patch.status {
+        task.status = st;
+    }
+    if let Some(t) = patch.title {
+        task.title = t;
+    }
+    if let Some(d) = patch.description {
+        task.description = d;
+    }
+    task.updated_at = chrono::Utc::now();
+    if let Err(e) = s.vault.upsert_task(&task) {
+        return Json(json!({ "error": e.to_string() }));
+    }
+    let _ = s.graph.store_task(&task).await; // derived projection
+    Json(serde_json::to_value(task).unwrap())
 }
 
 async fn list_conflicts(State(s): State<Arc<AppState>>) -> Json<Value> {

@@ -36,12 +36,23 @@ pub struct IngestResult {
 pub struct Pipeline {
     bridge: Arc<Bridge>,
     graph: Arc<dyn GraphStore>,
+    vault: Arc<crate::vault::Vault>,
     hub: Arc<Hub>,
 }
 
 impl Pipeline {
-    pub fn new(bridge: Arc<Bridge>, graph: Arc<dyn GraphStore>, hub: Arc<Hub>) -> Self {
-        Self { bridge, graph, hub }
+    pub fn new(
+        bridge: Arc<Bridge>,
+        graph: Arc<dyn GraphStore>,
+        vault: Arc<crate::vault::Vault>,
+        hub: Arc<Hub>,
+    ) -> Self {
+        Self {
+            bridge,
+            graph,
+            vault,
+            hub,
+        }
     }
 
     pub async fn process(&self, req: &IngestRequest) -> anyhow::Result<IngestResult> {
@@ -75,18 +86,24 @@ impl Pipeline {
         }
     }
 
-    /// Mirrors pipeline.go storeResults(): persist tasks + conflicts.
-    /// (Events are broadcast but not persisted, matching Go.)
+    /// Canonical-first: tasks/events are written to the **vault**
+    /// (the store of record) then projected into the derived graph.
+    /// Conflicts have no on-disk form yet (open sub-question in
+    /// docs/markdown-schema.md), so they stay graph-only for now.
     async fn store_results(&self, a: &AnalysisResult) {
         for t in &a.tasks {
-            if let Err(e) = self.graph.store_task(t).await {
-                tracing::warn!("[ingest] failed to store task: {e}");
+            if let Err(e) = self.vault.upsert_task(t) {
+                tracing::warn!("[ingest] failed to write task to vault: {e}");
+            }
+            let _ = self.graph.store_task(t).await; // derived projection
+        }
+        for e in &a.events {
+            if let Err(err) = self.vault.upsert_event(e) {
+                tracing::warn!("[ingest] failed to write event to vault: {err}");
             }
         }
         for c in &a.conflicts {
-            if let Err(e) = self.graph.store_conflict(c).await {
-                tracing::warn!("[ingest] failed to store conflict: {e}");
-            }
+            let _ = self.graph.store_conflict(c).await;
         }
     }
 

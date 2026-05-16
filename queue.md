@@ -469,14 +469,19 @@ honest `not_implemented` mutations).
       Round-trip unit test passes (caught + fixed a trailing-newline
       bug). serde_yaml dep added. All 3 builds green, zero warnings.
       (`VAULT_DIR` config wired in R5-2.)
-- [ ] R5-2. **Canonical-first wiring** — `AppState.vault`; API
-      create/list/get + **real** `update_task` write the vault then
-      project into the derived graph; reads come from the vault (full
-      fidelity — timestamps no longer lossy). `main` opens the vault
-      and **rebuilds the graph from it on startup** (derived contract).
-- [ ] R5-3. **Ingest → vault** + docs — pipeline `store_results`
-      writes the vault then projects; flip `docs/markdown-schema.md`
-      status to *implemented*; update CLAUDE/README/todo/queue.
+- [x] R5-2. **Canonical-first wiring** — done. `VAULT_DIR` config;
+      `AppState.vault` + `Pipeline.vault`. API create/list/get and
+      `update_task` (now **real** — read vault, patch, write, project)
+      go vault-first; reads are full-fidelity from the vault.
+      `main` opens the vault and **rebuilds the graph from it on
+      startup**. Pipeline `store_results` writes tasks/events to the
+      vault then projects (folded in here to avoid a dead field).
+      Smoke-verified end-to-end incl. **persistence across restart**
+      (a status mutation survived a full reboot via the markdown) and
+      the startup `projected vault → graph` rebuild. All 3 builds
+      green, zero warnings.
+- [ ] R5-3. **Docs** — flip `docs/markdown-schema.md` to *implemented*;
+      update CLAUDE/README/todo/queue; mark Round 5 complete.
 
 ## Notes for future sessions
 

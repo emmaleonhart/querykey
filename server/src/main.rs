@@ -10,6 +10,7 @@ use querykey_server::discord::DiscordBot;
 use querykey_server::graph::{memory::InMemoryGraph, GraphStore};
 use querykey_server::ingest::Pipeline;
 use querykey_server::openclaw::Bridge;
+use querykey_server::vault::Vault;
 use querykey_server::ws::Hub;
 
 #[tokio::main]
@@ -55,9 +56,36 @@ async fn main() -> anyhow::Result<()> {
     }
     let _ = graph.ensure_dataset().await;
 
+    // Canonical markdown vault (the store of record).
+    let vault = Arc::new(Vault::open(&cfg.vault_dir)?);
+    tracing::info!("[querykey] vault: {}", vault.root().display());
+
+    // The graph is a DERIVED index — rebuild it from the vault on
+    // startup so it always reflects the canonical files.
+    {
+        let people = vault.list_persons();
+        let tasks = vault.list_tasks();
+        for p in &people {
+            let _ = graph.store_person(p).await;
+        }
+        for t in &tasks {
+            let _ = graph.store_task(t).await;
+        }
+        tracing::info!(
+            "[querykey] projected vault → graph: {} person(s), {} task(s)",
+            people.len(),
+            tasks.len()
+        );
+    }
+
     // WebSocket hub + ingestion pipeline.
     let hub = Arc::new(Hub::new(bridge.clone()));
-    let pipeline = Arc::new(Pipeline::new(bridge.clone(), graph.clone(), hub.clone()));
+    let pipeline = Arc::new(Pipeline::new(
+        bridge.clone(),
+        graph.clone(),
+        vault.clone(),
+        hub.clone(),
+    ));
 
     // Optional Discord bot (not yet ported; no-op when absent).
     let _bot = DiscordBot::try_start(
@@ -69,6 +97,7 @@ async fn main() -> anyhow::Result<()> {
     let state = Arc::new(AppState {
         bridge: bridge.clone(),
         graph: graph.clone(),
+        vault: vault.clone(),
         hub: hub.clone(),
         pipeline,
     });
