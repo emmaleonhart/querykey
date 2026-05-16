@@ -243,6 +243,39 @@ pub struct LinkEdge {
     pub resolved: bool,
 }
 
+/// A compact, model-agnostic summary of the PRM the local agent
+/// attends over when drafting a card. Deliberately small: counts +
+/// the relations that actually matter, not a dump of the graph.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PrmDigest {
+    pub person_count: usize,
+    pub task_count: usize,
+    pub event_count: usize,
+    pub note_count: usize,
+    /// People you reference most (resolved inbound wikilinks).
+    pub top_people: Vec<DigestPerson>,
+    /// Distinct wikilink predicates in use — your relation vocabulary.
+    pub predicates: Vec<String>,
+    /// Targets linked with an "offering" predicate (offers/teaches/…)
+    /// — explicit key signal harvested from the graph.
+    pub offers: Vec<String>,
+    /// Targets linked with a "looking-for" predicate
+    /// (wants/needs/seeking/…) — explicit query signal.
+    pub wants: Vec<String>,
+    /// Titles of not-`done` tasks (capped).
+    pub active_tasks: Vec<String>,
+    /// Your current card, so a draft refines rather than resets it.
+    pub current_card: Option<crate::card::Card>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DigestPerson {
+    pub id: String,
+    pub display_name: String,
+    pub role: String,
+    pub mentions: usize,
+}
+
 /// One row of the merged agenda: a fixed event occurrence or a
 /// time-flexible task that has a deadline in the window. `movable`
 /// encodes the Task-vs-Event distinction ("if you can move it without
@@ -611,6 +644,84 @@ impl Vault {
             .into_iter()
             .filter(|e| e.resolved && e.to_kind == kind && e.to_id == id)
             .collect()
+    }
+
+    // ----- agent-drafted card (PRM → key/query) -----
+    //
+    // The agent's drafting behavior is governed by an editable,
+    // version-controlled `agents.md` at the vault root (the vision's
+    // "transparent, not a black box" envelope) — None if absent.
+
+    pub fn agents_md(&self) -> Option<String> {
+        fs::read_to_string(self.root.join("agents.md")).ok()
+    }
+
+    /// Build the compact PRM summary the drafter attends over.
+    pub fn prm_digest(&self) -> PrmDigest {
+        let persons = self.list_persons();
+        let tasks = self.list_tasks();
+        let links = self.collect_links();
+
+        const OFFER_PREDS: &[&str] = &[
+            "offers", "offering", "offer", "can-help", "can_help", "teaches", "provides",
+            "mentors",
+        ];
+        const WANT_PREDS: &[&str] = &[
+            "wants", "want", "looking-for", "looking_for", "needs", "need", "seeking", "seeks",
+        ];
+        let mut mentions: BTreeMap<String, usize> = BTreeMap::new();
+        let mut preds: std::collections::BTreeSet<String> = Default::default();
+        let (mut offers, mut wants): (Vec<String>, Vec<String>) = (Vec::new(), Vec::new());
+        for e in &links {
+            preds.insert(e.predicate.clone());
+            if e.resolved && e.to_kind == "person" {
+                *mentions.entry(e.to_id.clone()).or_insert(0) += 1;
+            }
+            let p = e.predicate.as_str();
+            if OFFER_PREDS.contains(&p) && !offers.contains(&e.to_label) {
+                offers.push(e.to_label.clone());
+            } else if WANT_PREDS.contains(&p) && !wants.contains(&e.to_label) {
+                wants.push(e.to_label.clone());
+            }
+        }
+        offers.truncate(15);
+        wants.truncate(15);
+
+        let mut top_people: Vec<DigestPerson> = persons
+            .iter()
+            .map(|p| DigestPerson {
+                id: p.id.clone(),
+                display_name: p.display_name.clone(),
+                role: p.role.clone(),
+                mentions: mentions.get(&p.id).copied().unwrap_or(0),
+            })
+            .collect();
+        top_people.sort_by(|a, b| {
+            b.mentions
+                .cmp(&a.mentions)
+                .then_with(|| a.display_name.cmp(&b.display_name))
+        });
+        top_people.truncate(10);
+
+        let active_tasks: Vec<String> = tasks
+            .iter()
+            .filter(|t| t.status != TaskStatus::Done)
+            .map(|t| t.title.clone())
+            .take(20)
+            .collect();
+
+        PrmDigest {
+            person_count: persons.len(),
+            task_count: tasks.len(),
+            event_count: self.list_events().len(),
+            note_count: self.list_notes().len(),
+            top_people,
+            predicates: preds.into_iter().collect(),
+            offers,
+            wants,
+            active_tasks,
+            current_card: self.get_card(),
+        }
     }
 
     fn write(&self, sub: &str, slug: &str, yaml: String, body: &str) -> anyhow::Result<()> {
