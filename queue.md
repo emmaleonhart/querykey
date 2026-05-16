@@ -429,9 +429,10 @@ real conflict/blocker.
       `models::GraphDiff` (added_nodes = tasks+events, new_conflicts);
       `ws.rs` wraps it as `WsMessage{type:"graph_diff", data}` exactly
       like hub.go BroadcastGraphDiff. Fan-out already worked.
-- [ ] R4-6. **dump-messages** — port the non-Discord parts; if it is
-      wholly Discord-coupled, leave the stub and note the dependency on
-      Phase Z (do not block Go removal on it).
+- [x] R4-6. **dump-messages** — triaged: **wholly Discord-coupled**
+      (discordgo session, guild/channel walk; no non-Discord part).
+      Stub kept, re-pointed at `todo.md` Phase Z + the serenity
+      feature. Explicitly does NOT block Go removal.
 - [ ] R4-7. **Parity review + DELETE `server-go-old/`** — once the Rust
       server covers everything non-deprioritized, delete the Go tree
       (history preserved in git, like `secretarybird-old/` was), and

@@ -1,17 +1,19 @@
 //! Port stub of server-go-old/cmd/dump-messages/main.go.
 //!
-//! The Go tool dumped buffered Discord messages (used by the
-//! cleanup-loop GitHub Action). It depends on the Discord bot, which
-//! is not yet ported (see src/discord.rs). This binary exists so the
-//! Cargo target mapping in server-go-old/README.md is real; it will be
-//! filled in alongside the Discord port.
+//! R4-6 triage: the Go tool is **wholly Discord-coupled** — it opens a
+//! discordgo session from DISCORD_TOKEN, walks guilds/channels, and
+//! dumps messages to `dev_scheduling/receipts/discord`. There is no
+//! non-Discord part to port. It therefore belongs with the
+//! **deprioritized Discord work in `todo.md` Phase Z**, not Round 4.
+//! It deliberately does NOT block deleting `server-go-old/`.
 //!
-//! TODO(port): server-go-old/cmd/dump-messages/main.go
+//! When Phase Z is picked up, port this against the feature-gated
+//! serenity bot (`server/src/discord.rs`, `--features discord`).
 
 fn main() {
     eprintln!(
-        "dump-messages: not yet ported to Rust (depends on the Discord \
-         bot port). See server-go-old/cmd/dump-messages/main.go and \
-         todo.md. Exiting 0 so CI scripts don't hard-fail."
+        "dump-messages: deferred with Discord (todo.md Phase Z; \
+         wholly Discord-coupled — see server-go-old/cmd/dump-messages). \
+         Exiting 0 so CI scripts don't hard-fail."
     );
 }
