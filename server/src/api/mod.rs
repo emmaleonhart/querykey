@@ -55,6 +55,15 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/questions/:id/resolve", post(resolve_question))
         // Follow-ups
         .route("/api/followups", get(list_followups).post(create_followup))
+        // P2P card layer (your key/query signal). Transport is the
+        // open question — these are local: edit, the 24h propagation
+        // safety valve, revert-before-propagation, read local peers.
+        .route("/api/card", get(get_card).put(put_card))
+        .route("/api/card/published", get(get_card_published))
+        .route("/api/card/revert", post(revert_card))
+        .route("/api/identity", get(get_identity))
+        .route("/api/peers", get(list_peers_h))
+        .route("/api/peers/:handle/card", get(get_peer_card_h))
         // Local-agent management
         .route("/api/openclaw/kill", post(openclaw_kill))
         .route("/api/openclaw/restart", post(openclaw_restart))
@@ -291,6 +300,122 @@ async fn create_followup(
         return Json(json!({ "error": e.to_string() }));
     }
     Json(serde_json::to_value(f).unwrap())
+}
+
+// ---- P2P card layer ----
+//
+// Local-only by design. Editing stages a card behind a 24h
+// propagation delay (the privacy safety valve); the published
+// snapshot is what a *future* transport would broadcast. What that
+// transport is remains the deliberately-unresolved open question —
+// no exchange/relay code here. Identity goes through the swappable
+// `crate::identity` provider (GitHub today), never named inline.
+
+fn card_state(s: &AppState) -> Value {
+    s.vault.promote_due_card(); // lazily propagate anything now due
+    let pending = s.vault.card_pending();
+    json!({
+        "card": s.vault.get_card(),
+        "propagation": {
+            "pending": pending.is_some(),
+            "eligible_at": pending.as_ref().map(|(_, t)| t.to_rfc3339()),
+            "published": s.vault.card_published().is_some(),
+        }
+    })
+}
+
+async fn get_card(State(s): State<Arc<AppState>>) -> Json<Value> {
+    Json(card_state(&s))
+}
+
+#[derive(Deserialize)]
+struct CardInput {
+    handle: String,
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    website: String,
+    #[serde(default)]
+    bio: String,
+    #[serde(default)]
+    offering: Vec<String>,
+    #[serde(default)]
+    looking_for: Vec<String>,
+    #[serde(default = "crate::card::default_visibility")]
+    visibility: String,
+}
+
+async fn put_card(
+    State(s): State<Arc<AppState>>,
+    Json(inp): Json<CardInput>,
+) -> Json<Value> {
+    let handle = crate::identity::default_provider()
+        .normalize(&inp.handle)
+        .to_string();
+    let card = crate::card::Card {
+        handle,
+        name: inp.name,
+        website: inp.website,
+        bio: inp.bio,
+        offering: inp.offering,
+        looking_for: inp.looking_for,
+        updated: chrono::Utc::now(),
+        visibility: inp.visibility,
+    };
+    if let Err(e) = s.vault.stage_card_edit(&card) {
+        return Json(json!({ "error": e.to_string() }));
+    }
+    Json(card_state(&s))
+}
+
+async fn get_card_published(State(s): State<Arc<AppState>>) -> Json<Value> {
+    s.vault.promote_due_card();
+    let pending = s.vault.card_pending();
+    Json(json!({
+        "published": s.vault.card_published(),
+        "pending": pending.is_some(),
+        "eligible_at": pending.as_ref().map(|(_, t)| t.to_rfc3339()),
+    }))
+}
+
+async fn revert_card(State(s): State<Arc<AppState>>) -> Json<Value> {
+    let reverted = s.vault.revert_pending_card();
+    let mut v = card_state(&s);
+    v["reverted"] = json!(reverted);
+    Json(v)
+}
+
+async fn get_identity(State(s): State<Arc<AppState>>) -> Json<Value> {
+    let p = crate::identity::default_provider();
+    match s.vault.get_card() {
+        Some(c) => {
+            let h = p.normalize(&c.handle);
+            Json(json!({
+                "handle": h.as_str(),
+                "scheme": h.scheme(),
+                "profile_url": p.profile_url(&h),
+            }))
+        }
+        None => Json(json!({
+            "handle": null,
+            "scheme": p.scheme(),
+            "profile_url": null,
+        })),
+    }
+}
+
+async fn list_peers_h(State(s): State<Arc<AppState>>) -> Json<Value> {
+    Json(json!({ "peers": s.vault.list_peers() }))
+}
+
+async fn get_peer_card_h(
+    State(s): State<Arc<AppState>>,
+    Path(handle): Path<String>,
+) -> Json<Value> {
+    match s.vault.get_peer_card(&handle) {
+        Some(c) => Json(serde_json::to_value(c).unwrap_or_else(|_| json!({}))),
+        None => Json(json!({ "error": "peer card not found", "handle": handle })),
+    }
 }
 
 async fn openclaw_kill(State(s): State<Arc<AppState>>) -> Json<Value> {

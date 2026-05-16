@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::vault::{compose, parse_dt, rfc3339, split};
 
-fn default_visibility() -> String {
+pub(crate) fn default_visibility() -> String {
     "public".into()
 }
 

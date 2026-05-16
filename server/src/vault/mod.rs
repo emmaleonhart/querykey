@@ -204,6 +204,8 @@ impl Vault {
             "conflicts",
             "questions",
             "followups",
+            "peers",     // others' cards — git-ignored (asymmetry)
+            ".querykey", // derived cache / propagation state — git-ignored
         ] {
             fs::create_dir_all(root.join(sub))?;
         }
@@ -261,6 +263,140 @@ impl Vault {
     pub fn upsert_card(&self, c: &crate::card::Card) -> anyhow::Result<()> {
         fs::write(self.card_path(), crate::card::render(c))?;
         Ok(())
+    }
+
+    // ----- 24h propagation delay (the privacy safety valve) -----
+    //
+    // docs/card-format.md: a card edit does NOT go out immediately. A
+    // drunk 11pm mistake can be corrected by morning and *nobody ever
+    // saw it*. We model the LOCAL side honestly:
+    //
+    //   card.md                      working/tracked (what you edit)
+    //   .querykey/card.pending.md    the staged edit, not yet out
+    //   .querykey/card.eligible_at   when it becomes eligible
+    //   .querykey/card.published.md  the frozen snapshot a transport
+    //                                would actually broadcast
+    //
+    // What *moves* card.published.md to peers is the deliberately
+    // unresolved TRANSPORT question — there is no transport code here;
+    // this is purely the local working↔published state + revert.
+
+    const PROPAGATION_DELAY_HOURS: i64 = 24;
+
+    fn pending_md(&self) -> PathBuf {
+        self.root.join(".querykey").join("card.pending.md")
+    }
+    fn eligible_at_file(&self) -> PathBuf {
+        self.root.join(".querykey").join("card.eligible_at")
+    }
+    fn published_md(&self) -> PathBuf {
+        self.root.join(".querykey").join("card.published.md")
+    }
+
+    /// The snapshot a peer would currently receive (None until the
+    /// first edit has propagated). Call `promote_due_card` first.
+    pub fn card_published(&self) -> Option<crate::card::Card> {
+        let s = fs::read_to_string(self.published_md()).ok()?;
+        crate::card::parse(&s)
+    }
+
+    /// The staged-but-not-yet-out edit and when it becomes eligible.
+    pub fn card_pending(&self) -> Option<(crate::card::Card, DateTime<Utc>)> {
+        let c = crate::card::parse(&fs::read_to_string(self.pending_md()).ok()?)?;
+        let at = parse_dt(fs::read_to_string(self.eligible_at_file()).ok()?.trim());
+        Some((c, at))
+    }
+
+    /// Write the working (tracked) card.md AND stage it as pending
+    /// with a 24h eligibility window. Does NOT touch the published
+    /// snapshot — the edit is invisible to peers until it propagates.
+    pub fn stage_card_edit(&self, c: &crate::card::Card) -> anyhow::Result<()> {
+        self.upsert_card(c)?;
+        fs::write(self.pending_md(), crate::card::render(c))?;
+        let eligible = Utc::now() + chrono::Duration::hours(Self::PROPAGATION_DELAY_HOURS);
+        fs::write(self.eligible_at_file(), rfc3339(&eligible))?;
+        Ok(())
+    }
+
+    /// If a pending edit's window has elapsed, promote it to the
+    /// published snapshot and clear the pending state. Idempotent;
+    /// returns true iff it promoted this call.
+    pub fn promote_due_card(&self) -> bool {
+        let Some((_, eligible)) = self.card_pending() else {
+            return false;
+        };
+        if Utc::now() < eligible {
+            return false;
+        }
+        if let Ok(md) = fs::read_to_string(self.pending_md()) {
+            if fs::write(self.published_md(), md).is_ok() {
+                let _ = fs::remove_file(self.pending_md());
+                let _ = fs::remove_file(self.eligible_at_file());
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Revert a not-yet-propagated edit immediately (no delay): drop
+    /// the pending edit and restore card.md from the published
+    /// snapshot. Returns false if nothing was pending. If there is no
+    /// published snapshot yet (first card never propagated), the
+    /// pending edit is simply un-staged (card.md is left as-is — there
+    /// is no prior state to roll back to).
+    pub fn revert_pending_card(&self) -> bool {
+        if self.card_pending().is_none() {
+            return false;
+        }
+        let _ = fs::remove_file(self.pending_md());
+        let _ = fs::remove_file(self.eligible_at_file());
+        if let Ok(published) = fs::read_to_string(self.published_md()) {
+            let _ = fs::write(self.card_path(), published);
+        }
+        true
+    }
+
+    // ----- peers (others' cards — read-only, git-ignored) -----
+    //
+    // We only ever READ what is locally present under peers/. Nothing
+    // here FETCHES a peer's card — that is the transport question.
+    // Dir name is a filesystem-safe slug; the true handle is the
+    // card's own frontmatter `handle`, so ':' never hits the FS.
+
+    fn peer_dirname(handle: &str) -> String {
+        handle
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') {
+                c
+            } else {
+                '_'
+            })
+            .collect()
+    }
+
+    pub fn list_peers(&self) -> Vec<crate::card::Card> {
+        let dir = self.root.join("peers");
+        let mut out = Vec::new();
+        if let Ok(rd) = fs::read_dir(&dir) {
+            for e in rd.flatten() {
+                let card = e.path().join("card.md");
+                if let Ok(s) = fs::read_to_string(&card) {
+                    if let Some(c) = crate::card::parse(&s) {
+                        out.push(c);
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    pub fn get_peer_card(&self, handle: &str) -> Option<crate::card::Card> {
+        let p = self
+            .root
+            .join("peers")
+            .join(Self::peer_dirname(handle))
+            .join("card.md");
+        crate::card::parse(&fs::read_to_string(p).ok()?)
     }
 
     fn write(&self, sub: &str, slug: &str, yaml: String, body: &str) -> anyhow::Result<()> {
@@ -839,6 +975,73 @@ mod tests {
         assert_eq!(gf.status, f.status);
         assert_eq!(gf.created_at, f.created_at);
         assert_eq!(v.list_followups().len(), 1);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn card_propagation_delay_revert_and_peers() {
+        use crate::card::Card;
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        // Privacy asymmetry: .gitignore written, ignores peers/ +
+        // .querykey/ but NOT card.md.
+        let gi = fs::read_to_string(dir.join(".gitignore")).unwrap();
+        let rules: Vec<&str> = gi
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .collect();
+        assert!(rules.contains(&"/peers/"));
+        assert!(rules.contains(&"/.querykey/"));
+        // card.md must never be an ignore *rule* (comments may mention
+        // it — that's the documentation of the asymmetry).
+        assert!(!rules.iter().any(|r| r.contains("card.md")));
+
+        let mk = |bio: &str| Card {
+            handle: "github:emma".into(),
+            name: "Emma".into(),
+            website: "https://emmaleonhart.com".into(),
+            bio: bio.into(),
+            offering: vec!["Rust help".into()],
+            looking_for: vec!["Flutter reviewers".into()],
+            updated: Utc::now(),
+            visibility: "public".into(),
+        };
+
+        // Edit → working card.md written, staged pending, NOT published.
+        v.stage_card_edit(&mk("first bio")).unwrap();
+        assert_eq!(v.get_card().unwrap().bio, "first bio");
+        assert!(v.card_pending().is_some());
+        assert!(v.card_published().is_none());
+        assert!(!v.promote_due_card()); // 24h not elapsed
+
+        // Backdate eligibility → propagation promotes it.
+        let elig = dir.join(".querykey").join("card.eligible_at");
+        fs::write(&elig, rfc3339(&(Utc::now() - chrono::Duration::hours(1)))).unwrap();
+        assert!(v.promote_due_card());
+        assert!(v.card_pending().is_none());
+        assert_eq!(v.card_published().unwrap().bio, "first bio");
+
+        // A bad edit, reverted before propagation → published
+        // unchanged, working restored to the published snapshot.
+        v.stage_card_edit(&mk("drunk 11pm mistake")).unwrap();
+        assert_eq!(v.get_card().unwrap().bio, "drunk 11pm mistake");
+        assert!(v.revert_pending_card());
+        assert!(v.card_pending().is_none());
+        assert_eq!(v.get_card().unwrap().bio, "first bio"); // rolled back
+        assert_eq!(v.card_published().unwrap().bio, "first bio"); // never saw it
+        assert!(!v.revert_pending_card()); // nothing pending now
+
+        // Peers: read-only, ':' in handle never hits the FS.
+        let peer = mk("a peer");
+        let pdir = dir.join("peers").join(Vault::peer_dirname("github:bob"));
+        fs::create_dir_all(&pdir).unwrap();
+        fs::write(pdir.join("card.md"), crate::card::render(&peer)).unwrap();
+        assert!(!Vault::peer_dirname("github:bob").contains(':'));
+        assert_eq!(v.list_peers().len(), 1);
+        assert_eq!(v.get_peer_card("github:bob").unwrap().handle, "github:emma");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
