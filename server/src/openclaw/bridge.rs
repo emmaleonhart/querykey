@@ -1,6 +1,7 @@
 //! Port of server-go-old/internal/openclaw/bridge.go.
 //! HTTP calls to the local agent gateway (OpenAI-compatible API).
 
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -110,9 +111,10 @@ impl Bridge {
         Ok(content)
     }
 
-    /// Streaming chat. TODO(port): full SSE delta parsing — see
-    /// server-go-old/internal/openclaw/bridge.go ChatStream(). For now
-    /// it does a non-streaming call and delivers the whole reply once.
+    /// Streaming chat over SSE. Port of bridge.go ChatStream(): POST
+    /// with `stream: true`, parse `data: {...}` lines, deliver each
+    /// `choices[0].delta.content` to `on_chunk` as it arrives, stop on
+    /// `data: [DONE]`. Handles SSE lines split across network chunks.
     pub async fn chat_stream<F>(
         &self,
         message: &str,
@@ -122,8 +124,52 @@ impl Bridge {
     where
         F: FnMut(&str),
     {
-        let full = self.chat(message, history).await?;
-        on_chunk(&full);
+        let mut msgs = history.to_vec();
+        msgs.push(ChatMessage {
+            role: "user".to_string(),
+            content: message.to_string(),
+        });
+        let body = serde_json::json!({
+            "model": self.agent_id,
+            "messages": msgs,
+            "stream": true,
+        });
+        let resp = self
+            .auth(self.http.post(format!("{}/v1/chat/completions", self.gateway_url)))
+            .json(&body)
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            let code = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            anyhow::bail!("agent gateway returned {code}: {text}");
+        }
+
+        let mut stream = resp.bytes_stream();
+        let mut buf = String::new();
+        while let Some(chunk) = stream.next().await {
+            let bytes = chunk?;
+            buf.push_str(&String::from_utf8_lossy(bytes.as_ref()));
+            // Drain complete lines; keep any partial trailing line.
+            while let Some(nl) = buf.find('\n') {
+                let line = buf[..nl].trim_end_matches('\r').trim().to_string();
+                buf.drain(..=nl);
+                let data = match line.strip_prefix("data: ") {
+                    Some(d) => d,
+                    None => continue,
+                };
+                if data == "[DONE]" {
+                    return Ok(());
+                }
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(data) {
+                    if let Some(c) = v["choices"][0]["delta"]["content"].as_str() {
+                        if !c.is_empty() {
+                            on_chunk(c);
+                        }
+                    }
+                }
+            }
+        }
         Ok(())
     }
 

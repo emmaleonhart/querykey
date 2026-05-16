@@ -110,23 +110,25 @@ async fn handle_chat(state: &Arc<AppState>, bridge: &Bridge, raw: &str) {
         })
         .collect::<Vec<_>>();
 
-    let hub = &state.hub;
+    let hub = state.hub.clone();
     hub.broadcast_message(WsMessage {
         msg_type: "stream_start".to_string(),
         content: String::new(),
         data: None,
     });
-    let mut acc = String::new();
-    match bridge
-        .chat_stream(&content, &history, |chunk| acc.push_str(chunk))
-        .await
-    {
-        Ok(()) => {
-            hub.broadcast_message(WsMessage {
+    // Broadcast each SSE delta live (incremental streaming, end-to-end).
+    let stream_hub = hub.clone();
+    let result = bridge
+        .chat_stream(&content, &history, move |chunk| {
+            stream_hub.broadcast_message(WsMessage {
                 msg_type: "stream_chunk".to_string(),
-                content: acc,
+                content: chunk.to_string(),
                 data: None,
             });
+        })
+        .await;
+    match result {
+        Ok(()) => {
             hub.broadcast_message(WsMessage {
                 msg_type: "stream_end".to_string(),
                 content: String::new(),

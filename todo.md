@@ -338,8 +338,9 @@ separate publishing chore.
 - [x] **Derived graph on Loca/SutraDB** — `loka-core` wired behind
   `--features loca`; person/task/message/conflict persist as triples;
   in-memory fallback default.
-- [ ] **Incremental agent streaming** — SSE delta parsing
-  (`TODO(port)`; today returns the whole reply at once).
+- [x] **Incremental agent streaming** — real SSE delta parsing in
+  `src/openclaw/bridge.rs` (port of bridge.go ChatStream); `ws.rs`
+  broadcasts each delta live as `stream_chunk`.
 - [ ] **Persistent SPARQL query bridge** — read-back of the derived
   graph (`loka_sparql` runs over in-memory TripleStore today).
 - [ ] **Discord bot port** — serenity/twilight (`server-go-old`
