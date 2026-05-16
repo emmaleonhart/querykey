@@ -1,28 +1,24 @@
 @echo off
 setlocal enabledelayedexpansion
-title Secretarybird
+title QueryKey
 echo ========================================
-echo   Secretarybird
-echo   AI secretary for team coordination
+echo   QueryKey
+echo   Local-first PRM / rationalist social net
 echo ========================================
 echo.
 
 cd /d "%~dp0"
 
-REM --- Check for Go ---
-where go >NUL 2>NUL
+REM --- Check for Rust/Cargo ---
+where cargo >NUL 2>NUL
 if errorlevel 1 (
-    if exist "C:\Program Files\Go\bin\go.exe" (
-        set "PATH=%PATH%;C:\Program Files\Go\bin"
-    ) else (
-        echo [ERROR] Go is not installed or not in PATH.
-        echo Install it with: winget install GoLang.Go
-        pause
-        exit /b 1
-    )
+    echo [ERROR] Rust/Cargo is not installed or not in PATH.
+    echo Install it from: https://rustup.rs
+    pause
+    exit /b 1
 )
-echo [OK] Go found:
-go version
+echo [OK] Cargo found:
+cargo --version
 
 REM --- Check for Flutter ---
 where flutter >NUL 2>NUL
@@ -34,25 +30,30 @@ if errorlevel 1 (
 echo [OK] Flutter found:
 flutter --version 2>NUL | findstr /C:"Flutter"
 
-REM --- Check for WSL + Ubuntu ---
+REM --- Check for WSL + Ubuntu (local AI agent gateway) ---
 wsl -d Ubuntu -- echo "WSL OK" >NUL 2>NUL
 if errorlevel 1 (
-    echo [WARN] WSL Ubuntu not found - OpenClaw will not be available.
+    echo [WARN] WSL Ubuntu not found - the local agent gateway will not be available.
 ) else (
     echo [OK] WSL Ubuntu found
 )
 echo.
 
-REM --- Build the Go server ---
-echo [1/4] Building Go server...
+REM --- Build the Rust server (with Loca/SutraDB graph store) ---
+echo [1/4] Building Rust server (--features loca)...
 cd /d "%~dp0server"
-go build -o secretarybird.exe ./cmd/secretarybird/
+cargo build --features loca
 if errorlevel 1 (
-    echo [ERROR] Server build failed.
-    pause
-    exit /b 1
+    echo [WARN] Loca build failed (is ..\..\SutraDB present?). Falling back
+    echo        to the in-memory graph build...
+    cargo build
+    if errorlevel 1 (
+        echo [ERROR] Server build failed.
+        pause
+        exit /b 1
+    )
 )
-echo [OK] Built server\secretarybird.exe
+echo [OK] Built server\target\debug\querykey-server.exe
 
 REM --- Get Flutter dependencies ---
 echo [2/4] Getting Flutter dependencies...
@@ -61,8 +62,8 @@ call flutter pub get >NUL 2>NUL
 echo [OK] Flutter dependencies ready
 echo.
 
-REM --- Start OpenClaw gateway in WSL ---
-echo [3/4] Starting OpenClaw gateway...
+REM --- Start the local agent gateway in WSL (OpenClaw bridge today) ---
+echo [3/4] Starting local agent gateway...
 
 REM Clean stale lock files (the fix for the old stuck-gateway problem)
 wsl -d Ubuntu -- bash -c "pkill -f openclaw-gateway 2>/dev/null; pkill -f 'openclaw gateway' 2>/dev/null; rm -f /tmp/openclaw-*/gateway.*.lock; true" >NUL 2>NUL
@@ -70,47 +71,45 @@ wsl -d Ubuntu -- bash -c "pkill -f openclaw-gateway 2>/dev/null; pkill -f 'openc
 REM Check if already running
 curl -s -o NUL -w "%%{http_code}" http://127.0.0.1:18789/ --connect-timeout 2 2>NUL | findstr "200" >NUL 2>NUL
 if not errorlevel 1 (
-    echo [OK] OpenClaw gateway already running on port 18789
-    goto :openclaw_done
+    echo [OK] Agent gateway already running on port 18789
+    goto :gateway_done
 )
 
-REM Start the gateway in a minimized window
-start "OpenClaw Gateway" /min wsl -d Ubuntu -- bash -lc "openclaw gateway"
+start "Agent Gateway" /min wsl -d Ubuntu -- bash -lc "openclaw gateway"
 
-REM Wait up to 15 seconds for it to come up
 echo Waiting for gateway to start...
 set TRIES=0
-:openclaw_wait
-if !TRIES! GEQ 15 goto :openclaw_timeout
+:gateway_wait
+if !TRIES! GEQ 15 goto :gateway_timeout
 timeout /t 1 /nobreak >NUL
 curl -s -o NUL -w "%%{http_code}" http://127.0.0.1:18789/ --connect-timeout 1 2>NUL | findstr "200" >NUL 2>NUL
 if not errorlevel 1 (
-    echo [OK] OpenClaw gateway started on port 18789
-    goto :openclaw_done
+    echo [OK] Agent gateway started on port 18789
+    goto :gateway_done
 )
 set /a TRIES+=1
-goto :openclaw_wait
+goto :gateway_wait
 
-:openclaw_timeout
-echo [WARN] OpenClaw gateway did not start within 15 seconds.
+:gateway_timeout
+echo [WARN] Agent gateway did not start within 15 seconds.
 echo        Server will work without it, but AI chat needs the gateway.
 echo        Try manually in WSL: openclaw gateway
 
-:openclaw_done
+:gateway_done
 echo.
 
-REM --- Start the Go server ---
-echo [4/4] Starting Secretarybird server...
+REM --- Start the Rust server ---
+echo [4/4] Starting QueryKey server...
 echo.
 echo   Server:    http://127.0.0.1:8000
 echo   Health:    http://127.0.0.1:8000/health
-echo   OpenClaw:  http://127.0.0.1:18789
+echo   Agent:     http://127.0.0.1:18789
 echo   WebSocket: ws://127.0.0.1:8000/ws/chat
 echo ========================================
 echo.
 
 cd /d "%~dp0server"
-start "Secretarybird Server" /min secretarybird.exe
+start "QueryKey Server" /min target\debug\querykey-server.exe
 timeout /t 2 /nobreak >NUL
 
 REM --- Launch Flutter app ---
@@ -123,9 +122,9 @@ call flutter run -d windows
 REM --- Cleanup: kill everything on exit ---
 echo.
 echo Stopping all processes...
-taskkill /fi "WINDOWTITLE eq Secretarybird Server" >NUL 2>NUL
-taskkill /im secretarybird.exe /f >NUL 2>NUL
+taskkill /fi "WINDOWTITLE eq QueryKey Server" >NUL 2>NUL
+taskkill /im querykey-server.exe /f >NUL 2>NUL
 wsl -d Ubuntu -- bash -c "pkill -f openclaw-gateway 2>/dev/null; pkill -f 'openclaw gateway' 2>/dev/null; rm -f /tmp/openclaw-*/gateway.*.lock; true" >NUL 2>NUL
-taskkill /fi "WINDOWTITLE eq OpenClaw Gateway" >NUL 2>NUL
+taskkill /fi "WINDOWTITLE eq Agent Gateway" >NUL 2>NUL
 echo Done.
 pause

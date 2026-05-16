@@ -328,17 +328,27 @@ separate publishing chore.
 
 ## Phase 11 — Server & Real-time
 
-> **Target language: Rust.** The current `server/` is Go and is
-> **deprecated** (kept compilable until the Rust rewrite supersedes it;
-> no rewrite this round). The Go OpenClaw/WSL bridge is the reference
-> implementation for re-solving the local-agent bridge in Rust.
+> **Server is Rust.** `server/` is the `querykey-server` Rust crate
+> (compiles + runs); the Go implementation is archived in
+> `server-go-old/` as the deprecated reference. Build with
+> `cargo build --features loca`.
 
-- [ ] **QueryKey Server (Rust, target)** — ingestion, the **derived**
-  graph (Loca/SutraDB, generated from the canonical markdown), MCP
-  endpoint, real-time sync, local-agent coordination
-- [ ] **Local mode** — server on your machine (privacy-first; the default)
+- [x] **QueryKey Server (Rust)** — crate scaffolded, compiles, runs;
+  axum HTTP API + WebSocket + agent bridge, graceful shutdown.
+- [x] **Derived graph on Loca/SutraDB** — `loka-core` wired behind
+  `--features loca`; person/task/message/conflict persist as triples;
+  in-memory fallback default.
+- [ ] **Incremental agent streaming** — SSE delta parsing
+  (`TODO(port)`; today returns the whole reply at once).
+- [ ] **Persistent SPARQL query bridge** — read-back of the derived
+  graph (`loka_sparql` runs over in-memory TripleStore today).
+- [ ] **Discord bot port** — serenity/twilight (`server-go-old`
+  reference); currently a no-op stub.
+- [ ] **MCP endpoint** — expose the server as an MCP server (day-one
+  infra per the vision).
+- [ ] **Local mode** — server on your machine (privacy-first; default)
 - [ ] **Cloud / hybrid modes** — only relevant alongside Phase 8
-- [ ] **WebSocket sync** — real-time graph diffs to connected clients
+- [ ] **WebSocket sync** — typed graph-diff broadcast (fan-out works)
 - [ ] **GraphDiff format** — added/updated nodes, added/removed edges,
   new/resolved conflicts
 - [ ] **Batch processing scheduler** — hourly default, configurable

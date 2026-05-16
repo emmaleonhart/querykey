@@ -97,9 +97,9 @@ committed.
 
 ### What is *not* in scope for this round
 
-- The actual Go → Rust rewrite of the server. That is a separate, large
-  piece of work; this round only updates the docs/roadmap to say Rust is
-  the target.
+- ~~The actual Go → Rust rewrite of the server.~~ **Superseded:** done
+  in Round 3 (see below) at the user's explicit request. The server is
+  now Rust (`server/`); Go archived in `server-go-old/`.
 - Replacing OpenClaw with Hermes (or anything else) in code. The
   implementation lives untouched under `server/internal/openclaw/` for
   now.
@@ -300,8 +300,37 @@ Go→Rust rewrite, and *implementing* the on-disk model or P2P code
 **Round 2 COMPLETE (2026-05-15).** Docs are organized and consistent.
 The remaining real design question is the **card format** (specced but
 will evolve); the next *building* work (implementing the markdown model
-/ MCP server / Loca integration) belongs to the Rust effort and is a
-separate, larger track.
+/ MCP server / Loca integration) belongs to the Rust effort.
+
+---
+
+## Round 3 — Go → Rust port (2026-05-15)
+
+The "Go→Rust rewrite is out of scope" guardrail above was **lifted by
+explicit user request** ("just copy the go to Rust with Loka being
+used … the go would go into a subdirectory just like the old
+secretarybird").
+
+- [x] R3-1. Archived the Go server to `server-go-old/` (deprecated
+      reference; `secretarybird-old/` pattern). README maps Go→Rust
+      file-for-file.
+- [x] R3-2. New Rust crate `querykey-server` in `server/` mirroring the
+      Go layout. `cargo build` (in-memory) and `cargo build --features
+      loca` (real SutraDB workspace) both compile clean.
+- [x] R3-3. **Loca/SutraDB** wired as the graph store via `loka-core`
+      (`PersistentStore`), behind `--features loca`; in-memory default
+      so the crate always builds. Fuseki fully gone from `server/`.
+- [x] R3-4. Smoke-tested: boots, detects the live OpenClaw gateway,
+      opens a Loca `.sdb` (`graph_ok:true`), `/health` + SPARQL
+      passthrough respond.
+- [x] R3-5. `!run.bat` + README + CLAUDE + todo updated: Rust is **the**
+      server, Go archived.
+
+**Honest status:** structural port. In-code `TODO(port)` markers
+(against `server-go-old/`) remain for: incremental agent streaming,
+the Discord bot port, the persistent-store SPARQL **query** bridge, and
+typed read-backs from the derived graph. These are the next building
+steps, tracked in `todo.md` Phase 11.
 
 ## Notes for future sessions
 
