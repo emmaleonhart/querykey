@@ -433,10 +433,22 @@ real conflict/blocker.
       (discordgo session, guild/channel walk; no non-Discord part).
       Stub kept, re-pointed at `todo.md` Phase Z + the serenity
       feature. Explicitly does NOT block Go removal.
-- [ ] R4-7. **Parity review + DELETE `server-go-old/`** — once the Rust
-      server covers everything non-deprioritized, delete the Go tree
-      (history preserved in git, like `secretarybird-old/` was), and
-      update `CLAUDE.md`/`README.md`/`todo.md`/this file: no more Go.
+- [x] R4-7. **Parity review + DELETE `server-go-old/`** — done. Parity
+      audit: all remaining `TODO(port)` markers are non-blocking
+      (architectural markdown-canonical deferrals, deprioritized Discord
+      Phase Z, future OCR/audio, MCP transport enhancements) — none
+      needed the Go tree. CI is only `pages.yml` (no Go build).
+      `server-go-old/` deleted (history preserved in git, like
+      `secretarybird-old/`). CLAUDE.md / README.md / todo.md / this
+      file updated: **no more Go.**
+
+**Round 4 COMPLETE (2026-05-15).** The Rust server is the sole server;
+Go is gone. All R4 items done, each its own commit, all pushed, all
+three build configs green. Honest non-blocking TODOs remain (canonical
+markdown write path — the load-bearing next piece; P2P card layer;
+GitHub identity; MCP stdio/SSE; Phase-Z Discord). In-code comments
+that reference `server-go-old/` are left as historical breadcrumbs
+(the Go reference is in git history) — not chased, per scope.
 
 ## Notes for future sessions
 
@@ -447,8 +459,9 @@ real conflict/blocker.
   pivot warranted it; default to executing.
 - Do not reintroduce the "Secretarybird" name into new docs.
 - Do not reintroduce hackathon references anywhere.
-- Flutter is settled. Rust is the new server target. Local-agent /
-  Gemma is the new AI framing. These are not open questions.
+- Flutter is settled (firm — frontend). Rust **is** the server (Go
+  fully removed in Round 4; only git history has it). Local-agent /
+  Gemma is the AI framing. These are not open questions.
 - **Fuseki is NOT used.** If you see Fuseki anywhere it is stale; the
   graph store is **Loca/SutraDB**, derived from canonical markdown.
 - Markdown + git is the source of truth; the graph is rebuildable from

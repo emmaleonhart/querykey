@@ -315,11 +315,11 @@ separate publishing chore.
 
 ## Phase 11 — Server & Real-time
 
-> **Server is Rust.** `server/` is the `querykey-server` Rust crate
-> (compiles + runs); the Go implementation is archived in
-> `server-go-old/` as the deprecated reference. Builds:
-> `cargo build` (in-memory), `--features loca` (Loca graph store),
-> `--features discord` (serenity bot). All three compile clean.
+> **Server is Rust — no more Go.** `server/` is the `querykey-server`
+> Rust crate (compiles + runs). The Go implementation was fully ported
+> (Round 4) then **deleted**; recoverable from git history if needed.
+> Builds: `cargo build` (in-memory), `--features loca` (Loca graph
+> store), `--features discord` (serenity bot). All three clean.
 
 - [x] **QueryKey Server (Rust)** — crate scaffolded, compiles, runs;
   axum HTTP API + WebSocket + agent bridge, graceful shutdown.

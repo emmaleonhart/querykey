@@ -79,12 +79,11 @@ today versus planned.
 | Server | **Rust** (crate `querykey-server`: `axum`, `tokio`, `reqwest`) — compiles & runs; structural port with TODOs | [`server/`](server/) |
 | Source of truth | Markdown files + git history (planned on-disk model) | user's disk / git repo |
 | AI engine | **Model-agnostic** via an **MCP server** (default agent: local **Gemma** — cheap & private; Claude/GPT optional). *Today's implementation:* OpenClaw via a local WSL gateway (port `18789`) | `server/src/openclaw/` |
-| Knowledge graph | **Loca** (formerly **SutraDB**) — the author's embedded Rust graph-vector-time DB; the graph is **derived from the markdown**, not canonical. Wired via `loka-core` behind `--features loca`; in-memory fallback otherwise. Fuseki is **not** used (dead stub only in `server-go-old/`) | `server/src/graph/` + [`../SutraDB`] |
-| Ingest surface | Discord (DM-first, hourly batch) + pasted text / screenshots / voice notes | `server/src/ingest.rs` (Discord port pending) |
+| Knowledge graph | **Loca** (formerly **SutraDB**) — the author's embedded Rust graph-vector-time DB; the graph is **derived from the markdown**, not canonical. Wired via `loka-core` behind `--features loca`; in-memory fallback otherwise. Fuseki is **not** used (removed with the Go server) | `server/src/graph/` + [`../SutraDB`] |
+| Ingest surface | Local markdown + pasted text / screenshots / voice notes (Discord deprioritized — todo.md Phase Z) | `server/src/ingest.rs` |
 | Identity / sync | **GitHub** (usernames as identity, repo as sync) — a thin, swappable abstraction | (planned) |
 | Peer-to-peer | **Card** exchange — pure P2P, no central server, 24h propagation delay | (planned) |
 | Real-time | WebSocket hub | `server/src/ws.rs` |
-| Prior Go server | Archived deprecated reference (the Rust port mirrors its layout) | [`server-go-old/`](server-go-old/) |
 
 Local endpoints when running: server `http://127.0.0.1:8000`, health
 `/health`, WebSocket `ws://127.0.0.1:8000/ws/chat`, OpenClaw gateway
@@ -96,37 +95,36 @@ This is early. Roughly: planning and data models are complete; the AI bridge
 is functional; most product behavior is scaffolding.
 
 **Working / functional**
-- **Rust server (`server/`)**: compiles (`cargo build` and
-  `cargo build --features loca`) and runs. Boots, detects the OpenClaw
-  gateway, opens a **Loca** `.sdb` store (`graph_ok`), serves the HTTP API
-  + `/health` + the WebSocket route + SPARQL passthrough. Mirrors the
-  archived Go layout (`server-go-old/`).
-- OpenClaw bridge: detects the WSL gateway; non-streaming chat works.
-- Data models: full entity set (Person, Handle, Task, Event, Message,
-  Conflict, Instruction, OpenQuestion, FollowUp, VoiceProfile, …) ported
-  to Rust with the JSON contract preserved; aligned with the Dart models.
-- Loca/SutraDB wired as the derived graph store (`--features loca`):
-  person/task/message/conflict persist as triples.
+- **Rust server (`server/`) is the only server** — Go fully ported then
+  deleted (recoverable from git history). Compiles in all three configs
+  (`cargo build`, `--features loca`, `--features discord`), zero warnings;
+  boots, detects the OpenClaw gateway, opens a **Loca** `.sdb` store,
+  serves the HTTP API + `/health` + WebSocket + SPARQL passthrough + an
+  **MCP endpoint** (`/mcp`).
+- OpenClaw bridge: gateway detect, **incremental SSE streaming**, analyze,
+  supervised retry + health-check gateway lifecycle, graceful stop.
+- Data models: full entity set ported to Rust, JSON contract preserved.
+- **Loca/SutraDB** derived graph (`--features loca`): person/task/message/
+  conflict persisted with full fields; SPARQL **query** bridge works;
+  typed read-back of persons & tasks (smoke-verified); `insert_triples`
+  via N-Triples.
+- Ingest pipeline: relaxed-schema parse → typed models → store + typed
+  GraphDiff broadcast over the WebSocket hub.
+- **MCP server** (`/mcp`): JSON-RPC `initialize`/`tools/list`/`tools/call`.
 
-**Scaffolded / partial (honest in-code TODOs against `server-go-old/`)**
-- Ingestion pipeline (accepts input, calls the agent; parsing is basic).
-- Agent streaming returns the whole reply at once (no incremental SSE yet).
-- Persistent SPARQL **query** bridge: parses, returns empty (read-back of
-  the derived graph not yet wired).
-- WebSocket hub fan-out works; typed graph-diff broadcast minimal.
-- Discord bot: not yet ported (no-op, as it was optional in Go).
-
-**Planned / not started**
-- **Markdown source-of-truth model** (YAML frontmatter + body; git-tracked)
-  and the agent reading/writing those files — *the first thing to build*.
-- **MCP server** so any agent can attend over the graph/files (day-one
-  infrastructure); model-agnostic with **Gemma** as the cheap local default.
+**Honest limitations / not yet built**
+- **Canonical markdown write path** (YAML frontmatter + body; git-tracked)
+  — the derived graph is a rebuildable index; task/conflict *mutations*
+  and full hydration go through markdown, which is **not built yet** (the
+  load-bearing next piece — `docs/markdown-schema.md`).
 - **Peer-to-peer card layer** (offer/looking-for cards, asymmetric
-  git-tracking, 24h propagation delay) — *built after* the solo PRM.
+  git-tracking, 24h delay) — *after* the solo PRM (`docs/card-format.md`).
 - **GitHub identity/sync** bootstrap behind a swappable handle abstraction.
-- The follow-up engine (contradiction → open question → message), conflict
-  resolution, daily check-ins; calendar/scheduling; audio/voice pipeline;
-  external tool sync; the Discord port.
+- MCP stdio/SSE transports + `agents.md`-governed write tools.
+- The follow-up engine, conflict resolution, daily check-ins;
+  calendar/scheduling; audio/voice pipeline; external tool sync.
+- **Discord** is deprioritized (feature-gated serenity skeleton only) —
+  see `todo.md` Phase Z.
 
 See [`queue.md`](queue.md) for the authoritative near-term plan and
 [`todo.md`](todo.md) for the full phased roadmap.
@@ -160,8 +158,7 @@ gateway in WSL, launches the server, and runs the Flutter app on Windows
 | Path | What it is |
 |---|---|
 | [`app/`](app/) | Flutter app (Dart) — desktop-first; Chat / Tasks / Ingest screens |
-| [`server/`](server/) | **Rust** server (`querykey-server`) — ingest, agent bridge, WebSocket, Loca graph store |
-| [`server-go-old/`](server-go-old/) | Archived Go server — deprecated reference for the Rust port |
+| [`server/`](server/) | **Rust** server (`querykey-server`) — the only server: ingest, agent bridge, WebSocket, MCP, Loca graph store |
 | [`docs/`](docs/) | `architecture.md`, `data-model.md`, `markdown-schema.md`, `card-format.md`, `versions-comparison.md`, `why-go.md` |
 | [`chat/`](chat/) | Vision corpus (chat-log exports); gitignored except its README — private context, not a spec |
 | [`dev_scheduling/`](dev_scheduling/) | Dev-time agent data (`receipts/discord/`), committed so CI can write to it |
