@@ -5,6 +5,10 @@
 # spec. Only this directory's README is tracked.
 /chat/*
 !/chat/README.md
+# chat/public/ holds non-personal, committable chats (vision/strategy
+# discussions with no private info). Everything directly under chat/
+# stays ignored; chat/public/ is tracked.
+!/chat/public/
 
 # Scheduler runtime (durable cron lock/state) — never commit.
 .claude/scheduled_tasks.lock

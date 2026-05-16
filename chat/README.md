@@ -4,11 +4,18 @@ This directory is where chat-log exports that carry context about
 QueryKey's vision get dumped: Discord servers and DMs, Claude / Grok /
 ChatGPT conversations, voice transcripts, pasted text.
 
-**This file is the only thing in here that is committed.** Everything
-else is gitignored (see the repo root `.gitignore`) because these
-exports contain private and personal information — about the author and
-about other real people who did not consent to being in a public repo.
-Privacy here is not just the author's; it is everyone mentioned.
+**Two zones:**
+
+- **`chat/` (root) — gitignored.** Personal exports (Discord DMs, etc.)
+  with private information about the author and other real people who
+  did not consent to a public repo. Only this README is committed from
+  here. Privacy here is not just the author's; it is everyone
+  mentioned.
+- **`chat/public/` — committed.** Non-personal chats: vision/strategy
+  discussions that contain no private information and are safe to
+  track. The clearest articulation of the product vision lives here
+  (e.g. the rationalist-P2P-social-network strategy chat). Drop a chat
+  here only after confirming it has no personal info.
 
 ## How future agents should treat this directory
 
