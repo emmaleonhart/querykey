@@ -338,19 +338,34 @@ separate publishing chore.
 - [x] **Derived graph on Loca/SutraDB** — `loka-core` wired behind
   `--features loca`; person/task/message/conflict persist as triples;
   in-memory fallback default.
-- [ ] **Incremental agent streaming** — SSE delta parsing
-  (`TODO(port)`; today returns the whole reply at once).
+- [x] **Incremental agent streaming** — `Bridge::chat_stream` parses
+  the OpenAI-style SSE `data:` stream and fires `on_chunk` per delta;
+  `ws::handle_chat` re-broadcasts each delta as its own
+  `stream_chunk` frame (was: buffered one big chunk at the end).
+- [x] **Task patch + conflict resolution persistence** — `GraphStore`
+  gained `update_task_status` / `resolve_conflict_with`. In-memory
+  backend implements them for real and the handlers broadcast
+  `task_updated` / `GraphDiff.resolved_conflicts` to match the Go
+  reference. Loca backend honestly stubs them pending the persistent
+  bridge below.
+- [x] **GraphDiff: tasks + events into added_nodes** — pipeline
+  broadcast was only firing `new_conflicts`; the Flutter board /
+  calendar now actually see live additions, matching `pipeline.go
+  broadcastResults`.
 - [ ] **Persistent SPARQL query bridge** — read-back of the derived
-  graph (`loka_sparql` runs over in-memory TripleStore today).
+  graph (`loka_sparql` runs over in-memory TripleStore today). Blocks
+  Loca read methods + Loca task/conflict patch persistence.
 - [ ] **Discord bot port** — serenity/twilight (`server-go-old`
   reference); currently a no-op stub.
 - [ ] **MCP endpoint** — expose the server as an MCP server (day-one
   infra per the vision).
 - [ ] **Local mode** — server on your machine (privacy-first; default)
 - [ ] **Cloud / hybrid modes** — only relevant alongside Phase 8
-- [ ] **WebSocket sync** — typed graph-diff broadcast (fan-out works)
-- [ ] **GraphDiff format** — added/updated nodes, added/removed edges,
-  new/resolved conflicts
+- [ ] **WebSocket sync** — typed graph-diff broadcast (basic fan-out
+  + per-delta chat streaming done; added/updated edges + removed
+  edges still unpopulated by ingestion).
+- [ ] **GraphDiff format** — added/updated nodes + new/resolved
+  conflicts populated; added/removed *edges* not yet wired.
 - [ ] **Batch processing scheduler** — hourly default, configurable
 - [ ] **Single-binary distribution** — trivial install is a feature,
   not a nicety (see `docs/versions-comparison.md`)

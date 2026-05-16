@@ -327,10 +327,60 @@ secretarybird").
       server, Go archived.
 
 **Honest status:** structural port. In-code `TODO(port)` markers
-(against `server-go-old/`) remain for: incremental agent streaming,
-the Discord bot port, the persistent-store SPARQL **query** bridge, and
-typed read-backs from the derived graph. These are the next building
-steps, tracked in `todo.md` Phase 11.
+(against `server-go-old/`) remain for: the Discord bot port, the
+persistent-store SPARQL **query** bridge, and typed read-backs from
+the derived graph. (Incremental agent streaming and task/conflict
+patch persistence were closed in Round 4 below.) These are the next
+building steps, tracked in `todo.md` Phase 11.
+
+---
+
+## Round 4 — Phase 11 chip-away (2026-05-15)
+
+Mechanical port follow-ups against the in-memory backend. The Loca
+path stays honestly stubbed because this dev machine has neither
+`cargo` nor the SutraDB sibling repo (auto-memory note); build
+verification is deferred to a machine that has them.
+
+- [x] R4-0. Pin LF line endings via `.gitattributes` so editing on
+      Windows with `core.autocrlf=true` stops rewriting whole files
+      on every commit (a one-line change was producing a 350-line
+      "rewrite" diff before this landed).
+- [x] R4-1. **Real SSE streaming in `Bridge::chat_stream`** — POST
+      with `stream:true`, parse `data:` lines, decode
+      `choices[0].delta.content`, honor `[DONE]`. Mirrors
+      `bridge.go ChatStream` with a `Vec<u8>` line buffer so UTF-8
+      multi-byte splits across reqwest chunks aren't mangled.
+      `ws::handle_chat` now re-broadcasts each delta as its own
+      `stream_chunk` frame instead of accumulating one big chunk.
+- [x] R4-2. **Task patch + conflict resolution persistence** —
+      `GraphStore` gained `update_task_status` and
+      `resolve_conflict_with`. The in-memory backend implements
+      both. Handlers broadcast `task_updated` and a
+      `GraphDiff.resolved_conflicts` mirror of the Go reference.
+      Loca path stubs `Ok(None)` with an honest TODO pointing at
+      the persistent SPARQL bridge.
+- [x] R4-3. **GraphDiff: tasks + events into `added_nodes`** —
+      `pipeline.broadcast_results` was only emitting `new_conflicts`,
+      so the Flutter board / calendar never saw live additions.
+      Now mirrors `pipeline.go broadcastResults`.
+
+**Still blocked on a build-capable machine** (require `cargo` and/or
+the SutraDB sibling; deferred until next session there):
+
+- Persistent SPARQL query bridge in `graph/loca.rs`. Requires the
+  `loka_sparql` executor to run over `PersistentStore`, not just an
+  in-memory `TripleStore`. Until this lands, the typed Loca
+  read-backs (`get_all_persons`, `get_tasks_for_person`,
+  `get_unresolved_conflicts`) and the Loca-side patch/resolve
+  methods keep returning empty / `None`.
+- N-Triples insertion via `loka_core::ntriples`. Same blocker — the
+  exact API surface isn't visible from this machine.
+- Discord bot port (`serenity`/`twilight`). Large, and the OpenClaw
+  gateway it talks through wants a WSL Ubuntu distro, which isn't
+  installed here either.
+- MCP endpoint. New feature; needs a design pass + a Rust MCP SDK
+  pick before any code.
 
 ## Notes for future sessions
 
