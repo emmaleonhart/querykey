@@ -280,8 +280,12 @@ Still good to drop the book off Saturday?
 
 ## Still open (not blocking)
 
-- `status` / `ambiguity` transition rules (enums exist; the *workflow*
-  isn't enforced yet).
+- `status` transition rules — **DONE (Round 9).** Task/Conflict/
+  Question state machines (`src/workflow`) enforced at the API
+  mutation boundary (not the vault — hand-edited markdown stays
+  legal): a resolved conflict can't be un-resolved, `done` can't
+  rewind to `extracted`, etc. (`ambiguity` is a score, not a
+  lifecycle — no transition rules apply.)
 - Freeform-body `[[wikilinks]]` resolution + semantic
   `[[property:target]]` triples — **DONE (Round 8).** Precedence +
   dangling specified above; parser/resolver/projection unit-tested;
@@ -290,6 +294,5 @@ Still good to drop the book off Saturday?
   on-disk forms + vault-first wiring; lossless round-trip unit-tested.
 - Instruction / VoiceProfile on-disk forms — **TBD**; still
   unimplemented. They do not block any canonical path that is live.
-- `status` workflow enforcement for the new entities (e.g. a resolved
-  conflict can't return to `unresolved`) is not enforced — same
-  open item as Task `status` transitions above.
+  (Round 9 also covers the new entities — the resolved-conflict rule
+  is enforced; see the `status` transition entry above.)

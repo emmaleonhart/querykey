@@ -127,8 +127,12 @@ is functional; most product behavior is scaffolding.
   `[[property:Target]]` (single-colon typed triples) in any entity
   body become derived edges with explicit resolution precedence +
   dangling handling; `GET /api/links` + per-entity backlinks live
-  from the vault. Instruction/VoiceProfile on-disk forms remain TBD;
-  status-workflow enforcement is future.
+  from the vault.
+- **Status-workflow enforcement** — DONE (Round 9): Task/Conflict/
+  Question state machines enforced at the API mutation boundary (a
+  resolved conflict can't be un-resolved; `done` can't rewind to
+  `extracted`) — hand-edited markdown stays legal. Instruction/
+  VoiceProfile on-disk forms remain TBD.
 - **Peer-to-peer card layer** — format + local layer DONE (Round 7):
   card format/parse, the `.gitignore` asymmetry, the 24h propagation
   safety valve + revert-before-propagation, read-only `peers/`,

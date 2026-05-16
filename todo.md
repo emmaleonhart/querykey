@@ -28,10 +28,10 @@
    `/api/card|identity|peers` endpoints. **Open: the P2P transport**
    (what moves a card between peers) + discovery + card↔graph
    agent-drafting — now *the* gating question (`docs/card-format.md`).
-2. status-workflow enforcement; Instruction/VoiceProfile on-disk
-   forms; calendar; audio pipeline. (Conflict/OpenQuestion/FollowUp
-   on-disk forms — done R6. Semantic `[[wikilink]]` resolution +
-   `[[property:target]]` triples — done R8.)
+2. Instruction/VoiceProfile on-disk forms; calendar; audio pipeline.
+   (Conflict/OpenQuestion/FollowUp on-disk forms — done R6. Semantic
+   `[[wikilink]]` + `[[property:target]]` triples — done R8.
+   Status-workflow enforcement — done R9.)
 
 **How to work here:** [`queue.md`](queue.md) is the barrel-through
 queue — do work from there. This `todo.md` is the long roadmap

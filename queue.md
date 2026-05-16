@@ -646,6 +646,35 @@ agent-drafted card↔graph (PRM exists, heuristic doesn't);
 calendar/audio. Code-fence/nested-bracket wikilink edge cases are
 documented future refinements.
 
+---
+
+## Round 9 — status-workflow enforcement (2026-05-16, PRM-priority)
+
+Second PRM-priority round. Make the PRM's state trustworthy: the
+*server* must not make illegal status jumps behind the user's back.
+
+- [x] R9-1. `src/workflow` — pure transition predicates for
+      Task/Conflict/Question, unit-tested (3). Idempotent allowed.
+      Task: extracted→confirmed→in_progress→done + disputed
+      side-state + explicit reopen; never rewind done→extracted.
+      Conflict: never return to unresolved (the user's rule).
+      Question: open→resolved|expired, expired re-askable, resolved
+      terminal. Commit `71189bc`.
+- [x] R9-2. Enforced in `update_task` / `resolve_conflict` /
+      `resolve_question` against the *current persisted* state;
+      illegal jump → `{error,from,to}`, vault NOT mutated. Vault
+      `upsert_*` deliberately NOT gated (hand-edited markdown /
+      Obsidian imports stay legal — "the tool serves you"). All 3
+      configs green; 19 lib tests. Commit `a9052e9`.
+- [x] R9-3. Docs — `docs/markdown-schema.md` open item flipped to
+      DONE; CLAUDE/README/todo updated. (This commit.)
+
+**Round 9 status.** COMPLETE. Each item its own commit. Next PRM
+thread: Instruction/VoiceProfile on-disk forms (the last two
+unimplemented canonical entities), then calendar/audio; the
+agent-drafted card↔graph projection remains design-heavy/social-
+leaning (parked-social steering applies — flag before barrelling).
+
 ## Notes for future sessions
 
 - The user dictates long stream-of-consciousness messages via voice. Do
