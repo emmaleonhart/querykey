@@ -763,6 +763,85 @@ social unknown is the **P2P transport + discovery** — still parked
 by explicit user steering as a *design* question; do not barrel it
 on a guess.
 
+---
+
+## Round 13 — agent-honesty fix (2026-05-16)
+
+**Origin: eating our own cooking.** QueryKey was pointed at a real
+personal data lake (the author's `life-planning` repo) for the first
+time. The PRM **storage** loop worked end-to-end on real data
+(`POST /api/persons|tasks` → clean canonical markdown on disk,
+source-traced, round-tripped). But `POST /api/ingest` returned an
+**empty** extraction **silently**, and that exposed a real bug that
+contradicts our own core principle ("AI does the hard work, and
+admits when it's unsure"; "ask when unsure rather than guess
+silently").
+
+**Root cause (verified):** the process on `127.0.0.1:18789` was the
+**OpenClaw Control UI SPA**, not the agent's OpenAI-compatible API.
+It serves `index.html` (HTTP 200) for every GET incl. `/health`
+(`{"ok":true,"status":"live"}`), but `POST /v1/chat/completions`
+**404s**. `Bridge::detect()` only probes `/health`, so it reports
+`available:true` and `main.rs` logs *"agent gateway connected"* —
+false. Then `Pipeline::process()` does
+`bridge.analyze(...).await.unwrap_or_default()`: the 404 `Err` becomes
+`""`, `parse_analysis("")` yields an empty `AnalysisResult`, and
+ingest returns **200 with empty arrays** — indistinguishable from
+"nothing to extract."
+
+**Reframe from the user (load-bearing — fold into docs):** QueryKey
+is **model-agnostic via MCP**. The default **Gemma** agent for the
+GUI is **not built yet**. *Right now the agent is whatever LLM
+session is operating QueryKey* — e.g. **Claude via Claude Code is a
+first-class agent**, not a stopgap. This makes the silent-empty bug
+**worse**, not excusable: a GUI user whose default agent isn't up
+must be **told**, not handed silent empties; and ingest-extraction
+does **not** require the OpenClaw gateway at all — an operating agent
+(Claude now, Gemma later, Hermes/GPT optionally) can do extraction
+and write the canonical markdown directly (markdown is the source of
+truth; the graph is rebuildable). That separate "agent-operates-the-
+lake" track is **not** this round — this round is only making the
+tool *honest* about agent availability.
+
+Rules (this repo's workflow): each item its own commit with a *why*;
+`cargo build`, `--features loca`, `--features discord` all green,
+zero warnings, before each commit; keep the 30 lib tests green + add
+tests; `git pull --rebase` + push after each.
+
+- [ ] R13-1. **`detect()` verifies chat capability, not just liveness.**
+      `/health` 200 ≠ agent ready (the Control-UI SPA answers it).
+      Add a capability probe of the actual dependency
+      (`POST /v1/chat/completions`, minimal body, e.g. `max_tokens:1`)
+      and treat the gateway as available **only** if the response is
+      a real OpenAI-shaped JSON (not 404, not `text/html`/SPA). Keep a
+      fast liveness tier for the 10s health ticker (don't hit the LLM
+      every tick — capability is verified on startup / on demand,
+      cached). `Status` gains a precise `error` like *"gateway alive
+      but chat API absent (got 404 / HTML — is this the OpenClaw
+      Control UI, not the agent API?)"*. `main.rs` log must reflect
+      the real state.
+- [ ] R13-2. **Ingest must not silently swallow an agent failure.**
+      Replace the `unwrap_or_default()` in `Pipeline::process()` with
+      explicit handling: on agent error, the `IngestResult` carries an
+      explicit `agent_error: Option<String>` (or an
+      `extraction_status`) so the response is *"agent unavailable:
+      <why>"*, never an empty success. HTTP can stay 200 (ingest
+      didn't crash) but the body must be honest. Log a `warn!`. This
+      is the core principle fix.
+- [ ] R13-3. **Tests + docs.** Unit test: an analyze-failure path
+      surfaces the error rather than an empty `AnalysisResult`
+      presented as success (use a seam that needs no live gateway).
+      Update `README.md` Status, `CLAUDE.md`, `todo.md`, this file,
+      and `docs/` to (a) describe the honesty fix and (b) record the
+      **model-agnostic / agent-is-whoever-operates-it** framing
+      (Claude-now, Gemma-later-for-GUI) so it stops being implicit.
+
+**Not in this round:** the "operating agent eats the lake directly"
+track (Claude/this session doing extraction → canonical markdown
+without the gateway). That is the natural *next* thing and is the
+real "QueryKey eats the lake" path, but it is separate from making
+the tool honest. Flag to the user before barrelling it.
+
 ## Notes for future sessions
 
 - The user dictates long stream-of-consciousness messages via voice. Do
