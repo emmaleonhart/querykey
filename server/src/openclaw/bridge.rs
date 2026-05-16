@@ -93,32 +93,118 @@ impl Bridge {
         msgs
     }
 
-    /// Probe the gateway. Mirrors bridge.go Detect().
-    pub async fn detect(&self) -> Status {
+    /// Cheap liveness probe: "is *something* answering `/health`."
+    /// This is necessary but **NOT** sufficient to call the agent
+    /// ready — the OpenClaw *Control UI* SPA answers `/health` too.
+    /// Used by the supervised health ticker, whose only job is to
+    /// reset the retry counter while the process is reachable.
+    async fn liveness(&self) -> bool {
         let url = format!("{}/health", self.gateway_url);
-        match self
-            .auth(self.http.get(&url))
-            .timeout(Duration::from_secs(5))
+        matches!(
+            self.auth(self.http.get(&url))
+                .timeout(Duration::from_secs(5))
+                .send()
+                .await,
+            Ok(resp) if resp.status().is_success()
+        )
+    }
+
+    /// Pure classifier for a `/v1/chat/completions` probe response (no
+    /// I/O — unit-tested). The OpenClaw Control UI SPA serves
+    /// `index.html` (200 `text/html`) for every GET and **404s** the
+    /// POST; a real OpenAI-compatible agent API returns JSON with a
+    /// `choices` array (the exact field `chat()` reads).
+    fn classify_chat_probe(
+        status: u16,
+        content_type: Option<&str>,
+        body: &str,
+    ) -> Result<(), String> {
+        if status == 404 {
+            return Err(
+                "gateway alive but POST /v1/chat/completions 404s — is \
+                 this the OpenClaw Control UI, not the agent API?"
+                    .to_string(),
+            );
+        }
+        if content_type.is_some_and(|ct| ct.contains("text/html")) {
+            return Err(
+                "/v1/chat/completions returned HTML (an SPA?), not an \
+                 OpenAI JSON response — wrong service on this port?"
+                    .to_string(),
+            );
+        }
+        if !(200..300).contains(&status) {
+            return Err(format!("chat endpoint returned HTTP {status}"));
+        }
+        match serde_json::from_str::<serde_json::Value>(body) {
+            Ok(v) if v.get("choices").is_some() => Ok(()),
+            Ok(_) => Err(
+                "chat endpoint returned JSON without a `choices` field \
+                 — not an OpenAI-compatible chat API"
+                    .to_string(),
+            ),
+            Err(_) => Err(
+                "chat endpoint returned a non-JSON 2xx body — not an \
+                 OpenAI-compatible chat API"
+                    .to_string(),
+            ),
+        }
+    }
+
+    /// Verify the actual dependency: a real OpenAI-compatible
+    /// `/v1/chat/completions`. One minimal 1-token request.
+    async fn probe_chat(&self) -> Result<(), String> {
+        let url = format!("{}/v1/chat/completions", self.gateway_url);
+        let body = serde_json::json!({
+            "model": self.agent_id,
+            "messages": [{ "role": "user", "content": "ping" }],
+            "max_tokens": 1,
+            "stream": false,
+        });
+        let resp = self
+            .auth(self.http.post(&url))
+            .json(&body)
+            .timeout(Duration::from_secs(20))
             .send()
             .await
-        {
-            Ok(resp) if resp.status().is_success() => Status {
+            .map_err(|e| format!("chat probe request failed: {e}"))?;
+        let status = resp.status().as_u16();
+        let ct = resp
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
+        let text = resp.text().await.unwrap_or_default();
+        Self::classify_chat_probe(status, ct.as_deref(), &text)
+    }
+
+    /// Probe the gateway. Liveness is necessary but NOT sufficient —
+    /// the OpenClaw Control UI answers `/health`. We verify the chat
+    /// capability QueryKey actually depends on, so a misconfigured
+    /// port can never be reported as "connected" (CLAUDE.md: admit
+    /// when unsure rather than guess silently). Port of bridge.go
+    /// Detect(), hardened.
+    pub async fn detect(&self) -> Status {
+        if !self.liveness().await {
+            return Status {
+                available: false,
+                gateway_url: self.gateway_url.clone(),
+                agent_id: self.agent_id.clone(),
+                error: "gateway /health not reachable".to_string(),
+            };
+        }
+        match self.probe_chat().await {
+            Ok(()) => Status {
                 available: true,
                 gateway_url: self.gateway_url.clone(),
                 agent_id: self.agent_id.clone(),
                 error: String::new(),
             },
-            Ok(resp) => Status {
-                available: false,
-                gateway_url: self.gateway_url.clone(),
-                agent_id: self.agent_id.clone(),
-                error: format!("gateway returned {}", resp.status()),
-            },
             Err(e) => Status {
                 available: false,
                 gateway_url: self.gateway_url.clone(),
                 agent_id: self.agent_id.clone(),
-                error: e.to_string(),
+                error: e,
             },
         }
     }
@@ -297,7 +383,12 @@ impl Bridge {
                 if me.state.lock().unwrap().stop_requested {
                     return;
                 }
-                if me.detect().await.available {
+                // Reachability (not full capability) is the right
+                // signal here: the ticker only resets the retry
+                // counter while the process is up. Capability is
+                // verified by detect() at startup / on demand — doing
+                // a 1-token LLM call every 10s would be wasteful.
+                if me.liveness().await {
                     me.state.lock().unwrap().retries = 0;
                 }
             }
@@ -327,5 +418,57 @@ impl Bridge {
     pub fn force_kill(&self) -> anyhow::Result<()> {
         self.stop_gateway();
         self.wsl.force_kill_openclaw()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Bridge;
+
+    // The exact case eating-our-own-cooking hit: the OpenClaw Control
+    // UI SPA 404s POST /v1/chat/completions. Must NOT be "available".
+    #[test]
+    fn control_ui_404_is_not_a_chat_api() {
+        let r = Bridge::classify_chat_probe(404, Some("text/plain"), "Not Found");
+        let e = r.expect_err("404 must be rejected");
+        assert!(e.contains("Control UI"), "actionable hint, got: {e}");
+    }
+
+    // Some SPA catch-alls answer the POST with 200 index.html.
+    #[test]
+    fn html_body_is_not_a_chat_api() {
+        let r = Bridge::classify_chat_probe(
+            200,
+            Some("text/html; charset=utf-8"),
+            "<!doctype html><html><title>OpenClaw Control</title>",
+        );
+        assert!(r.is_err(), "HTML 200 must be rejected");
+    }
+
+    // A real OpenAI-compatible reply: JSON with a `choices` array.
+    #[test]
+    fn real_openai_json_is_accepted() {
+        let body = r#"{"choices":[{"message":{"role":"assistant","content":"pong"}}]}"#;
+        assert!(
+            Bridge::classify_chat_probe(200, Some("application/json"), body).is_ok()
+        );
+    }
+
+    #[test]
+    fn json_without_choices_is_rejected() {
+        let r = Bridge::classify_chat_probe(200, Some("application/json"), r#"{"ok":true}"#);
+        assert!(r.is_err(), "JSON lacking `choices` is not the chat API");
+    }
+
+    #[test]
+    fn non_json_2xx_is_rejected() {
+        assert!(Bridge::classify_chat_probe(200, None, "pong").is_err());
+    }
+
+    #[test]
+    fn server_error_is_rejected_with_status() {
+        let e = Bridge::classify_chat_probe(500, Some("application/json"), "{}")
+            .expect_err("5xx must be rejected");
+        assert!(e.contains("500"), "error should name the status, got: {e}");
     }
 }
