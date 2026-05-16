@@ -71,10 +71,16 @@ async fn main() -> anyhow::Result<()> {
         for t in &tasks {
             let _ = graph.store_task(t).await;
         }
+        let links = vault.collect_links();
+        if !links.is_empty() {
+            let nt = querykey_server::graph::link_ntriples(&links);
+            let _ = graph.insert_triples(&nt).await;
+        }
         tracing::info!(
-            "[querykey] projected vault → graph: {} person(s), {} task(s)",
+            "[querykey] projected vault → graph: {} person(s), {} task(s), {} link(s)",
             people.len(),
-            tasks.len()
+            tasks.len(),
+            links.len()
         );
     }
 

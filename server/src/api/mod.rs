@@ -64,6 +64,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/identity", get(get_identity))
         .route("/api/peers", get(list_peers_h))
         .route("/api/peers/:handle/card", get(get_peer_card_h))
+        // Semantic wikilink graph (derived live from the canonical
+        // vault — backend-independent, never stale).
+        .route("/api/links", get(list_links))
+        .route("/api/entities/:kind/:id/links", get(entity_links))
         // Local-agent management
         .route("/api/openclaw/kill", post(openclaw_kill))
         .route("/api/openclaw/restart", post(openclaw_restart))
@@ -416,6 +420,26 @@ async fn get_peer_card_h(
         Some(c) => Json(serde_json::to_value(c).unwrap_or_else(|_| json!({}))),
         None => Json(json!({ "error": "peer card not found", "handle": handle })),
     }
+}
+
+// ---- semantic wikilink graph ----
+//
+// Computed live from the canonical vault (collect_links), so these
+// are correct on every build config and never stale — the derived
+// triple store is only a startup-projected convenience for SPARQL.
+
+async fn list_links(State(s): State<Arc<AppState>>) -> Json<Value> {
+    Json(json!({ "links": s.vault.collect_links() }))
+}
+
+async fn entity_links(
+    State(s): State<Arc<AppState>>,
+    Path((kind, id)): Path<(String, String)>,
+) -> Json<Value> {
+    Json(json!({
+        "from": s.vault.links_from(&kind, &id), // outgoing
+        "to": s.vault.links_to(&kind, &id),     // backlinks
+    }))
 }
 
 async fn openclaw_kill(State(s): State<Arc<AppState>>) -> Json<Value> {

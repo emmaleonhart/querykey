@@ -27,7 +27,7 @@ fn unquote(s: &str) -> String {
     t.replace("\\\"", "\"")
 }
 
-const NS: &str = "http://querykey.dev/ns/";
+use super::NS;
 const RDF_TYPE: &str = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 
 pub struct LocaGraph {
