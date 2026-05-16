@@ -22,18 +22,15 @@
   `docs/card-format.md`, vision corpus in `chat/public/`.
 
 **Next big pieces:**
-1. **Calendar structure** — DONE (Round 11): Event `recurrence`
-   (RFC-5545 subset) + `GET /api/calendar` merged agenda
-   (movable-vs-fixed).
-2. **Agent-drafted card↔graph** — Round 12. The local agent reads the
-   PRM and drafts a key/query for you to approve. **Reopened by user
-   2026-05-16** (only this sub-piece — the P2P **transport** +
-   discovery stay parked as the unresolved design question;
-   `docs/card-format.md`).
+1. Calendar structure — DONE (Round 11).
+2. Agent-drafted card↔graph — DONE (Round 12): PRM digest + agents.md
+   envelope → `POST /api/card/draft`, heuristic fallback, approve via
+   `PUT /api/card`.
 3. **P2P card layer** — format + local layer DONE (Round 7).
    **Open/parked: the P2P transport** (what moves a card between
-   peers) + discovery — the gating design question; do not barrel on
-   a guess.
+   peers) + discovery — the gating *design* question; do not barrel
+   on a guess (explicit user steering). This is now the main
+   remaining social unknown; PRM side is broadly built out.
 
 (Done: Conflict/OpenQuestion/FollowUp forms — R6. Semantic
 `[[wikilink]]`/`[[property:target]]` — R8. Status-workflow

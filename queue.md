@@ -735,6 +735,34 @@ audio → back of todo). Calendar = recurrence + a merged agenda.
 Next: Round 12 — the agent-drafted card↔graph (reopened sub-piece;
 transport stays parked).
 
+---
+
+## Round 12 — agent-drafted card↔graph (2026-05-16)
+
+The reopened sub-piece (transport stays parked). The agent that has
+been building the PRM drafts the card's key/query; the user approves.
+
+- [x] R12-1. `Vault::prm_digest()` — compact model-agnostic PRM
+      summary (counts, top people by inbound mentions, relation
+      vocabulary, active tasks, explicit offer/want signals from
+      `[[offers:…]]`/`[[wants:…]]`, current card) + `agents_md()` the
+      editable governing envelope. Commit `931d01c`.
+- [x] R12-2. `card::{draft_prompt,parse_draft_reply,heuristic_draft}`
+      + `POST /api/card/draft`: digest+agents.md → bridge → JSON,
+      heuristic fallback offline; identity always carried from the
+      user's card (never the model's); never saved (approve via
+      `PUT /api/card`; 24h valve guards). No engine named (asserted).
+      Commit `bc97184`.
+- [x] R12-3. Docs — `docs/card-format.md` "Agent-drafted" flipped to
+      IMPLEMENTED, the "Card ↔ graph projection" open question marked
+      RESOLVED; README/todo/CLAUDE updated. (This commit.)
+
+**Round 12 status.** COMPLETE. All 3 configs green; 30 lib tests.
+The PRM is broadly built out (Rounds 5–12). The **only** remaining
+social unknown is the **P2P transport + discovery** — still parked
+by explicit user steering as a *design* question; do not barrel it
+on a guess.
+
 ## Notes for future sessions
 
 - The user dictates long stream-of-consciousness messages via voice. Do
@@ -757,8 +785,9 @@ transport stays parked).
   is now the **P2P transport** (what actually moves a card between
   peers) + discovery; the format deliberately does not assume it.
 - **Priority (2026-05-16): PRM structure > social layer.** PRM/vault/
-  graph structure is the focus. The **agent-drafted card↔graph**
-  sub-piece was reopened by the user (Round 12) — it's the PRM output
-  side, in scope. The **P2P transport + discovery stay parked**
-  pending a *design* decision; do not barrel them on a guess. Audio
-  pipeline → back of `todo.md`. See "Direction (2026-05-16)" above.
+  graph structure was the focus through Rounds 8–12 and is broadly
+  built out. The agent-drafted card↔graph sub-piece is **DONE
+  (Round 12)**. The **P2P transport + discovery remain parked**
+  pending a *design* decision — this is now the single biggest open
+  question; do **not** barrel it on a guess (explicit user steering).
+  Audio pipeline → back of `todo.md`. See "Direction (2026-05-16)".

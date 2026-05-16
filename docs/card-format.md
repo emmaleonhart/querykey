@@ -51,7 +51,7 @@ People will constantly want to grow the card — the standing answer is
 website."* A small, stable card also keeps the P2P payload tiny and
 easy to sync.
 
-### Agent-drafted, human-approved
+### Agent-drafted, human-approved — IMPLEMENTED (Round 12)
 
 Most people — especially younger people — are bad at articulating their
 own value. So the card is **drafted by your local agent**, which has
@@ -59,8 +59,23 @@ been building your PRM by observing your conversations, commitments,
 and what energizes you; it is in a better position to write a first
 draft of your `key` (and notice patterns for your `query`) than you
 are. You **review, curate, and approve** before it goes out. This is a
-more honest representation than a self-reported form. How the agent
-drafts it is governed by `agents.md` (see below / `CLAUDE.md`).
+more honest representation than a self-reported form.
+
+**As built:** `POST /api/card/draft` builds a compact, model-agnostic
+**PRM digest** (`Vault::prm_digest`: counts, most-referenced people,
+relation vocabulary, active tasks, and explicit offer/want signals
+harvested from `[[offers:…]]`/`[[wants:…]]`-style predicates) and asks
+the agent — within the **`agents.md` envelope** (an editable,
+version-controlled markdown file at the vault root; the agent's
+behavior is *not* a black box) — for a strict JSON `{bio, offering,
+looking_for}`. The agent proposes **only** bio/offering/looking_for;
+identity (`handle`/`website`) is always carried from your own card,
+never the model's to set. When no agent is reachable it falls back to
+a **deterministic, epistemically-humble heuristic**: it surfaces only
+what *you* explicitly tagged in the graph, never fabricated claims.
+The draft is **never saved** — approval is the existing
+`PUT /api/card`, and the 24h propagation valve guards regardless. No
+model/engine is named anywhere in the drafting path (any agent).
 
 ## File & example
 
@@ -172,7 +187,9 @@ owns your history and you fight to delete things. Here:
 - **Private vs. public card.** Planned but explicitly **not now** —
   more complex; revisit after the single public-card model works.
   `visibility:` is in the frontmatter only to reserve the field.
-- **Card ↔ graph projection.** Which private nodes a user surfaces into
-  the card (the agent-drafted `key`/`query`), and whether that
-  selection is manual or `agents.md`-assisted. The vault/PRM it would
-  draw from exists (Rounds 5–6); the drafting heuristic does not yet.
+- ~~**Card ↔ graph projection.**~~ **RESOLVED (Round 12)** — the
+  agent drafts `key`/`query` from the PRM digest within the
+  `agents.md` envelope (`POST /api/card/draft`); user approves via
+  `PUT /api/card`. See "Agent-drafted, human-approved" above. The
+  *only* remaining open question is the **transport** (+ discovery),
+  which is parked by an explicit user steering decision.

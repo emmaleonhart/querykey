@@ -140,6 +140,11 @@ is functional; most product behavior is scaffolding.
   (RFC-5545 subset) + `GET /api/calendar?from&to` merged agenda
   (event occurrences + deadlined tasks, movable-vs-fixed), live from
   the vault.
+- **Agent-drafted card** — DONE (Round 12): `POST /api/card/draft`
+  drafts your key/query from a model-agnostic PRM digest within the
+  editable `agents.md` envelope; deterministic humble heuristic when
+  offline; never saved (approve via `PUT /api/card`). **Still
+  parked: the P2P transport** (+ discovery) — explicit user steering.
 - **Peer-to-peer card layer** — format + local layer DONE (Round 7):
   card format/parse, the `.gitignore` asymmetry, the 24h propagation
   safety valve + revert-before-propagation, read-only `peers/`,
