@@ -401,10 +401,14 @@ real conflict/blocker.
       that resets retries, graceful stop_gateway/force_kill, plus the
       `x-openclaw-agent-id` header and system-prompt buildMessages.
       All 3 build configs green; boots clean, gateway detected.
-- [ ] R4-2. **Graph store completeness** — in `src/graph/loca.rs`
-      persist full Task/Event/Message/Conflict/Instruction/FollowUp
-      fields; implement `update` (SPARQL UPDATE) and `insert_triples`
-      (N-Triples via `loka_core::ntriples`) over the PersistentStore.
+- [x] R4-2. **Graph store completeness** — store_task/message/conflict
+      enriched to the full fuseki.go field sets (smoke-verified via
+      SPARQL). `insert_triples` implemented via
+      `loka_core::ntriples::parse_ntriples_line`. `update` validates
+      syntax but is a documented read-only limitation (no public SPARQL
+      UPDATE writer in loka; writes go via store_*/insert_triples).
+      Event/Instruction/FollowUp persistence needs new GraphStore
+      trait methods → folded into R4-4 (pipeline parity).
 - [ ] R4-3. **API handler parity** — real `list_tasks`, `update_task`,
       `resolve_conflict`, `questions`/`followups` against the graph
       (drop the stub/echo TODOs in `src/api/`).

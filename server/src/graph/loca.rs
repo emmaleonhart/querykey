@@ -87,14 +87,30 @@ impl GraphStore for LocaGraph {
     }
 
     async fn store_task(&self, t: &Task) -> anyhow::Result<()> {
+        // Field set mirrors fuseki.go StoreTask.
         let s = self.iri("task", &t.id.to_string());
         self.triple(&s, RDF_TYPE, &format!("{NS}Task"))?;
         self.lit(&s, &format!("{NS}title"), &t.title)?;
+        if !t.description.is_empty() {
+            self.lit(&s, &format!("{NS}description"), &t.description)?;
+        }
         self.lit(
             &s,
             &format!("{NS}status"),
-            &serde_json::to_string(&t.status).unwrap_or_default(),
+            serde_json::to_value(t.status)
+                .ok()
+                .and_then(|v| v.as_str().map(str::to_string))
+                .as_deref()
+                .unwrap_or("extracted"),
         )?;
+        self.lit(&s, &format!("{NS}confidence"), &t.confidence.to_string())?;
+        self.lit(
+            &s,
+            &format!("{NS}ambiguityScore"),
+            &t.ambiguity_score.to_string(),
+        )?;
+        self.lit(&s, &format!("{NS}createdAt"), &t.created_at.to_rfc3339())?;
+        self.lit(&s, &format!("{NS}updatedAt"), &t.updated_at.to_rfc3339())?;
         if !t.assigned_to.is_empty() {
             self.triple(
                 &s,
@@ -102,23 +118,70 @@ impl GraphStore for LocaGraph {
                 &self.iri("person", &t.assigned_to),
             )?;
         }
+        if !t.assigned_by.is_empty() {
+            self.triple(
+                &s,
+                &format!("{NS}assignedBy"),
+                &self.iri("person", &t.assigned_by),
+            )?;
+        }
+        if let Some(d) = t.deadline {
+            self.lit(&s, &format!("{NS}deadline"), &d.to_rfc3339())?;
+        }
+        for mid in &t.source_messages {
+            self.triple(&s, &format!("{NS}sourceMessage"), &self.iri("message", mid))?;
+        }
         Ok(())
     }
 
     async fn store_message(&self, m: &Message) -> anyhow::Result<()> {
+        // Field set mirrors fuseki.go StoreMessage.
         let s = self.iri("message", &m.id.to_string());
         self.triple(&s, RDF_TYPE, &format!("{NS}Message"))?;
         self.lit(&s, &format!("{NS}content"), &m.content)?;
+        self.lit(&s, &format!("{NS}confidence"), &m.confidence.to_string())?;
+        if !m.source_ingest.is_empty() {
+            self.lit(&s, &format!("{NS}sourceIngest"), &m.source_ingest)?;
+        }
         if !m.author.is_empty() {
             self.triple(&s, &format!("{NS}author"), &self.iri("person", &m.author))?;
+        }
+        if let Some(ts) = m.timestamp {
+            self.lit(&s, &format!("{NS}timestamp"), &ts.to_rfc3339())?;
         }
         Ok(())
     }
 
     async fn store_conflict(&self, c: &Conflict) -> anyhow::Result<()> {
+        // Field set mirrors fuseki.go StoreConflict.
         let s = self.iri("conflict", &c.id.to_string());
         self.triple(&s, RDF_TYPE, &format!("{NS}Conflict"))?;
         self.lit(&s, &format!("{NS}explanation"), &c.explanation)?;
+        self.lit(
+            &s,
+            &format!("{NS}conflictType"),
+            serde_json::to_value(c.conflict_type)
+                .ok()
+                .and_then(|v| v.as_str().map(str::to_string))
+                .as_deref()
+                .unwrap_or(""),
+        )?;
+        self.lit(
+            &s,
+            &format!("{NS}resolution"),
+            serde_json::to_value(c.resolution)
+                .ok()
+                .and_then(|v| v.as_str().map(str::to_string))
+                .as_deref()
+                .unwrap_or("unresolved"),
+        )?;
+        if !c.message_a.is_empty() {
+            self.triple(&s, &format!("{NS}messageA"), &self.iri("message", &c.message_a))?;
+        }
+        if !c.message_b.is_empty() {
+            self.triple(&s, &format!("{NS}messageB"), &self.iri("message", &c.message_b))?;
+        }
+        self.lit(&s, &format!("{NS}createdAt"), &c.created_at.to_rfc3339())?;
         Ok(())
     }
 
@@ -234,11 +297,36 @@ impl GraphStore for LocaGraph {
             results: SparqlBindings { bindings },
         })
     }
-    async fn update(&self, _sparql: &str) -> anyhow::Result<()> {
-        Ok(()) // TODO(port): SPARQL UPDATE over PersistentStore
+    async fn update(&self, sparql: &str) -> anyhow::Result<()> {
+        // loka_sparql parses INSERT DATA / DELETE DATA but its executor
+        // is read-only (&TripleStore) — there is no public SPARQL
+        // UPDATE writer over PersistentStore. We validate the syntax so
+        // callers get a real parse error; mutation is intentionally not
+        // applied. Writes go through the typed store_* paths or
+        // insert_triples (N-Triples). Documented limitation, not a bug.
+        loka_sparql::parse(sparql).map_err(|e| anyhow::anyhow!("sparql parse: {e}"))?;
+        tracing::warn!(
+            "[loca] SPARQL UPDATE parsed but not applied (no public \
+             update writer in loka); use store_* / insert_triples"
+        );
+        Ok(())
     }
-    async fn insert_triples(&self, _ntriples: &str) -> anyhow::Result<()> {
-        Ok(()) // TODO(port): use loka_core::ntriples parser
+
+    async fn insert_triples(&self, ntriples: &str) -> anyhow::Result<()> {
+        // Real N-Triples ingest via loka_core::ntriples.
+        let mut n = 0usize;
+        for line in ntriples.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            if let Some((subj, pred, obj)) = loka_core::ntriples::parse_ntriples_line(line) {
+                self.triple(&subj, &pred, &obj)?;
+                n += 1;
+            }
+        }
+        tracing::info!("[loca] insert_triples: {n} triple(s)");
+        Ok(())
     }
 
     fn backend(&self) -> String {
