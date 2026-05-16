@@ -243,6 +243,21 @@ pub struct LinkEdge {
     pub resolved: bool,
 }
 
+/// One row of the merged agenda: a fixed event occurrence or a
+/// time-flexible task that has a deadline in the window. `movable`
+/// encodes the Task-vs-Event distinction ("if you can move it without
+/// asking anyone, it's a task").
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AgendaItem {
+    pub kind: String, // "event" | "task"
+    pub id: String,
+    pub title: String,
+    pub start: String,        // rfc3339 (event occurrence start | task deadline)
+    pub end: Option<String>,  // events only
+    pub movable: bool,        // task → true, event → false
+    pub recurring: bool,      // this row is one occurrence of a rule
+}
+
 /// Resolution/comparison slug: lowercase, non-alphanumeric runs become
 /// a single `-`, trimmed. So `John  Smith`, `john-smith`, and
 /// `John-Smith` all compare equal.
@@ -803,6 +818,61 @@ impl Vault {
             .into_iter()
             .filter_map(|(_, c)| self.event_from(&c))
             .collect()
+    }
+
+    /// Merged, time-ordered agenda for `[from, to]` (inclusive):
+    /// every event occurrence (recurrence expanded) plus every task
+    /// whose deadline falls in the window. Backend-independent — read
+    /// straight from the canonical vault.
+    pub fn agenda(
+        &self,
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
+    ) -> Vec<AgendaItem> {
+        let mut items: Vec<(DateTime<Utc>, AgendaItem)> = Vec::new();
+
+        for e in self.list_events() {
+            let dur = e.end_time - e.start_time;
+            let recurring = e.recurrence.is_some();
+            for occ in
+                crate::calendar::occurrences(e.start_time, e.recurrence.as_deref(), from, to)
+            {
+                items.push((
+                    occ,
+                    AgendaItem {
+                        kind: "event".into(),
+                        id: e.id.to_string(),
+                        title: e.title.clone(),
+                        start: rfc3339(&occ),
+                        end: Some(rfc3339(&(occ + dur))),
+                        movable: false,
+                        recurring,
+                    },
+                ));
+            }
+        }
+
+        for t in self.list_tasks() {
+            if let Some(d) = t.deadline {
+                if d >= from && d <= to {
+                    items.push((
+                        d,
+                        AgendaItem {
+                            kind: "task".into(),
+                            id: t.id.to_string(),
+                            title: t.title.clone(),
+                            start: rfc3339(&d),
+                            end: None,
+                            movable: true, // time-flexible by definition
+                            recurring: false,
+                        },
+                    ));
+                }
+            }
+        }
+
+        items.sort_by(|a, b| a.0.cmp(&b.0));
+        items.into_iter().map(|(_, it)| it).collect()
     }
 
     // ----- Conflict -----
@@ -1580,6 +1650,71 @@ mod tests {
                 .with_timezone(&Utc),
         );
         assert_eq!(occ.len(), 4); // COUNT=4
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn agenda_merges_events_and_deadlined_tasks_in_order() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+        let d = |s: &str| {
+            DateTime::parse_from_rfc3339(s)
+                .unwrap()
+                .with_timezone(&Utc)
+        };
+
+        // Weekly event starting Mon May 4.
+        v.upsert_event(&Event {
+            id: uuid::Uuid::new_v4(),
+            title: "Standup".into(),
+            description: String::new(),
+            start_time: d("2026-05-04T09:00:00+00:00"),
+            end_time: d("2026-05-04T09:15:00+00:00"),
+            participants: vec![],
+            recurrence: Some("FREQ=WEEKLY;COUNT=6".into()),
+            confidence: 0.9,
+            source_messages: vec![],
+            created_at: Utc::now(),
+        })
+        .unwrap();
+
+        // Task due Tue May 5 (in window) and one due far outside.
+        for (title, dl) in [
+            ("Send invoice", "2026-05-05T17:00:00+00:00"),
+            ("Out of range", "2026-09-01T00:00:00+00:00"),
+        ] {
+            v.upsert_task(&Task {
+                id: uuid::Uuid::new_v4(),
+                title: title.into(),
+                description: String::new(),
+                status: TaskStatus::Confirmed,
+                assigned_to: String::new(),
+                assigned_by: String::new(),
+                deadline: Some(d(dl)),
+                confidence: 0.8,
+                ambiguity_score: 0.0,
+                source_messages: vec![],
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            })
+            .unwrap();
+        }
+
+        let ag = v.agenda(d("2026-05-04T00:00:00+00:00"), d("2026-05-12T00:00:00+00:00"));
+        // May 4 standup, May 5 invoice, May 11 standup. Out-of-range
+        // task excluded.
+        assert_eq!(ag.len(), 3);
+        assert_eq!(ag[0].kind, "event");
+        assert!(!ag[0].movable && ag[0].recurring);
+        assert_eq!(ag[0].end.as_deref(), Some("2026-05-04T09:15:00+00:00"));
+        assert_eq!(ag[1].kind, "task");
+        assert_eq!(ag[1].title, "Send invoice");
+        assert!(ag[1].movable && ag[1].end.is_none());
+        assert_eq!(ag[2].kind, "event"); // May 11 occurrence
+        assert!(ag[2].start.starts_with("2026-05-11"));
+        // Strictly time-ordered.
+        assert!(ag[0].start <= ag[1].start && ag[1].start <= ag[2].start);
 
         let _ = std::fs::remove_dir_all(&dir);
     }

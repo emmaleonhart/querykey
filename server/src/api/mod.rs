@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::routing::{get, patch, post};
 use axum::{Json, Router};
 use serde::Deserialize;
@@ -65,6 +65,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(list_voice_profiles).put(put_voice_profile),
         )
         .route("/api/persons/:id/voiceprofile", get(person_voice_profile))
+        // Calendar: merged agenda (events incl. recurrence + tasks
+        // with deadlines) for a window. ?from&to (rfc3339); defaults
+        // to [now, now+30d].
+        .route("/api/calendar", get(calendar_agenda))
         // P2P card layer (your key/query signal). Transport is the
         // open question — these are local: edit, the 24h propagation
         // safety valve, revert-before-propagation, read local peers.
@@ -451,6 +455,34 @@ async fn get_peer_card_h(
         Some(c) => Json(serde_json::to_value(c).unwrap_or_else(|_| json!({}))),
         None => Json(json!({ "error": "peer card not found", "handle": handle })),
     }
+}
+
+// ---- Calendar ----
+
+#[derive(Deserialize)]
+struct CalRange {
+    from: Option<String>,
+    to: Option<String>,
+}
+
+fn parse_dt_opt(s: &Option<String>) -> Option<chrono::DateTime<chrono::Utc>> {
+    s.as_deref()
+        .and_then(|x| chrono::DateTime::parse_from_rfc3339(x).ok())
+        .map(|d| d.with_timezone(&chrono::Utc))
+}
+
+async fn calendar_agenda(
+    State(s): State<Arc<AppState>>,
+    Query(q): Query<CalRange>,
+) -> Json<Value> {
+    let now = chrono::Utc::now();
+    let from = parse_dt_opt(&q.from).unwrap_or(now);
+    let to = parse_dt_opt(&q.to).unwrap_or_else(|| now + chrono::Duration::days(30));
+    Json(json!({
+        "from": from.to_rfc3339(),
+        "to": to.to_rfc3339(),
+        "agenda": s.vault.agenda(from, to),
+    }))
 }
 
 // ---- Instructions / Voice profiles (canonical vault) ----
