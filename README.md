@@ -122,9 +122,13 @@ is functional; most product behavior is scaffolding.
 - **Conflict/OpenQuestion/FollowUp on-disk forms** — DONE (Round 6):
   canonical markdown + vault-first wiring; `resolve_conflict`,
   `resolve_question`, `create_followup` are real markdown mutations
-  (no more `not_implemented`). Instruction/VoiceProfile on-disk forms
-  remain TBD; `[[wikilink]]` resolution + status-workflow enforcement
-  are future.
+  (no more `not_implemented`).
+- **Semantic wikilinks** — DONE (Round 8): `[[Target]]` /
+  `[[property:Target]]` (single-colon typed triples) in any entity
+  body become derived edges with explicit resolution precedence +
+  dangling handling; `GET /api/links` + per-entity backlinks live
+  from the vault. Instruction/VoiceProfile on-disk forms remain TBD;
+  status-workflow enforcement is future.
 - **Peer-to-peer card layer** — format + local layer DONE (Round 7):
   card format/parse, the `.gitignore` asymmetry, the 24h propagation
   safety valve + revert-before-propagation, read-only `peers/`,

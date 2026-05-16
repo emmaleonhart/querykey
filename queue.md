@@ -605,6 +605,47 @@ deepening the PRM compounds; the social layer can wait for a real
 transport decision. Future sessions: prioritize PRM/vault/graph
 structure over anything P2P until the user reopens the social track.
 
+---
+
+## Round 8 — semantic wikilinks (2026-05-16, PRM-priority)
+
+First round under the PRM-first direction. **User ask (voice):**
+per-person markdown is central; want `[[wikilink]]` *and* semantic
+`[[property:wikilink]]` — single colon (NOT SMW's ugly `::`), the
+property defining "the triple type." This also resolves the
+long-open `docs/markdown-schema.md` question (wikilink vs frontmatter
+ref: precedence + dangling).
+
+- [x] R8-1. **Parser** `src/wikilink` — `[[X]]` untyped, `[[p:X]]`
+      typed, `[[X|Alias]]` Obsidian alias off the edge; predicate =
+      lowercase non-URI-scheme token; forgives `::`. 7 tests.
+      Commit `81da6ad`.
+- [x] R8-2. **Vault resolver** — `collect_links()` scans every
+      person/task/event/note body, resolves targets with explicit
+      precedence (kind:id → person → task → event → note → dangling
+      `thing`, never dropped), slug-insensitive; `links_from`/
+      `links_to` (backlinks). Backend-independent + unit-tested.
+      Commit `d2aa501`.
+- [x] R8-3. **Projection + API** — `graph::NS` deduped (loca uses it);
+      `graph::link_ntriples` (resolved edges + dangling label,
+      escaping-tested); startup vault→graph projects links;
+      `GET /api/links` + `GET /api/entities/:kind/:id/links` served
+      LIVE from the vault (every build config, never stale).
+      Commit `1563294`.
+- [x] R8-4. **Docs** — `docs/markdown-schema.md` gets a "Semantic
+      wikilinks" section (syntax + precedence + dangling) and the
+      open item flipped to DONE; CLAUDE/README/todo updated. (This
+      commit.)
+
+**Round 8 status.** COMPLETE. All 3 build configs green; 16 lib
+tests pass (parser 7, projector 1, vault incl. resolver 8). Each
+item its own commit. Markdown stays canonical; the link graph is
+derived and rebuildable. Next PRM threads (queued, not started):
+status-workflow enforcement; Instruction/VoiceProfile on-disk forms;
+agent-drafted card↔graph (PRM exists, heuristic doesn't);
+calendar/audio. Code-fence/nested-bracket wikilink edge cases are
+documented future refinements.
+
 ## Notes for future sessions
 
 - The user dictates long stream-of-consciousness messages via voice. Do

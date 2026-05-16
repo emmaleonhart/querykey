@@ -125,8 +125,51 @@ Climbing session, the usual gym.
 
 ### Note — `notes/<slug>.md`
 
-Frontmatter optional beyond `id`/`type`. The body is the point;
-`[[wikilinks]]` to entity slugs are how a note attaches to the graph.
+Frontmatter optional beyond `id`/`type` (a note may have *no*
+frontmatter at all — the body is the point). `[[wikilinks]]` in the
+body are how a note attaches to the graph.
+
+### Semantic wikilinks (IMPLEMENTED, Round 8)
+
+Any entity body (person/task/event/note) may contain wikilinks; each
+becomes a derived graph edge from that entity:
+
+- `[[Target]]` — an **untyped reference**. Predicate: `references`.
+- `[[property:Target]]` — a **semantic triple**: the token before the
+  **single** `:` is the predicate. `[[employer:Acme Corp]]` in
+  `people/jane.md` ⇒ `(person:jane) —employer→ (Acme Corp)`.
+  Deliberately a single colon — *not* Semantic-MediaWiki's `::` (an
+  accidental `::` is parsed forgivingly).
+- `[[Target|Alias]]` — Obsidian display alias; the alias does not
+  affect the edge (left side is the link).
+- A predicate token is `[a-z][a-z0-9_-]*` and not a URI scheme, so
+  `[[https://x]]` is an untyped link, not an `https:` predicate.
+
+**Resolution precedence** (first match wins — this is the answer to
+the formerly-open "wikilink vs frontmatter ref" question):
+
+1. an explicit `kind:id` (`[[knows:person:jane]]`) — symmetry with
+   frontmatter refs;
+2. **person** by id/slug, then by display name;
+3. **task** by uuid, then by title;
+4. **event** by uuid, then by title;
+5. **note** by slug;
+6. **dangling** → kind `thing`, id `slug(target)`, `resolved:false` —
+   the edge is **never dropped**; dangling links stay queryable and
+   the raw target is kept as a `label`. (A note for a not-yet-created
+   person still connects; the node materializes when they're added.)
+
+Matching is slug-insensitive (`John  Smith` ≡ `john-smith`).
+Frontmatter refs (`person:`, `people:`) and wikilink edges are
+**additive**, not competing — frontmatter carries structural fields,
+wikilinks carry freeform relations.
+
+Served live from the canonical vault at `GET /api/links` and
+`GET /api/entities/:kind/:id/links` (`{from: outgoing, to:
+backlinks}`); also projected into the derived triple store on the
+startup rebuild (a SPARQL convenience — markdown stays canon).
+Code-fence exclusion and nested brackets are documented future
+refinements (rare in practice).
 
 ### Conflict — `conflicts/<uuid>.md`
 
@@ -239,8 +282,10 @@ Still good to drop the book off Saturday?
 
 - `status` / `ambiguity` transition rules (enums exist; the *workflow*
   isn't enforced yet).
-- Freeform-body `[[wikilinks]]` resolution vs. explicit frontmatter
-  refs (precedence, dangling links).
+- Freeform-body `[[wikilinks]]` resolution + semantic
+  `[[property:target]]` triples — **DONE (Round 8).** Precedence +
+  dangling specified above; parser/resolver/projection unit-tested;
+  `/api/links` + backlinks live from the vault.
 - Conflict / OpenQuestion / FollowUp — **DONE (Round 6).** Canonical
   on-disk forms + vault-first wiring; lossless round-trip unit-tested.
 - Instruction / VoiceProfile on-disk forms — **TBD**; still
