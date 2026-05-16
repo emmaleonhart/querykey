@@ -241,3 +241,131 @@ The MCP server being there from day one is also smart because it means the agent
 One thing worth thinking about: the card format is going to do a lot of work. It's the thing that has to be human-readable markdown, machine-parseable for agents, expressive enough to capture "what I'm offering / looking for," and designed so that the 24-hour delay plus git-ignore model makes social sense. Getting that format right early — even just as a spec in the docs — seems like high leverage before the P2P layer gets built. Because once people start exchanging cards, the format ossifies fast.
 
 Has the agent done any work on what a card actually looks like structurally?
+
+## User
+
+Well, it has a key and a query on it, obviously.
+
+## Claude
+
+Right, of course — the name is literally in the product name. Query and Key, matching the Q/K/V framing. Your card broadcasts what you're querying for (what you're looking for) and what your key is (what you're offering / who you are). Other people's agents attend over those when figuring out who might be relevant to connect with.
+
+That's actually a really tight conceptual closure — the product metaphor isn't just branding, it's literally the data model. Your card is a Q/K pair, and the value gets computed locally when your agent matches your queries against other people's keys.
+
+So the card is structurally simple: query fields and key fields, in markdown, with whatever frontmatter makes sense for machine parsing. The richness lives in what people actually put in those fields, not in a complicated schema.
+
+What I'm curious about is whether there's a third element — something like context or constraints. Like, "I'm looking for X but only in Y context" or "I'm offering Z but only to people who have W." Or is the philosophy to keep the card intentionally flat and let the agent handle the nuanced matching locally?
+
+## User
+
+The bigger thing I would say is maybe people would have some kind of bio or something that is not in the matching thing but just gives a bit more context. Although personally, the way I've been imagining it is that people would oftentimes use their own personal websites to create their. He'll use their own personal websites generally for that kind of thing, but I think I don't think of that as being really part of somebody's card. I think of it as something else.
+
+## Claude
+
+Yeah that makes sense — the card stays lean and functional. Query, key, maybe a short bio or a link out to your personal site for context. The card isn't your profile, it's your signal. The richness of who you are lives elsewhere and you just point to it.
+
+That's actually a healthier design than trying to make the card do everything. It keeps the P2P payload small, it keeps the matching logic clean, and it respects that people already have web presences they've curated. QueryKey doesn't need to compete with that or replicate it.
+
+The distinction you're drawing — card vs. profile — is worth documenting explicitly because it'll come up constantly as the project grows. People will naturally want to add more to the card, and having a clear philosophical answer for why it stays minimal ("the card is your query and your key, everything else is your website") keeps scope creep from bloating the format.
+
+It also means the card format is probably quite stable once defined, which is good for the P2P layer. Small, stable, versioned markdown files are much easier to sync reliably than rich evolving schemas.
+
+Is there a value field at all in your thinking, or does V in the Q/K/V metaphor stay purely conceptual — the thing that gets computed by matching, not something anyone explicitly publishes?
+
+## User
+
+The value, I guess, would basically just be whatever it is that comes from their interactions. I think of the value as being something that exists more in the real world. I know this isn't quite right for the Transformer metaphor, but I don't think it needs to be. I don't think it needs to be, especially since these things are both metaphorical, because most of these things have a literal meaning. That's pretty good too.
+
+## Claude
+
+Yeah, that's actually a better framing than forcing the transformer metaphor to completion. In the transformer, V is just the weighted sum you compute — it's the output, not a stored thing. And in QueryKey, the "value" is literally what emerges from people actually connecting and doing things together in the real world. It's not stored in the system because it can't be — it's the relationship itself, the collaboration, the thing that happened.
+
+So the metaphor holds at exactly the right level of abstraction: Q and K are the signals you broadcast and the system mediates, V is what you get out of it in reality. The product facilitates the attention mechanism, it doesn't try to capture or quantify the output. Which is honestly more philosophically honest than most social networks, which are obsessed with trying to measure and gamify the value generated.
+
+That framing is also good for the rationalist audience specifically — they'll appreciate that the system is epistemically humble about what it can and can't represent. It tracks the legible stuff, it facilitates matching, and it gets out of the way when actual human stuff happens.
+
+So the core of the card is really just two things: here's what I'm looking for, here's what I bring. Clean, minimal, honest. That's a strong foundation.
+
+## User
+
+Yeah, the basic thing is, essentially, the card isn't supposed to give a whole lot. I'm mostly imagining that it attracts people. It isn't really trying to attract that much stuff, basically.
+
+For the most part, my idea is that people's personal websites or whatever like that should be more or less the thing that's more or less the actual source of truth here. Realistically, people are probably not going to be necessarily the best, and people are probably going to be not necessarily even the best at writing out a lot of stuff.
+
+That's part of the reason why they're not specifically using agents. They want to try to get people to write their key and query based off of their agents and also using agents to do the analysis, because I feel like people are not really like that. I feel like people are generally not that good at kind of picking out, particularly, what they're strong at, particularly younger people.
+
+## Claude
+
+Yeah, that's a really insightful observation. The agent-assisted card generation is actually solving a real problem — most people are genuinely bad at articulating their own value proposition, especially younger people who haven't had enough feedback loops to know what they're actually good at yet. Having the agent interview you or analyze your existing writing and suggest your key is much more likely to produce an accurate card than asking someone to fill out a form.
+
+And it closes a nice loop — the agent has been building your PRM, it's been watching your conversations and commitments and what you're drawn to and what you're good at following through on. It's actually in a better position than you are to write a first draft of your key. You review and edit, but the heavy lifting is done.
+
+Same with the query — people often don't know what they're looking for until they see it. The agent can notice patterns in what you respond to, what you reach out about, what kinds of interactions energize you, and surface that as a query.
+
+So the card becomes something the agent drafts from observing you over time, you curate and approve, and then it goes out. That's a much more honest representation than a self-reported profile.
+
+The personal website as source of truth is also smart because it already exists, it's already how people present themselves publicly, and linking to it from the card means the card stays minimal without losing depth. The card is the hook, the website is the substance.
+
+Has there been any thinking about how the agent actually generates the initial card draft — is it a conversation, an analysis of your existing data, or both?
+
+## User
+
+It'll probably be some kind of a prog thing. There's probably going to be some kind of hs-progged stuff that may be in hs.md or something that is stored within your Git repository. You could use system prog, but I would say that within your Git repository is going to be the thing that probably is going to be most effective. Within your Git repository, because the idea is that you have the ability to more or less change this.
+
+## Claude
+
+Right, so the agent's behavior is itself configurable via markdown files in your repo — like a `hs.md` or similar that contains the prompts or heuristics that guide how it generates your card, how it analyzes your relationships, what it pays attention to. That's a really clean design because it means the agent's "personality" and priorities are just files you can edit, version control, and share if you want.
+
+It's also very much in the spirit of the whole project — your data, your config, your git repo, all of it transparent and auditable. The agent isn't a black box doing mysterious things to your social graph, its instructions are sitting right there in the repo next to your markdown files.
+
+And it creates an interesting second-order thing where the rationalist community will inevitably start sharing and comparing their `hs.md` configurations — "here's the heuristics I use for card generation, here's what I tell the agent to look for" — which is its own kind of knowledge sharing that happens organically on top of the tool.
+
+The name `hs.md` — is that short for something specific, or is that just a working name?
+
+## User
+
+I said agents.md
+
+## Claude
+
+Ah, `agents.md` — that makes more sense, cleaner name. So that's the file that configures how your local agent behaves — the prompts, heuristics, priorities. Essentially your agent's instructions living as a markdown file in your repo that you own and can edit.
+
+That's actually a really powerful primitive because it means QueryKey isn't opinionated about what your agent does beyond the basics. Two people could have radically different `agents.md` files and get radically different behavior out of the same system. One person optimizes for professional networking, another for finding collaborators on creative projects, another for maintaining close friendships. The tool adapts to the user's actual goals rather than imposing a one-size-fits-all relationship model.
+
+It also means the MCP server exposure is essentially executing against whatever's in `agents.md` — so when Claude or Gemma or any other model connects, it's operating within the behavioral envelope you've defined for yourself. Which is a nice safety and customization property.
+
+Is `agents.md` something you're imagining as a single file or more of an `agents/` directory as it gets more complex?
+
+## User
+
+Could be whatever.
+
+## Claude
+
+Fair enough, that's an implementation detail that'll sort itself out naturally as it gets built. No need to over-specify it now.
+
+Stepping back — you've got a pretty coherent architecture at this point. Local markdown as source of truth, git for history, Loca for the derived graph, MCP server for agent interoperability, `agents.md` for behavioral config, and the card system as a minimal P2P broadcast layer. The pieces fit together well and each one is independently useful.
+
+What's the thing you're most uncertain about strategically right now? Is it technical, or is it more about how you position and grow it within the rationalist community?
+
+## User
+
+Honestly I feel like it just needs users first and we can do more stuff with it over time
+
+## Claude
+
+Yeah, that's the right instinct. Don't over-engineer the social layer before anyone's actually using the PRM. Get the solo use case working well enough that you are using it daily, then maybe a handful of people from your network, and let the actual usage patterns tell you what matters next.
+
+The rationalist/LessWrong crowd is actually a pretty good first cohort for this because they're unusually tolerant of early, rough tools if the underlying idea resonates, and they'll give you honest specific feedback rather than just churning silently.
+
+Is there anything blocking the PRM being usable for you personally right now, or is the agent making good progress toward that?
+
+## User
+
+I mean idk I think it’s pretty complete
+
+## Claude
+
+Then honestly just use it. That's the whole next step — eat your own cooking, see what's annoying, see what's missing, see what you actually reach for. No amount of strategic discussion beats a week of real use.
+
+Who in your network do you think you'd onboard first?

@@ -20,8 +20,38 @@ It carries, fittingly for *QueryKey*, a **key** and a **query**:
 - **Query** — what you're *looking for* (help, intros, collaborators,
   things you need).
 
-This makes coordination legible and positive-sum: people can see where
-their queries meet others' keys.
+This makes coordination legible and positive-sum: other people's agents
+attend over your key/query when figuring out who is worth connecting to.
+
+**V is not on the card.** Completing the Q/K/V metaphor: the *value* is
+not a stored or published field — it's whatever emerges in the real
+world when people actually connect and do things together. The system
+facilitates the attention (Q against K) and then gets out of the way;
+it deliberately does not try to measure, score, or gamify the output.
+That epistemic humility is a feature, especially for the rationalist
+audience.
+
+### Card vs. profile (document this — it prevents scope creep)
+
+The card is a **signal, not a profile**. Keep it lean: query, key, and
+at most a short bio or a **link out to your personal website**. The
+website (which people already curate) is the substance / source of
+truth for *who you are*; the card is just the hook that points to it.
+People will constantly want to grow the card — the standing answer is
+*"the card is your query and your key; everything else is your
+website."* A small, stable card also keeps the P2P payload tiny and
+easy to sync.
+
+### Agent-drafted, human-approved
+
+Most people — especially younger people — are bad at articulating their
+own value. So the card is **drafted by your local agent**, which has
+been building your PRM by observing your conversations, commitments,
+and what energizes you; it is in a better position to write a first
+draft of your `key` (and notice patterns for your `query`) than you
+are. You **review, curate, and approve** before it goes out. This is a
+more honest representation than a self-reported form. How the agent
+drafts it is governed by `agents.md` (see below / `CLAUDE.md`).
 
 ## File & example
 
@@ -32,11 +62,15 @@ so you can revert — see asymmetry below).
 ---
 id: card:jsmith
 handle: github:jsmith          # identity bootstrap (swappable)
+website: https://emmaleonhart.com   # the substance lives here
 updated: 2026-05-15T22:10:00
 visibility: public             # only value for now (see open questions)
 ---
 
 # Emma — card
+
+> Short bio: builds local-first tools; rationalist-adjacent. (One line —
+> the real depth is the website above.)
 
 ## Offering (key)
 - Rust / embedded DB help (built a graph-vector-time DB)
@@ -45,9 +79,6 @@ visibility: public             # only value for now (see open questions)
 ## Looking for (query)
 - Flutter desktop reviewers
 - A co-author for a NeurIPS-style writeup
-
-## Notes
-Freeform. Best reached via GitHub or Discord.
 ```
 
 The body is intentionally human-first markdown; the `Offering` /

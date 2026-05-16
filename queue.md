@@ -13,6 +13,34 @@ See the new bigger chat I just imported, please extract it and move forward sinc
 
 Please keep this section when rebasing with the remote
 
+> **Status (extracted 2026-05-15).** The bigger chat was extracted via
+> Sutra `extract_chat.py` and now lives at
+> `chat/public/vision - rationalist p2p social network (Claude).md`
+> (39 KB, 19 exchanges) — it **replaces** the prior 27 KB extraction.
+> **Future/other sessions: read THIS file as the authoritative vision.**
+> New material vs. the prior version (folded lightly into the docs;
+> deeper reorg left for the next session):
+> - The **card is literally a Q/K pair** — `query` = what you're
+>   looking for, `key` = what you offer. **V is not stored**: it's the
+>   real-world outcome of people actually connecting (epistemically
+>   honest, anti-gamification).
+> - **Card ≠ profile.** The card is a lean *signal* (query + key + a
+>   short bio or a link out to your personal site). Your personal
+>   website is the substance/source of truth for "who you are"; the
+>   card just points to it. Keeps the P2P payload small and the format
+>   stable.
+> - **Agent-drafted cards.** People (esp. younger) are bad at
+>   articulating their own value; the local agent drafts `key`/`query`
+>   from the PRM it already built by observing you — you curate/approve.
+> - **`agents.md`** (name/shape flexible — could be an `agents/` dir):
+>   the local agent's behavior/heuristics/prompts as an editable,
+>   version-controlled markdown file in your repo. Transparent, not a
+>   black box; the MCP server executes within that envelope; the
+>   rationalist community will share/compare configs.
+> - **Strategy:** stop over-engineering the social layer; the PRM is
+>   "pretty complete" — next step is real daily use (eat own cooking),
+>   rationalist/LessWrong as first cohort.
+
 ## RECOVERY DUMP — written 2026-05-15
 
 The user's laptop battery was about to die in the middle of a planning
