@@ -29,6 +29,14 @@ pub struct IngestRequest {
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct IngestResult {
     pub ingest_id: String,
+    /// Set when the agent could not be reached or returned an error.
+    /// When present, the (empty) `analysis` is **not** a confident
+    /// "nothing to extract" — extraction did not happen at all. We
+    /// never hide this behind an empty success (CLAUDE.md: "admit
+    /// when unsure", "ask rather than guess silently"). Absent on a
+    /// real extraction, so successful responses are unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_error: Option<String>,
     #[serde(flatten)]
     pub analysis: AnalysisResult,
 }
@@ -58,11 +66,28 @@ impl Pipeline {
     pub async fn process(&self, req: &IngestRequest) -> anyhow::Result<IngestResult> {
         let ingest_id = uuid::Uuid::new_v4().to_string();
         let normalized = self.normalize(req);
-        let analysis_json = self
+
+        // Honesty boundary: an agent failure must be SURFACED, not
+        // turned into an empty-but-"successful" extraction. The old
+        // `.unwrap_or_default()` masked a gateway 404 as
+        // `tasks: [], events: [], ...` — indistinguishable from
+        // "nothing to extract" — which is exactly the silent guess
+        // CLAUDE.md forbids.
+        let (analysis_json, agent_error) = match self
             .bridge
             .analyze(&normalized, &req.source_context)
             .await
-            .unwrap_or_default();
+        {
+            Ok(j) => (j, None),
+            Err(e) => {
+                tracing::warn!(
+                    "[ingest] agent extraction failed ({ingest_id}): {e} \
+                     — returning an explicit agent_error, NOT a silent \
+                     empty result"
+                );
+                (String::new(), Some(e.to_string()))
+            }
+        };
 
         let analysis = parse_analysis(&analysis_json, &ingest_id);
         self.store_results(&analysis).await;
@@ -70,6 +95,7 @@ impl Pipeline {
 
         Ok(IngestResult {
             ingest_id,
+            agent_error,
             analysis,
         })
     }
