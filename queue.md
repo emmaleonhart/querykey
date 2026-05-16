@@ -360,11 +360,22 @@ secretarybird").
 - [x] R3-5. `!run.bat` + README + CLAUDE + todo updated: Rust is **the**
       server, Go archived.
 
-**Honest status:** structural port. In-code `TODO(port)` markers
-(against `server-go-old/`) remain for: incremental agent streaming,
-the Discord bot port, the persistent-store SPARQL **query** bridge, and
-typed read-backs from the derived graph. These are the next building
-steps, tracked in `todo.md` Phase 11.
+**Round 3 building steps — DONE (2026-05-15, scheduled session).**
+The structural port has been fleshed out (each its own commit, all
+pushed, all three build configs green):
+- ✅ Incremental agent streaming — real SSE delta parsing (`1ef5af1`).
+- ✅ Persistent SPARQL query bridge — PersistentStore snapshot →
+  loka_sparql, smoke-verified (`ee434eb`).
+- ✅ Typed graph read-back (persons) via the POS index (`1d6ee13`).
+- ✅ MCP endpoint — minimal JSON-RPC `/mcp` (`7bf0f46`).
+- ✅ Discord bot port — feature-gated serenity client (`f59cd4b`).
+
+**Remaining `TODO(port)` (deeper, lower priority):** MCP stdio/SSE
+transports + `agents.md`-governed write tools; Discord per-channel
+filters + hourly-batch-into-pipeline + DM follow-ups; markdown-canonical
+read path for tasks/conflicts (the derived graph is intentionally lossy
+for those); perf — cache/incrementally maintain the SPARQL snapshot.
+None block the server; tracked in `todo.md` Phase 11.
 
 ## Notes for future sessions
 
