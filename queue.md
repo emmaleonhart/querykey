@@ -534,11 +534,61 @@ were `not_implemented`).
       notes; the three moved from "Still open" → DONE),
       CLAUDE/README/todo updated. (This commit.)
 
-**Round 6 status.** Code + docs complete, all builds green, each item
-its own commit. The *only* open thread is R6-0's push: until
-`origin/main` has the commits, PR #1 stays open and `other-machine`
-is not deleted (deliberate — don't lose the salvage). Next big
-pieces unchanged: P2P card layer, GitHub identity.
+**Round 6 status.** COMPLETE. Pushed (`b3193fe..3056886`); R6-0 also
+done — `.gitattributes` on `origin/main`, PR #1 closed with the full
+diagnosis, `other-machine` deleted + pruned.
+
+---
+
+## Round 7 — P2P card layer + GitHub identity (2026-05-16)
+
+**User directive:** delete the orphaned
+`claude/team-communication-bot-C2WBA` branch (a pre-pivot stub whose
+markdown-vault idea is now built+surpassed on `main`), then barrel
+the P2P card layer + GitHub-bootstrapped identity. The PRM/vault is
+built (R5–R6), so per the adoption sequencing the card layer is the
+right next piece. Build the **format** (it ossifies once cards are
+exchanged) + identity + the *local* propagation/asymmetry — **not**
+the transport (the doc's top open question; the format must not
+assume it; no exchange/relay code).
+
+- [~] R7-0. Delete `claude/team-communication-bot-C2WBA` — **blocked
+      by the auto-mode classifier** (read "delete it" as ambiguous
+      despite the branch being named and the user replying to it).
+      Handed to the user as `! git push origin --delete …` (recoverable
+      from SHA `ad728a5`). Non-blocking side cleanup.
+- [x] R7-1. **Card format module** — `src/card`: Card model +
+      render/parse, the stable `## Offering`/`## Looking for` heading
+      contract, no `value` field (V is the real-world outcome).
+      `Vault::{card_path,get_card,upsert_card}`. **Privacy `.gitignore`
+      asymmetry** written on `Vault::open` (ignores `/peers/` +
+      `/.querykey/`, NOT `card.md`; idempotent, non-clobbering).
+      2 round-trip tests. Commit `f4a9abd`.
+- [x] R7-2. **Identity abstraction** — `src/identity`:
+      `CanonicalHandle` + `IdentityProvider` trait; `GitHubIdentity`
+      normalizes every input form; `default_provider()` the only site
+      naming GitHub (swappable). Discovery deliberately absent
+      (transport). 2 tests. Commit `792968c`.
+- [x] R7-3. **API + propagation + peers** — `card.md` working/tracked,
+      `.querykey/card.pending.md`+`eligible_at` staged, `card.published
+      .md` the snapshot a transport *would* ship; 24h lazy promotion;
+      revert-before-propagation restores from published. Read-only
+      `peers/` (FS-safe slug; `:` never hits disk).
+      `/api/card|card/published|card/revert|identity|peers`. Full
+      cycle + asymmetry unit-tested. Commit `d9763b7`.
+- [x] R7-4. **Docs** — `docs/card-format.md` flipped to
+      format+local IMPLEMENTED with as-built notes + the narrowed
+      open-questions (transport/discovery/private-card/agent-draft);
+      CLAUDE/README/todo updated. (This commit.)
+
+**Round 7 status.** Code + docs complete; all 3 build configs green,
+zero warnings (the loca dead_code note is the external loka-core
+crate); 7 lib tests pass; each item its own commit. The card
+*format* and *local* layer are done and unit-tested. **The next
+gating question is the P2P transport** (what actually moves a card
+between peers) + discovery + the agent-drafted card↔graph projection
+(the PRM it would draw from now exists). Only loose end: R7-0's
+branch delete, handed to the user.
 
 ## Notes for future sessions
 
@@ -557,5 +607,7 @@ pieces unchanged: P2P card layer, GitHub identity.
 - Markdown + git is the source of truth; the graph is rebuildable from
   it. MCP server is day-one infra. Identity bootstraps via GitHub
   (swappable). Social layer is pure-P2P cards, built after the PRM.
-- Don't relitigate the Round 2 resolved decisions above. The one real
-  open design question is the **card format spec**.
+- Don't relitigate the Round 2 resolved decisions above. The card
+  *format* is now built (Round 7) — the one real open design question
+  is now the **P2P transport** (what actually moves a card between
+  peers) + discovery; the format deliberately does not assume it.

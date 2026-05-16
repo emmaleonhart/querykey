@@ -1,11 +1,20 @@
 # The Card — P2P broadcast format
 
-> **Status: spec (Round 2, 2026-05-15). Highest-leverage open design
-> question.** The card format ossifies fast once people start
-> exchanging cards, so it is specced *before* any peer-to-peer code is
-> written. **No exchange/transport code this round.** The card layer is
-> built *after* the solo PRM (it is a window into a graph you already
-> built). Authoritative alongside `CLAUDE.md` / `queue.md`.
+> **Status: format + local layer IMPLEMENTED (Round 7, 2026-05-16).**
+> The PRM/vault landed (Rounds 5–6), so per the adoption sequencing
+> the card layer was built next. **What is built:** the card *format*
+> (`src/card`, `card.md` at the vault root, the stable `## Offering` /
+> `## Looking for` heading contract, lossless round-trip), the
+> swappable *identity* abstraction (`src/identity`, GitHub bootstrap),
+> the local *24h propagation safety valve* (working↔published with
+> revert-before-propagation), the privacy `.gitignore` *asymmetry*
+> (your card tracked; peers' ignored), and a read-only *peers* path +
+> the `/api/card|identity|peers` endpoints. **What is deliberately
+> NOT built:** the **transport** that actually moves a card between
+> peers — still the highest open question; the format does not assume
+> it and there is no exchange/relay code. Authoritative alongside
+> `CLAUDE.md` / `queue.md`. Spec below matches the build; deviations
+> are under "Implementation notes".
 
 ## What a card is
 
@@ -117,17 +126,53 @@ owns your history and you fight to delete things. Here:
 - **Pure peer-to-peer.** No central server, no global source of truth.
   Cards move directly between peers.
 
-## Open questions (resolve before P2P code)
+## Implementation notes (Round 7 — as built)
+
+- **Format** lives in `server/src/card/`. `Card` =
+  handle/name/website/bio/offering/looking_for/updated/visibility.
+  `offering` is the **key**, `looking_for` the **query**; there is no
+  `value` field by design (V is the real-world outcome — never stored
+  or scored). `render`/`parse` round-trip losslessly and are
+  idempotent (unit-tested); parsing is tolerant of the `(key)`/
+  `(query)` heading suffixes and extra prose, but the `## Offering` /
+  `## Looking for` heading names are the contract.
+- **Identity** is `server/src/identity/` — a `CanonicalHandle`
+  (`scheme:localpart`) + an `IdentityProvider` trait. `GitHubIdentity`
+  normalizes every input form (`jsmith`, `@jsmith`,
+  `https://github.com/jsmith`, …) to one handle. `default_provider()`
+  is the **only** site that names GitHub — swap there for DID/Nostr.
+  *Discovery* (whose cards you pull) is part of the transport question
+  and is not implemented (no network calls).
+- **Propagation mechanics (resolved, local side):** `card.md` is the
+  working/tracked file; `.querykey/card.pending.md` + `card.eligible_at`
+  is the staged edit; `.querykey/card.published.md` is the frozen
+  snapshot a transport *would* broadcast. An edit stages pending with
+  a 24h window and never touches the published snapshot; promotion is
+  lazy (computed on every card read); revert-before-propagation drops
+  the pending edit and restores `card.md` from the published snapshot
+  immediately. `.querykey/` is git-ignored, so this state never enters
+  history.
+- **Asymmetry enforced:** `Vault::open` writes a `.gitignore` into the
+  vault root ignoring `/peers/` and `/.querykey/` but **not**
+  `card.md` (idempotent; appends rather than clobbering an existing
+  one). Peer cards are read-only from `peers/<fs-safe-slug>/card.md`;
+  `:` in a handle never hits the filesystem.
+- **API:** `GET|PUT /api/card`, `GET /api/card/published`,
+  `POST /api/card/revert`, `GET /api/identity`, `GET /api/peers`,
+  `GET /api/peers/:handle/card`.
+
+## Open questions (still open — block the P2P transport, not the format)
 
 - **Transport.** What actually moves a card peer-to-peer (a shared
   GitHub org repo as a stepping stone? a relay like Nostr? true P2P)?
-  Deliberately unresolved; the *format* must not assume the transport.
+  Still deliberately unresolved; the format + local layer do not
+  assume it. This is now *the* gating question for the P2P layer.
+- **Discovery.** "Follow on GitHub" → whose `peers/` you populate.
+  Tied to transport (needs network); intentionally unbuilt.
 - **Private vs. public card.** Planned but explicitly **not now** —
   more complex; revisit after the single public-card model works.
   `visibility:` is in the frontmatter only to reserve the field.
-- **Propagation mechanics.** Where the 24h timer lives, how revert-
-  before-propagation is detected, what a peer sees mid-delay.
 - **Card ↔ graph projection.** Which private nodes a user surfaces into
-  the card, and whether that selection is manual or assisted.
-
-None of these block the *format* spec; they block the P2P layer.
+  the card (the agent-drafted `key`/`query`), and whether that
+  selection is manual or `agents.md`-assisted. The vault/PRM it would
+  draw from exists (Rounds 5–6); the drafting heuristic does not yet.

@@ -125,9 +125,13 @@ is functional; most product behavior is scaffolding.
   (no more `not_implemented`). Instruction/VoiceProfile on-disk forms
   remain TBD; `[[wikilink]]` resolution + status-workflow enforcement
   are future.
-- **Peer-to-peer card layer** (offer/looking-for cards, asymmetric
-  git-tracking, 24h delay) — *after* the solo PRM (`docs/card-format.md`).
-- **GitHub identity/sync** bootstrap behind a swappable handle abstraction.
+- **Peer-to-peer card layer** — format + local layer DONE (Round 7):
+  card format/parse, the `.gitignore` asymmetry, the 24h propagation
+  safety valve + revert-before-propagation, read-only `peers/`,
+  `/api/card|identity|peers`, swappable GitHub identity abstraction
+  (`docs/card-format.md`). **Still open: the P2P transport itself**
+  (what actually moves a card between peers) + discovery — the format
+  deliberately does not assume it; this is now the gating question.
 - MCP stdio/SSE transports + `agents.md`-governed write tools.
 - The follow-up engine, conflict resolution, daily check-ins;
   calendar/scheduling; audio/voice pipeline; external tool sync.

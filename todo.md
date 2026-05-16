@@ -21,11 +21,14 @@
 - **Specs/context:** `docs/markdown-schema.md` (as-built),
   `docs/card-format.md`, vision corpus in `chat/public/`.
 
-**Next big pieces (not started):**
-1. **P2P card layer** — `docs/card-format.md` (offer/looking-for
-   cards = your key/query, asymmetric git-tracking, 24h delay).
-2. **GitHub identity / sync** behind a swappable handle abstraction.
-3. `[[wikilink]]` resolution; status-workflow enforcement;
+**Next big pieces:**
+1. **P2P card layer** — format + local layer DONE (Round 7): format/
+   parse, `.gitignore` asymmetry, 24h propagation safety valve +
+   revert, read-only `peers/`, swappable GitHub identity, the
+   `/api/card|identity|peers` endpoints. **Open: the P2P transport**
+   (what moves a card between peers) + discovery + card↔graph
+   agent-drafting — now *the* gating question (`docs/card-format.md`).
+2. `[[wikilink]]` resolution; status-workflow enforcement;
    Instruction/VoiceProfile on-disk forms; calendar; audio pipeline.
    (Conflict/OpenQuestion/FollowUp on-disk forms — done, Round 6.)
 
