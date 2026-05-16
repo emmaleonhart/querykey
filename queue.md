@@ -230,8 +230,21 @@ for ergonomic editing as items are completed.)
 - [x] 8. Reframe `todo.md` — done: personal-first rewrite, phase
       skeleton kept, team mode demoted to optional Phase 8, Rust/Gemma/
       markdown folded in. Also corrected `docs/why-go.md` framing note.
-- [ ] 9. Verify / lightly update `site/index.html`
-- [ ] 10. Commit and push each step
+- [x] 9. Verify / update `site/index.html` — verified on-message and
+      free of stale refs; per an explicit user decision (asked because
+      it is public-facing), applied the **full** public reframe:
+      rationalist social network + PRM/CRM/JIRA + Q/K/V naming.
+- [x] 10. Commit and push each step — each queue item was its own
+      commit, pulled `--ff-only` and pushed to `origin/main`.
+
+---
+
+**Action queue COMPLETE (2026-05-15).** All 10 items done and pushed.
+This was executed live in the current session (the user asked to start
+now rather than wait for the scheduled fallback run). Remaining work is
+the deferred, out-of-scope items below (Go→Rust rewrite, markdown
+on-disk model, graph-store decision) and the still-open product/design
+questions — none of which were in scope for this round.
 
 ## Notes for future sessions
 
