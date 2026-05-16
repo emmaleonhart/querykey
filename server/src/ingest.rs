@@ -11,7 +11,7 @@ use chrono::Utc;
 use crate::graph::GraphStore;
 use crate::models::{
     AnalysisResult, Conflict, ConflictResolution, ConflictType, Event, GraphDiff, InputType,
-    Task, TaskStatus,
+    Instruction, Task, TaskStatus,
 };
 use crate::openclaw::Bridge;
 use crate::ws::Hub;
@@ -108,6 +108,11 @@ impl Pipeline {
             }
             let _ = self.graph.store_conflict(c).await; // derived projection
         }
+        for i in &a.instructions {
+            if let Err(err) = self.vault.upsert_instruction(i) {
+                tracing::warn!("[ingest] failed to write instruction to vault: {err}");
+            }
+        }
     }
 
     /// Mirrors pipeline.go broadcastResults(): tasks+events as added
@@ -143,6 +148,8 @@ struct RawAnalysis {
     events: Vec<RawEvent>,
     #[serde(default)]
     conflicts: Vec<RawConflict>,
+    #[serde(default)]
+    instructions: Vec<RawInstruction>,
 }
 #[derive(Default, Deserialize)]
 struct RawTask {
@@ -178,6 +185,17 @@ struct RawConflict {
     conflict_type: String,
     #[serde(default)]
     explanation: String,
+}
+#[derive(Default, Deserialize)]
+struct RawInstruction {
+    #[serde(default)]
+    content: String,
+    #[serde(default)]
+    speaker: String,
+    #[serde(default)]
+    audience: Vec<String>,
+    #[serde(default)]
+    is_task: bool,
 }
 
 /// Port of pipeline.go parseAnalysis(): extract the JSON object (the
@@ -238,6 +256,18 @@ pub fn parse_analysis(s: &str, ingest_id: &str) -> AnalysisResult {
             resolved_by: String::new(),
             created_at: now,
             resolved_at: None,
+        });
+    }
+    for i in raw.instructions {
+        out.instructions.push(Instruction {
+            id: uuid::Uuid::new_v4(),
+            content: i.content,
+            speaker: i.speaker,
+            audience: i.audience,
+            is_task: i.is_task,
+            task_id: String::new(),
+            source_message: ingest_id.to_string(),
+            created_at: now,
         });
     }
     out

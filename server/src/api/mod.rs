@@ -13,7 +13,7 @@ use tower_http::cors::{Any, CorsLayer};
 use crate::graph::GraphStore;
 use crate::ingest::{IngestRequest, Pipeline};
 use crate::models::{
-    ConflictResolution, FollowUp, GraphDiff, Person, QuestionStatus, Task,
+    ConflictResolution, FollowUp, GraphDiff, Person, QuestionStatus, Task, VoiceProfile,
 };
 use crate::openclaw::Bridge;
 use crate::ws::{ws_handler, Hub};
@@ -55,6 +55,16 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/questions/:id/resolve", post(resolve_question))
         // Follow-ups
         .route("/api/followups", get(list_followups).post(create_followup))
+        // Instructions (who said what to whom) — vault-canonical, read
+        // surface (written by ingest).
+        .route("/api/instructions", get(list_instructions))
+        // Voice profiles (speaker identity) — read + upsert; the audio
+        // pipeline that fills embeddings is a separate todo.
+        .route(
+            "/api/voiceprofiles",
+            get(list_voice_profiles).put(put_voice_profile),
+        )
+        .route("/api/persons/:id/voiceprofile", get(person_voice_profile))
         // P2P card layer (your key/query signal). Transport is the
         // open question — these are local: edit, the 24h propagation
         // safety valve, revert-before-propagation, read local peers.
@@ -441,6 +451,44 @@ async fn get_peer_card_h(
         Some(c) => Json(serde_json::to_value(c).unwrap_or_else(|_| json!({}))),
         None => Json(json!({ "error": "peer card not found", "handle": handle })),
     }
+}
+
+// ---- Instructions / Voice profiles (canonical vault) ----
+
+async fn list_instructions(State(s): State<Arc<AppState>>) -> Json<Value> {
+    Json(json!({ "instructions": s.vault.list_instructions() }))
+}
+
+async fn list_voice_profiles(State(s): State<Arc<AppState>>) -> Json<Value> {
+    Json(json!({ "voiceprofiles": s.vault.list_voice_profiles() }))
+}
+
+async fn person_voice_profile(
+    State(s): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Json<Value> {
+    match s.vault.voice_profile_for_person(&id) {
+        Some(vp) => Json(serde_json::to_value(vp).unwrap_or_else(|_| json!({}))),
+        None => Json(json!({ "error": "no voice profile", "person": id })),
+    }
+}
+
+async fn put_voice_profile(
+    State(s): State<Arc<AppState>>,
+    Json(mut vp): Json<VoiceProfile>,
+) -> Json<Value> {
+    if vp.id.is_nil() {
+        vp.id = uuid::Uuid::new_v4();
+    }
+    let now = chrono::Utc::now();
+    if vp.created_at.timestamp() == 0 {
+        vp.created_at = now;
+    }
+    vp.last_updated = now;
+    if let Err(e) = s.vault.upsert_voice_profile(&vp) {
+        return Json(json!({ "error": e.to_string() }));
+    }
+    Json(serde_json::to_value(vp).unwrap())
 }
 
 // ---- semantic wikilink graph ----
