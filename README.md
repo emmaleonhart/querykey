@@ -76,14 +76,15 @@ today versus planned.
 | Component | Stack | Where |
 |---|---|---|
 | Desktop/mobile app | Flutter (Dart `sdk ^3.10.8`); `provider`, `web_socket_channel`, `http`, `uuid`, `intl` | [`app/`](app/) |
-| Server | Go 1.23 (`discordgo`, `gorilla/websocket`, `google/uuid`) — **deprecated; the target language is Rust** (no rewrite yet) | [`server/`](server/) |
+| Server | **Rust** (crate `querykey-server`: `axum`, `tokio`, `reqwest`) — compiles & runs; structural port with TODOs | [`server/`](server/) |
 | Source of truth | Markdown files + git history (planned on-disk model) | user's disk / git repo |
-| AI engine | **Model-agnostic** via an **MCP server** (default agent: local **Gemma** — cheap & private; Claude/GPT optional). *Today's implementation:* OpenClaw via a local WSL gateway (port `18789`) — to be superseded by the Rust rewrite | `server/internal/openclaw/` |
-| Knowledge graph | **Loca** (formerly **SutraDB**) — the author's own embedded Rust graph-vector-time DB; the graph is **derived from the markdown**, not canonical. *(The current Go `server/internal/graph/` Fuseki stub is stale pre-pivot scaffolding, slated for removal — Fuseki is **not** used.)* | (Rust, separate project) |
-| Ingest surface | Discord (DM-first, hourly batch) + pasted text / screenshots / voice notes | `server/internal/discord/`, `server/internal/ingest/` |
+| AI engine | **Model-agnostic** via an **MCP server** (default agent: local **Gemma** — cheap & private; Claude/GPT optional). *Today's implementation:* OpenClaw via a local WSL gateway (port `18789`) | `server/src/openclaw/` |
+| Knowledge graph | **Loca** (formerly **SutraDB**) — the author's embedded Rust graph-vector-time DB; the graph is **derived from the markdown**, not canonical. Wired via `loka-core` behind `--features loca`; in-memory fallback otherwise. Fuseki is **not** used (dead stub only in `server-go-old/`) | `server/src/graph/` + [`../SutraDB`] |
+| Ingest surface | Discord (DM-first, hourly batch) + pasted text / screenshots / voice notes | `server/src/ingest.rs` (Discord port pending) |
 | Identity / sync | **GitHub** (usernames as identity, repo as sync) — a thin, swappable abstraction | (planned) |
 | Peer-to-peer | **Card** exchange — pure P2P, no central server, 24h propagation delay | (planned) |
-| Real-time | WebSocket hub | `server/internal/ws/` |
+| Real-time | WebSocket hub | `server/src/ws.rs` |
+| Prior Go server | Archived deprecated reference (the Rust port mirrors its layout) | [`server-go-old/`](server-go-old/) |
 
 Local endpoints when running: server `http://127.0.0.1:8000`, health
 `/health`, WebSocket `ws://127.0.0.1:8000/ws/chat`, OpenClaw gateway
@@ -95,37 +96,37 @@ This is early. Roughly: planning and data models are complete; the AI bridge
 is functional; most product behavior is scaffolding.
 
 **Working / functional**
-- OpenClaw bridge: detects/auto-starts the WSL gateway, streams completions,
-  retries, health-polls.
-- Data models: the full entity set (Person, Handle, Task, Event, Message,
-  Conflict, Instruction, OpenQuestion, FollowUp, VoiceProfile, …) defined in
-  both Go and Dart, and aligned.
-- Config loading, REST route/handler skeleton, WebSocket connection layer
-  (auto-reconnect, streaming protocol), Flutter navigation shell with Chat /
-  Tasks / Ingest screens, Discord bot connection + message buffering.
+- **Rust server (`server/`)**: compiles (`cargo build` and
+  `cargo build --features loca`) and runs. Boots, detects the OpenClaw
+  gateway, opens a **Loca** `.sdb` store (`graph_ok`), serves the HTTP API
+  + `/health` + the WebSocket route + SPARQL passthrough. Mirrors the
+  archived Go layout (`server-go-old/`).
+- OpenClaw bridge: detects the WSL gateway; non-streaming chat works.
+- Data models: full entity set (Person, Handle, Task, Event, Message,
+  Conflict, Instruction, OpenQuestion, FollowUp, VoiceProfile, …) ported
+  to Rust with the JSON contract preserved; aligned with the Dart models.
+- Loca/SutraDB wired as the derived graph store (`--features loca`):
+  person/task/message/conflict persist as triples.
 
-**Scaffolded / partial**
-- Ingestion pipeline (accepts input, calls OpenClaw; result parsing is basic).
-- A Go Fuseki graph stub exists but is **stale pre-pivot scaffolding** —
-  Fuseki is not the plan; the graph store is Loca/SutraDB, derived from
-  markdown. The stub is slated for removal.
-- WebSocket hub (clients tracked; graph-diff broadcast minimal).
-- Discord bot (connected and buffering; no follow-up or contradiction logic).
+**Scaffolded / partial (honest in-code TODOs against `server-go-old/`)**
+- Ingestion pipeline (accepts input, calls the agent; parsing is basic).
+- Agent streaming returns the whole reply at once (no incremental SSE yet).
+- Persistent SPARQL **query** bridge: parses, returns empty (read-back of
+  the derived graph not yet wired).
+- WebSocket hub fan-out works; typed graph-diff broadcast minimal.
+- Discord bot: not yet ported (no-op, as it was optional in Go).
 
 **Planned / not started**
 - **Markdown source-of-truth model** (YAML frontmatter + body; git-tracked)
   and the agent reading/writing those files — *the first thing to build*.
 - **MCP server** so any agent can attend over the graph/files (day-one
   infrastructure); model-agnostic with **Gemma** as the cheap local default.
-- **Loca/SutraDB** integration as the derived graph store (replaces the
-  dead Fuseki stub).
 - **Peer-to-peer card layer** (offer/looking-for cards, asymmetric
   git-tracking, 24h propagation delay) — *built after* the solo PRM.
 - **GitHub identity/sync** bootstrap behind a swappable handle abstraction.
 - The follow-up engine (contradiction → open question → message), conflict
   resolution, daily check-ins; calendar/scheduling; audio/voice pipeline;
-  external tool sync.
-- **Server rewrite in Rust** (the Go server is deprecated; not started).
+  external tool sync; the Discord port.
 
 See [`queue.md`](queue.md) for the authoritative near-term plan and
 [`todo.md`](todo.md) for the full phased roadmap.
@@ -134,10 +135,12 @@ See [`queue.md`](queue.md) for the authoritative near-term plan and
 
 Windows + WSL is the current target. Prerequisites:
 
-- **Go** (1.23+) — `winget install GoLang.Go`
+- **Rust** (stable, via [rustup](https://rustup.rs)) — `cargo` on `PATH`
 - **Flutter** (Dart SDK 3.10.8+) on `PATH`
 - **WSL Ubuntu** with **OpenClaw** installed (for AI features; the server runs
   without it, but AI chat/extraction needs the gateway)
+- *Optional:* the sibling **`../SutraDB`** checkout for the Loca graph store
+  (`--features loca`); without it the server uses an in-memory graph
 
 Then, from the repo root:
 
@@ -145,7 +148,8 @@ Then, from the repo root:
 !run.bat
 ```
 
-That script builds the Go server, runs `flutter pub get`, starts the OpenClaw
+That script builds the Rust server (`cargo build --features loca`, falling
+back to the in-memory build), runs `flutter pub get`, starts the OpenClaw
 gateway in WSL, launches the server, and runs the Flutter app on Windows
 (`flutter run -d windows`). Closing the app window tears everything back down.
 
@@ -156,8 +160,9 @@ gateway in WSL, launches the server, and runs the Flutter app on Windows
 | Path | What it is |
 |---|---|
 | [`app/`](app/) | Flutter app (Dart) — desktop-first; Chat / Tasks / Ingest screens |
-| [`server/`](server/) | Go server — ingest, OpenClaw bridge, WebSocket, (planned) graph store |
-| [`docs/`](docs/) | `architecture.md`, `data-model.md`, `versions-comparison.md`, `why-go.md` — design, entity model, history |
+| [`server/`](server/) | **Rust** server (`querykey-server`) — ingest, agent bridge, WebSocket, Loca graph store |
+| [`server-go-old/`](server-go-old/) | Archived Go server — deprecated reference for the Rust port |
+| [`docs/`](docs/) | `architecture.md`, `data-model.md`, `markdown-schema.md`, `card-format.md`, `versions-comparison.md`, `why-go.md` |
 | [`chat/`](chat/) | Vision corpus (chat-log exports); gitignored except its README — private context, not a spec |
 | [`dev_scheduling/`](dev_scheduling/) | Dev-time agent data (`receipts/discord/`), committed so CI can write to it |
 | [`queue.md`](queue.md) | Authoritative near-term plan / recovery dump |
