@@ -711,6 +711,30 @@ embeddings). The agent-drafted card↔graph projection is the other
 big piece but is design-heavy and social-leaning — per the parked-
 social steering, flag before barrelling it.
 
+---
+
+## Round 11 — calendar structure (2026-05-16, PRM-priority)
+
+User direction: barrel calendar (then the agent-drafts-card piece;
+audio → back of todo). Calendar = recurrence + a merged agenda.
+
+- [x] R11-1. Event `recurrence: Option<String>` + `src/calendar`
+      RFC-5545-subset parser/expander (FREQ/INTERVAL/COUNT/UNTIL;
+      unsupported parts ignored, not errors). Occurrences anchored on
+      `start` so a clamped short month doesn't drift (TDD: failing
+      monthly-clamp test → fix). Vault/ingest carry it losslessly.
+      6 calendar/vault tests. Commit `d108ff1`.
+- [x] R11-2. `Vault::agenda(from,to)` + `GET /api/calendar?from&to`
+      — merged, time-ordered: event occurrences (movable:false) +
+      tasks with in-window deadlines (movable:true). The Task-vs-Event
+      distinction, queryable. Backend-independent. Commit `673116e`.
+- [x] R11-3. Docs — markdown-schema Event gains `recurrence` +
+      agenda note; README/todo/CLAUDE updated. (This commit.)
+
+**Round 11 status.** COMPLETE. All 3 configs green; 27 lib tests.
+Next: Round 12 — the agent-drafted card↔graph (reopened sub-piece;
+transport stays parked).
+
 ## Notes for future sessions
 
 - The user dictates long stream-of-consciousness messages via voice. Do

@@ -116,12 +116,23 @@ type: event
 start: 2026-05-18T18:00:00
 end:   2026-05-18T20:00:00
 people: [person:john-smith]
+recurrence: FREQ=WEEKLY;INTERVAL=1;COUNT=10   # optional; omit = one-off
 confidence: 0.95
 source: [message:2026-05-14-15:05-discord]
 ---
 
 Climbing session, the usual gym.
 ```
+
+`recurrence` (Round 11) is an optional RFC-5545 **subset**:
+`FREQ=DAILY|WEEKLY|MONTHLY|YEARLY`, `INTERVAL`, `COUNT`, `UNTIL`.
+Unsupported parts (`BYDAY`, …) are ignored, not errors. Occurrences
+are computed from the `start` anchor (a clamped short month — Jan 31
+→ Feb 28 — does not drag later months off the day-of-month).
+`GET /api/calendar?from&to` returns a **merged agenda**: expanded
+event occurrences (`movable:false`) plus tasks whose `deadline` is in
+the window (`movable:true`) — the Task-vs-Event distinction made
+queryable. Computed live from the canonical vault.
 
 ### Note — `notes/<slug>.md`
 

@@ -136,6 +136,10 @@ is functional; most product behavior is scaffolding.
   Instruction + VoiceProfile vault forms added; nothing is graph-only
   or unimplemented anymore. Instruction is written by ingest; both
   have read/upsert API.
+- **Calendar** — DONE (Round 11): optional Event `recurrence`
+  (RFC-5545 subset) + `GET /api/calendar?from&to` merged agenda
+  (event occurrences + deadlined tasks, movable-vs-fixed), live from
+  the vault.
 - **Peer-to-peer card layer** — format + local layer DONE (Round 7):
   card format/parse, the `.gitignore` asymmetry, the 24h propagation
   safety valve + revert-before-propagation, read-only `peers/`,

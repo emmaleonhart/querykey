@@ -22,9 +22,9 @@
   `docs/card-format.md`, vision corpus in `chat/public/`.
 
 **Next big pieces:**
-1. **Calendar structure** — Round 11 (in progress): recurrence on
-   Event + a merged agenda window query (fixed events + tasks with
-   deadlines, movable-vs-fixed).
+1. **Calendar structure** — DONE (Round 11): Event `recurrence`
+   (RFC-5545 subset) + `GET /api/calendar` merged agenda
+   (movable-vs-fixed).
 2. **Agent-drafted card↔graph** — Round 12. The local agent reads the
    PRM and drafts a key/query for you to approve. **Reopened by user
    2026-05-16** (only this sub-piece — the P2P **transport** +
