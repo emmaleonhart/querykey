@@ -36,6 +36,11 @@ async-trait = "0.1"
 loka-core = { path = "../../SutraDB/loka-core", optional = true }
 loka-sparql = { path = "../../SutraDB/loka-sparql", optional = true }
 
+# Discord bot (heavy). Optional so the default build never pulls it.
+# Enable with --features discord.
+serenity = { version = "0.12", default-features = false, features = ["client", "gateway", "model", "rustls_backend"], optional = true }
+
 [features]
 default = []
 loca = ["dep:loka-core", "dep:loka-sparql"]
+discord = ["dep:serenity"]

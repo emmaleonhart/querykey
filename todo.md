@@ -330,8 +330,9 @@ separate publishing chore.
 
 > **Server is Rust.** `server/` is the `querykey-server` Rust crate
 > (compiles + runs); the Go implementation is archived in
-> `server-go-old/` as the deprecated reference. Build with
-> `cargo build --features loca`.
+> `server-go-old/` as the deprecated reference. Builds:
+> `cargo build` (in-memory), `--features loca` (Loca graph store),
+> `--features discord` (serenity bot). All three compile clean.
 
 - [x] **QueryKey Server (Rust)** — crate scaffolded, compiles, runs;
   axum HTTP API + WebSocket + agent bridge, graceful shutdown.
@@ -350,8 +351,11 @@ separate publishing chore.
   from the POS index (find_by_predicate_object + find_by_subject);
   smoke-verified. Tasks/conflicts intentionally left as markdown-read
   TODOs (the derived graph is lossy; markdown is the store of record).
-- [ ] **Discord bot port** — serenity/twilight (`server-go-old`
-  reference); currently a no-op stub.
+- [x] **Discord bot port** — feature-gated `serenity` client
+  (`--features discord`, default OFF so the default build never pulls
+  it): connects, logs on ready, receives + logs human messages.
+  Compiles clean. `TODO(port)`: per-channel filters, hourly batch into
+  the ingest pipeline, outbound DM follow-ups (bot.go).
 - [x] **MCP endpoint** — minimal JSON-RPC-over-HTTP at `POST /mcp`
   (`initialize` / `tools/list` / `tools/call`), tools: query_graph,
   list_persons, server_health. Dependency-free; smoke-verified.
