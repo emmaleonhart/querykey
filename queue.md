@@ -417,11 +417,18 @@ real conflict/blocker.
       resolve_conflict/question, create_followup) made **honest
       not_implemented** (canonical-markdown write path not built; no
       faking success). All builds clean, zero warnings.
-- [ ] R4-4. **Ingest pipeline parity** — match pipeline.go: normalize,
-      parse_analysis (incl. events/instructions/follow-ups), store all,
-      broadcast a typed GraphDiff (added nodes/edges).
-- [ ] R4-5. **WS hub parity** — typed GraphDiff broadcast shape per
-      hub.go / models.GraphDiff.
+- [x] R4-4. **Ingest pipeline parity** — fixed a real bug: parse now
+      uses a *relaxed* schema (the agent returns loose fields, no
+      ids/timestamps; the old strict `from_str::<AnalysisResult>` would
+      always fail) then constructs full typed models with new uuids +
+      timestamps + `source_messages=[ingest_id]`, matching pipeline.go.
+      storeResults persists tasks+conflicts (Go parity; events
+      broadcast-only). Smoke-verified: POST /api/ingest returns a valid
+      result, no crash on non-JSON agent output (Go's fallback).
+- [x] R4-5. **WS hub parity** — broadcast_results now emits a typed
+      `models::GraphDiff` (added_nodes = tasks+events, new_conflicts);
+      `ws.rs` wraps it as `WsMessage{type:"graph_diff", data}` exactly
+      like hub.go BroadcastGraphDiff. Fan-out already worked.
 - [ ] R4-6. **dump-messages** — port the non-Discord parts; if it is
       wholly Discord-coupled, leave the stub and note the dependency on
       Phase Z (do not block Go removal on it).

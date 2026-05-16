@@ -6,8 +6,13 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+use chrono::Utc;
+
 use crate::graph::GraphStore;
-use crate::models::{AnalysisResult, GraphDiff, InputType};
+use crate::models::{
+    AnalysisResult, Conflict, ConflictResolution, ConflictType, Event, GraphDiff, InputType,
+    Task, TaskStatus,
+};
 use crate::openclaw::Bridge;
 use crate::ws::Hub;
 
@@ -48,7 +53,7 @@ impl Pipeline {
             .await
             .unwrap_or_default();
 
-        let analysis = parse_analysis(&analysis_json);
+        let analysis = parse_analysis(&analysis_json, &ingest_id);
         self.store_results(&analysis).await;
         self.broadcast_results(&analysis);
 
@@ -70,20 +75,37 @@ impl Pipeline {
         }
     }
 
+    /// Mirrors pipeline.go storeResults(): persist tasks + conflicts.
+    /// (Events are broadcast but not persisted, matching Go.)
     async fn store_results(&self, a: &AnalysisResult) {
-        for m in &a.messages {
-            let _ = self.graph.store_message(m).await;
-        }
         for t in &a.tasks {
-            let _ = self.graph.store_task(t).await;
+            if let Err(e) = self.graph.store_task(t).await {
+                tracing::warn!("[ingest] failed to store task: {e}");
+            }
         }
         for c in &a.conflicts {
-            let _ = self.graph.store_conflict(c).await;
+            if let Err(e) = self.graph.store_conflict(c).await {
+                tracing::warn!("[ingest] failed to store conflict: {e}");
+            }
         }
     }
 
+    /// Mirrors pipeline.go broadcastResults(): tasks+events as added
+    /// nodes, conflicts as new_conflicts, over the typed GraphDiff.
     fn broadcast_results(&self, a: &AnalysisResult) {
+        let mut added: Vec<serde_json::Value> = Vec::new();
+        for t in &a.tasks {
+            if let Ok(v) = serde_json::to_value(t) {
+                added.push(v);
+            }
+        }
+        for e in &a.events {
+            if let Ok(v) = serde_json::to_value(e) {
+                added.push(v);
+            }
+        }
         let diff = GraphDiff {
+            added_nodes: added,
             new_conflicts: a.conflicts.clone(),
             ..Default::default()
         };
@@ -91,11 +113,114 @@ impl Pipeline {
     }
 }
 
-/// Mirrors pipeline.go parseAnalysis() + extractJSON(): the agent often
-/// wraps JSON in prose / code fences; pull the JSON object out.
-pub fn parse_analysis(s: &str) -> AnalysisResult {
+/// Relaxed shape the agent actually returns (loose fields, no ids or
+/// timestamps). Mirrors pipeline.go's anonymous parse struct.
+#[derive(Default, Deserialize)]
+struct RawAnalysis {
+    #[serde(default)]
+    tasks: Vec<RawTask>,
+    #[serde(default)]
+    events: Vec<RawEvent>,
+    #[serde(default)]
+    conflicts: Vec<RawConflict>,
+}
+#[derive(Default, Deserialize)]
+struct RawTask {
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    description: String,
+    #[serde(default)]
+    assigned_to: String,
+    #[serde(default)]
+    assigned_by: String,
+    #[serde(default)]
+    deadline: String,
+    #[serde(default)]
+    confidence: f64,
+}
+#[derive(Default, Deserialize)]
+struct RawEvent {
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    description: String,
+    #[serde(default)]
+    start_time: String,
+    #[serde(default)]
+    end_time: String,
+    #[serde(default)]
+    confidence: f64,
+}
+#[derive(Default, Deserialize)]
+struct RawConflict {
+    #[serde(default, rename = "type")]
+    conflict_type: String,
+    #[serde(default)]
+    explanation: String,
+}
+
+/// Port of pipeline.go parseAnalysis(): extract the JSON object (the
+/// agent wraps it in prose/fences), parse the *relaxed* schema, then
+/// construct full typed models with generated ids + timestamps and
+/// `source_messages = [ingest_id]`. Never errors — returns whatever
+/// parsed (empty on failure), matching Go's "store raw" fallback.
+pub fn parse_analysis(s: &str, ingest_id: &str) -> AnalysisResult {
     let json = extract_json(s);
-    serde_json::from_str::<AnalysisResult>(&json).unwrap_or_default()
+    let raw: RawAnalysis = serde_json::from_str(&json).unwrap_or_default();
+    let now = Utc::now();
+    let mut out = AnalysisResult::default();
+    for t in raw.tasks {
+        out.tasks.push(Task {
+            id: uuid::Uuid::new_v4(),
+            title: t.title,
+            description: t.description,
+            status: TaskStatus::Extracted,
+            assigned_to: t.assigned_to,
+            assigned_by: t.assigned_by,
+            deadline: chrono::DateTime::parse_from_rfc3339(&t.deadline)
+                .ok()
+                .map(|d| d.with_timezone(&Utc)),
+            confidence: t.confidence,
+            ambiguity_score: 0.0,
+            source_messages: vec![ingest_id.to_string()],
+            created_at: now,
+            updated_at: now,
+        });
+    }
+    for e in raw.events {
+        out.events.push(Event {
+            id: uuid::Uuid::new_v4(),
+            title: e.title,
+            description: e.description,
+            start_time: chrono::DateTime::parse_from_rfc3339(&e.start_time)
+                .map(|d| d.with_timezone(&Utc))
+                .unwrap_or(now),
+            end_time: chrono::DateTime::parse_from_rfc3339(&e.end_time)
+                .map(|d| d.with_timezone(&Utc))
+                .unwrap_or(now),
+            participants: Vec::new(),
+            confidence: e.confidence,
+            source_messages: vec![ingest_id.to_string()],
+            created_at: now,
+        });
+    }
+    for c in raw.conflicts {
+        out.conflicts.push(Conflict {
+            id: uuid::Uuid::new_v4(),
+            conflict_type: serde_json::from_value(serde_json::Value::String(c.conflict_type))
+                .unwrap_or(ConflictType::ContradictoryTasks),
+            message_a: String::new(),
+            message_b: String::new(),
+            task_id: String::new(),
+            explanation: c.explanation,
+            resolution: ConflictResolution::Unresolved,
+            resolved_by: String::new(),
+            created_at: now,
+            resolved_at: None,
+        });
+    }
+    out
 }
 
 fn extract_json(s: &str) -> String {
