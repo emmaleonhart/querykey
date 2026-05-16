@@ -6,6 +6,17 @@
 - **Keep this file up to date.** As the project takes shape, record architectural decisions, conventions, and anything needed to work effectively in this repo.
 - **Update README.md regularly.** It should always reflect the current state of the project for human readers.
 
+## Queue & longer-horizon work (the flow — read this)
+
+Work flows in one direction and never leaves residue behind:
+
+**`todo.md` (abstract horizons) → `queue.md` (concrete steps) → task tool (in-flight) → `git log` (history).**
+
+- **`queue.md`** — *concrete, executable, in-flight steps only.* Plan-first: when any non-trivial multi-step work is planned, the plan is written here **before** execution so an interrupted session resumes from the queue, not from chat. When an item is done, **delete it in the same commit as the work** — no `[x]` checkmarks, no "DONE/COMPLETE" blocks, no per-Round logs. If it's in `queue.md` it is *not done*; if it's not in `queue.md` it is *not in scope* this session. (Round 14 pruned 882 lines of accumulated completed-Round logs that violated this — do not regrow it.)
+- **`todo.md`** — the **long-horizon, abstract** roadmap: multi-session goals, architectural ambitions, future capabilities. Items are *destinations, not steps*. When work begins, pull an item from `todo.md`, decompose it into concrete steps in `queue.md`, mirror into the task tool, execute, delete. As `queue.md` drains, refill from `todo.md`.
+- **`git log`** — the narrative history. **Finished work lives here** (each change is its own commit whose message is the record). Never keep a "recently completed" section anywhere else.
+- New ideas surfacing mid-work go to the **bottom** of `queue.md` (or to `todo.md` if long-horizon), never silently into the in-flight task.
+
 ## Project Description
 QueryKey is a **rationalist social network** that doubles as a local-first personal relationship manager (PRM) / lightweight CRM / JIRA-style task tracker, run from your own desktop. It ingests the unstructured streams of how you actually communicate (Discord chats, voice notes, screenshots, pasted text) and uses a **local AI agent** to build a private model of the people and commitments in your life. It then helps you, proactively and quietly, keep those relationships and commitments in good standing.
 
