@@ -1,3 +1,19 @@
+// DEPRECATED — DO NOT BUILD ON THIS.
+//
+// Fuseki is NOT the QueryKey graph store. This Apache Jena Fuseki
+// client is stale pre-pivot scaffolding. The decided architecture
+// (see /queue.md, /CLAUDE.md, /docs/markdown-schema.md):
+//
+//   - Markdown files + git are the canonical source of truth.
+//   - The graph is DERIVED from those files and stored in Loca/SutraDB
+//     (the author's embedded Rust graph-vector-time DB) — not Fuseki.
+//
+// This file is intentionally left in place (not excised) because it is
+// load-bearing for the *deprecated* Go server's compilation, and the
+// Go server is being replaced wholesale by the Rust rewrite — gutting
+// it now would be churn on throwaway code. It will be deleted together
+// with the Go server in that rewrite. No new code should reference it.
+
 package graph
 
 import (

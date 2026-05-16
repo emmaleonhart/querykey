@@ -273,20 +273,35 @@ These are documentation/spec + cleanup. Still **not** in scope: the
 Go→Rust rewrite, and *implementing* the on-disk model or P2P code
 (spec them first). Each item = its own commit, pull `--ff-only`, push.
 
-- [ ] R2-1. Reorganize the 4 canonical docs from the vision chat
-      (README/CLAUDE/todo/queue). ← done in this session.
-- [ ] R2-2. Purge stale pre-pivot framing from `docs/architecture.md`
-      and `docs/data-model.md` (Fuseki, team-coordination); align with
-      markdown-canonical / Loca-derived / MCP / P2P.
-- [ ] R2-3. Write `docs/markdown-schema.md` — the canonical on-disk
-      spec: YAML frontmatter fields + body conventions for Person /
-      Task / Event / Note. The load-bearing decision.
-- [ ] R2-4. Write `docs/card-format.md` — the P2P card spec:
-      offer/looking-for structure, git-tracking asymmetry, the 24h
-      delay model, GitHub identity. Spec only; no exchange code.
-- [ ] R2-5. Remove the dead Fuseki stub from the Go server (keep it
-      compilable) so the tree stops implying Fuseki is the plan.
-- [ ] R2-6. Commit + push each of the above.
+- [x] R2-1. Reorganize the 4 canonical docs from the vision chat —
+      done (commit 6ae8508).
+- [x] R2-2. Purge stale pre-pivot framing from `docs/architecture.md`,
+      `docs/data-model.md` (and `why-go.md`) — done (commit after
+      6ae8508): misleading banners replaced with accurate "superseded
+      by" notes; inline Fuseki-as-store assertion fixed.
+- [x] R2-3. Write `docs/markdown-schema.md` — done. Canonical on-disk
+      spec (YAML frontmatter + body, git, derived graph).
+- [x] R2-4. Write `docs/card-format.md` — done. P2P card spec
+      (key/query, asymmetric git-tracking, 24h delay, GitHub identity).
+- [x] R2-5. ~~Remove the dead Fuseki stub~~ → **adjusted.** On
+      inspection the Fuseki client is NOT a dead isolated stub: it is
+      wired through `main.go`, `handlers.go`, `router.go`, `bot.go`,
+      `config.go`, `pipeline.go` and is load-bearing for the
+      *deprecated* Go server's compilation. Excising it = refactoring
+      the Go server, which is explicitly out of scope ("no rewrite this
+      round; keep it compilable"). Instead added a prominent DEPRECATED
+      banner to `fuseki.go` stating Fuseki is not the plan; it will be
+      deleted wholesale with the Go→Rust rewrite. The user's actual
+      concern (Fuseki *documented as the plan*) is fully resolved by
+      R2-1/R2-2.
+- [x] R2-6. Commit + push each of the above (per-item commits,
+      `--ff-only` pull, push to origin/main).
+
+**Round 2 COMPLETE (2026-05-15).** Docs are organized and consistent.
+The remaining real design question is the **card format** (specced but
+will evolve); the next *building* work (implementing the markdown model
+/ MCP server / Loca integration) belongs to the Rust effort and is a
+separate, larger track.
 
 ## Notes for future sessions
 
