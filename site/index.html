@@ -12,32 +12,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- Canonical identity: the ONE shared stylesheet (palette, buttons,
+       toggle, aurora, eyebrow, the .gh repo pill, type). Linked, not
+       copied — same file as emmaleonhart.com/identity.css. -->
+  <link rel="stylesheet" href="/identity.css">
   <style>
-    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-    :root{
-      --bg:#07070c; --bg-card:#11111b; --border:#1d1d2c; --border-hover:#34344e;
-      --text:#d4d4e0; --text-strong:#f0f0f6; --text-mute:#8c8caa; --text-faint:#5d5d78;
-      --accent:#8b9bff; --accent-bright:#b0bcff; --accent-soft:rgba(139,155,255,.10);
-      --accent-glow:rgba(139,155,255,.28);
-      --serif:'Instrument Serif','Times New Roman',serif;
-      --sans:'Inter','Segoe UI',system-ui,sans-serif;
-      --mono:'JetBrains Mono','Consolas',monospace;
-    }
-    html{scroll-behavior:smooth}
-    body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;
-      display:flex;flex-direction:column;position:relative;overflow-x:hidden;
-      -webkit-font-smoothing:antialiased;letter-spacing:-.005em}
-    .aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
-    .aurora::before,.aurora::after{content:'';position:absolute;border-radius:50%;
-      filter:blur(90px);opacity:.5;mix-blend-mode:screen}
-    .aurora::before{width:680px;height:680px;top:-260px;left:-120px;
-      background:radial-gradient(circle,rgba(139,155,255,.30) 0%,transparent 70%);
-      animation:drift1 24s ease-in-out infinite alternate}
-    .aurora::after{width:600px;height:600px;top:-160px;right:-90px;
-      background:radial-gradient(circle,rgba(103,232,249,.16) 0%,transparent 70%);
-      animation:drift2 28s ease-in-out infinite alternate}
-    @keyframes drift1{to{transform:translate(120px,70px) scale(1.15)}}
-    @keyframes drift2{to{transform:translate(-90px,110px) scale(1.1)}}
+    /* Page-specific layout only. /identity.css owns the identity. */
+    body{display:flex;flex-direction:column;position:relative;overflow-x:hidden}
     .topbar{position:relative;z-index:2;display:flex;align-items:center;
       justify-content:space-between;gap:16px;padding:20px 28px;
       border-bottom:1px solid var(--border)}
@@ -45,46 +26,27 @@
       text-decoration:none;transition:color .2s}
     .topbar .home{color:var(--text-mute)}
     .topbar .home:hover{color:var(--accent-bright)}
-    .topbar .gh{display:inline-flex;align-items:center;gap:8px;color:var(--accent);
-      padding:7px 14px;border:1px solid var(--border-hover);border-radius:8px;
-      background:var(--accent-soft);font-family:var(--mono);font-size:.8rem;
-      font-weight:500;transition:color .2s,border-color .2s,background .2s}
-    .topbar .gh:hover{color:var(--accent-bright);border-color:var(--accent);
-      background:rgba(139,155,255,.16)}
-    .topbar .gh svg{width:15px;height:15px;fill:currentColor;flex:none}
-    .topbar .gh .gh-stat{display:inline-flex;align-items:center;gap:5px;
-      padding-left:9px;border-left:1px solid var(--border-hover);
-      color:var(--text-mute);font-variant-numeric:tabular-nums}
-    .topbar .gh .gh-stat svg{width:13px;height:13px}
-    .topbar .gh:hover .gh-stat{border-color:var(--accent);color:var(--accent-bright)}
     main{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;
       justify-content:center;max-width:680px;width:100%;margin:0 auto;
       padding:80px 28px 96px}
-    .eyebrow{display:inline-flex;align-items:center;gap:9px;align-self:flex-start;
-      font-family:var(--mono);font-size:.7rem;font-weight:500;text-transform:uppercase;
-      letter-spacing:1.6px;color:var(--accent-bright);margin-bottom:26px;
-      padding:6px 13px 6px 11px;background:rgba(139,155,255,.06);
-      border:1px solid rgba(139,155,255,.18);border-radius:999px}
-    .eyebrow::before{content:'';width:6px;height:6px;border-radius:50%;
-      background:var(--accent-bright);box-shadow:0 0 12px var(--accent-glow);
-      animation:pulse 2.4s ease-in-out infinite}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    /* identity.css owns .eyebrow + its pulsing dot; page only adds spacing */
+    .eyebrow{align-self:flex-start;margin-bottom:26px}
     h1{font-size:clamp(2.6rem,7vw,3.8rem);font-weight:700;letter-spacing:-1.4px;
       line-height:1.02;margin-bottom:22px;
-      background:linear-gradient(120deg,#fff 0%,#b0bcff 60%,#8b9bff 100%);
+      background:linear-gradient(120deg,var(--text-strong) 0%,var(--accent-bright) 60%,var(--accent) 100%);
       -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
     .lede{font-size:1.18rem;line-height:1.65;color:var(--text);max-width:600px;
       margin-bottom:20px}
-    .lede em{font-family:var(--serif);font-style:italic;font-size:1.1em;color:#c8c8e0}
+    .lede em{font-family:var(--serif);font-style:italic;font-size:1.1em;color:var(--text-strong)}
     .note{font-size:.98rem;line-height:1.7;color:var(--text-mute);max-width:600px;
       margin-bottom:38px}
     .links{display:flex;flex-wrap:wrap;gap:12px}
     .links a{font-family:var(--mono);font-size:.84rem;font-weight:500;
       text-decoration:none;color:var(--accent);padding:10px 18px;
       border:1px solid var(--border-hover);border-radius:8px;
-      background:rgba(255,255,255,.012);transition:all .2s}
+      background:var(--accent-soft);transition:all .2s}
     .links a:hover{color:var(--accent-bright);border-color:var(--accent);
-      background:var(--accent-soft);transform:translateY(-1px)}
+      transform:translateY(-1px)}
     footer{position:relative;z-index:2;padding:24px 28px;
       border-top:1px solid var(--border);font-family:var(--mono);
       font-size:.72rem;letter-spacing:1px;color:var(--text-faint)}
@@ -92,29 +54,6 @@
       .topbar{padding:16px 18px}main{padding:56px 20px 72px}
       h1{font-size:2.3rem;letter-spacing:-.8px}.lede{font-size:1.05rem}
     }
-    @media(prefers-reduced-motion:reduce){.aurora::before,.aurora::after,.eyebrow::before{animation:none}}
-  
-    /* ===== CANONICAL VISUAL IDENTITY (see emmaleonhart.com/_identity/) ===
-       Light-mode Lacquer palette + the top-right toggle. Dark stays
-       default; the page's existing :root holds the dark values. */
-    html[data-theme="light"]{
-      --bg:#f4f4f8; --bg-soft:#ebebf2; --bg-card:#ffffff; --bg-elevated:#fbfbfe;
-      --border:#dadae6; --border-hover:#b6b6cf; --border-strong:#c7c7d8;
-      --text:#2b2b38; --text-strong:#14141f; --text-mute:#5c5c74; --text-faint:#8c8caa;
-      --accent:#5160dd; --accent-bright:#3a48c4; --accent-soft:rgba(81,96,221,.10);
-      --accent-glow:rgba(81,96,221,.22);
-    }
-    body{transition:background .35s ease,color .35s ease}
-    .theme-toggle{position:fixed;top:18px;right:18px;z-index:200;width:40px;
-      height:40px;display:flex;align-items:center;justify-content:center;
-      background:var(--bg-card);border:1px solid var(--border);border-radius:999px;
-      color:var(--text-mute);cursor:pointer;
-      transition:color .2s,border-color .2s,background .2s,transform .2s}
-    .theme-toggle:hover{color:var(--accent-bright);border-color:var(--accent);
-      background:var(--accent-soft);transform:translateY(-1px)}
-    .theme-toggle svg{width:18px;height:18px;display:none}
-    html[data-theme="dark"] .theme-toggle .icon-sun{display:block}
-    html[data-theme="light"] .theme-toggle .icon-moon{display:block}
   </style>
   <!-- Canonical identity: theme before first paint (dark default). See emmaleonhart.com/_identity/. -->
   <script>(function(){try{var t=localStorage.getItem('theme');if(t!=='light'&&t!=='dark')t='dark';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
