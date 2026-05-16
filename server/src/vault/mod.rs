@@ -23,7 +23,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::{
     Conflict, ConflictResolution, ConflictType, DeliveryAttempt, Event, FollowUp, FollowUpStatus,
-    Handle, OpenQuestion, Person, QuestionStatus, Task, TaskStatus, TriggerType, Urgency,
+    Handle, Instruction, OpenQuestion, Person, QuestionStatus, Task, TaskStatus, TriggerType,
+    Urgency, VoiceProfile,
 };
 
 pub struct Vault {
@@ -155,6 +156,41 @@ struct FollowUpFm {
     created: String,
 }
 
+#[derive(Serialize, Deserialize)]
+struct InstructionFm {
+    id: String,
+    #[serde(rename = "type")]
+    kind: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    speaker: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    audience: Vec<String>,
+    is_task: bool,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    task: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    source_message: String,
+    created: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct VoiceProfileFm {
+    id: String,
+    #[serde(rename = "type")]
+    kind: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    person: String,
+    // Raw embedding bytes as a YAML int sequence — lossless, no extra
+    // dep, and omitted entirely until the audio pipeline fills it
+    // (the common case today). Not meant for hand-editing.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    embedding: Vec<u8>,
+    sample_count: i64,
+    confidence: f64,
+    last_updated: String,
+    created: String,
+}
+
 // ---------- frontmatter (de)serialization ----------
 
 pub(crate) fn compose(yaml: &str, body: &str) -> String {
@@ -236,6 +272,8 @@ impl Vault {
             "conflicts",
             "questions",
             "followups",
+            "instructions",
+            "voiceprofiles",
             "peers",     // others' cards — git-ignored (asymmetry)
             ".querykey", // derived cache / propagation state — git-ignored
         ] {
@@ -949,6 +987,123 @@ impl Vault {
             .filter_map(|(slug, c)| self.followup_from(&slug, &c))
             .collect()
     }
+
+    // ----- Instruction -----
+    //
+    // Who said what to whom. Body = the human `content` (the actual
+    // utterance); everything structured is frontmatter.
+
+    pub fn upsert_instruction(&self, i: &Instruction) -> anyhow::Result<()> {
+        let fm = InstructionFm {
+            id: format!("instruction:{}", i.id),
+            kind: "instruction".into(),
+            speaker: i.speaker.clone(),
+            audience: i.audience.clone(),
+            is_task: i.is_task,
+            task: if i.task_id.is_empty() {
+                String::new()
+            } else {
+                format!("task:{}", i.task_id)
+            },
+            source_message: i.source_message.clone(),
+            created: rfc3339(&i.created_at),
+        };
+        let yaml = serde_yaml::to_string(&fm)?;
+        self.write("instructions", &i.id.to_string(), yaml, &i.content)
+    }
+
+    fn instruction_from(&self, content: &str) -> Option<Instruction> {
+        let (yaml, body) = split(content);
+        let fm: InstructionFm = serde_yaml::from_str(&yaml).ok()?;
+        let id =
+            uuid::Uuid::parse_str(fm.id.strip_prefix("instruction:").unwrap_or(&fm.id)).ok()?;
+        Some(Instruction {
+            id,
+            content: body,
+            speaker: fm.speaker,
+            audience: fm.audience,
+            is_task: fm.is_task,
+            task_id: fm.task.strip_prefix("task:").unwrap_or(&fm.task).to_string(),
+            source_message: fm.source_message,
+            created_at: parse_dt(&fm.created),
+        })
+    }
+
+    pub fn get_instruction(&self, id: &uuid::Uuid) -> Option<Instruction> {
+        let p = self.root.join("instructions").join(format!("{id}.md"));
+        self.instruction_from(&fs::read_to_string(p).ok()?)
+    }
+
+    pub fn list_instructions(&self) -> Vec<Instruction> {
+        self.read_files("instructions")
+            .into_iter()
+            .filter_map(|(_, c)| self.instruction_from(&c))
+            .collect()
+    }
+
+    // ----- VoiceProfile -----
+    //
+    // Speaker identity (diarization). The most "machine" entity — the
+    // body is a cosmetic heading; everything is frontmatter, and the
+    // embedding is omitted until the audio pipeline fills it.
+
+    pub fn upsert_voice_profile(&self, v: &VoiceProfile) -> anyhow::Result<()> {
+        let fm = VoiceProfileFm {
+            id: format!("voiceprofile:{}", v.id),
+            kind: "voice_profile".into(),
+            person: if v.person_id.is_empty() {
+                String::new()
+            } else {
+                format!("person:{}", v.person_id)
+            },
+            embedding: v.embedding.clone(),
+            sample_count: v.sample_count,
+            confidence: v.confidence,
+            last_updated: rfc3339(&v.last_updated),
+            created: rfc3339(&v.created_at),
+        };
+        let yaml = serde_yaml::to_string(&fm)?;
+        let body = format!("# Voice profile — person:{}\n", v.person_id);
+        self.write("voiceprofiles", &v.id.to_string(), yaml, &body)
+    }
+
+    fn voice_profile_from(&self, content: &str) -> Option<VoiceProfile> {
+        let (yaml, _body) = split(content);
+        let fm: VoiceProfileFm = serde_yaml::from_str(&yaml).ok()?;
+        let id =
+            uuid::Uuid::parse_str(fm.id.strip_prefix("voiceprofile:").unwrap_or(&fm.id)).ok()?;
+        Some(VoiceProfile {
+            id,
+            person_id: fm
+                .person
+                .strip_prefix("person:")
+                .unwrap_or(&fm.person)
+                .to_string(),
+            embedding: fm.embedding,
+            sample_count: fm.sample_count,
+            confidence: fm.confidence,
+            last_updated: parse_dt(&fm.last_updated),
+            created_at: parse_dt(&fm.created),
+        })
+    }
+
+    pub fn get_voice_profile(&self, id: &uuid::Uuid) -> Option<VoiceProfile> {
+        let p = self.root.join("voiceprofiles").join(format!("{id}.md"));
+        self.voice_profile_from(&fs::read_to_string(p).ok()?)
+    }
+
+    pub fn list_voice_profiles(&self) -> Vec<VoiceProfile> {
+        self.read_files("voiceprofiles")
+            .into_iter()
+            .filter_map(|(_, c)| self.voice_profile_from(&c))
+            .collect()
+    }
+
+    pub fn voice_profile_for_person(&self, person_id: &str) -> Option<VoiceProfile> {
+        self.list_voice_profiles()
+            .into_iter()
+            .find(|v| v.person_id == person_id)
+    }
 }
 
 #[cfg(test)]
@@ -1283,6 +1438,83 @@ mod tests {
         assert!(back.len() >= 3);
         assert!(back.iter().all(|e| e.resolved));
         assert!(v.links_from("note", "salon").iter().any(|e| e.predicate == "knows"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn instruction_and_voice_profile_round_trip() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        let iid = uuid::Uuid::new_v4();
+        let inst = Instruction {
+            id: iid,
+            content: "Ship the report by Friday.\n\nNo extensions.".into(),
+            speaker: "alice".into(),
+            audience: vec!["bob".into(), "carol".into()],
+            is_task: true,
+            task_id: "11111111-1111-1111-1111-111111111111".into(),
+            source_message: "ingest:abc".into(),
+            created_at: DateTime::parse_from_rfc3339("2026-05-16T09:00:00+00:00")
+                .unwrap()
+                .with_timezone(&Utc),
+        };
+        v.upsert_instruction(&inst).unwrap();
+        let gi = v.get_instruction(&iid).unwrap();
+        assert_eq!(gi.id, inst.id);
+        assert_eq!(gi.content, inst.content);
+        assert_eq!(gi.speaker, "alice");
+        assert_eq!(gi.audience, vec!["bob", "carol"]);
+        assert!(gi.is_task);
+        assert_eq!(gi.task_id, inst.task_id);
+        assert_eq!(gi.source_message, "ingest:abc");
+        assert_eq!(gi.created_at, inst.created_at);
+        assert_eq!(v.list_instructions().len(), 1);
+
+        let vid = uuid::Uuid::new_v4();
+        let vp = VoiceProfile {
+            id: vid,
+            person_id: "ada-lovelace".into(),
+            embedding: vec![0, 17, 255, 128, 64],
+            sample_count: 12,
+            confidence: 0.83,
+            last_updated: DateTime::parse_from_rfc3339("2026-05-16T10:00:00+00:00")
+                .unwrap()
+                .with_timezone(&Utc),
+            created_at: DateTime::parse_from_rfc3339("2026-05-16T08:00:00+00:00")
+                .unwrap()
+                .with_timezone(&Utc),
+        };
+        v.upsert_voice_profile(&vp).unwrap();
+        let gv = v.get_voice_profile(&vid).unwrap();
+        assert_eq!(gv.id, vp.id);
+        assert_eq!(gv.person_id, "ada-lovelace");
+        assert_eq!(gv.embedding, vec![0, 17, 255, 128, 64]);
+        assert_eq!(gv.sample_count, 12);
+        assert_eq!(gv.confidence, 0.83);
+        assert_eq!(gv.last_updated, vp.last_updated);
+        assert_eq!(gv.created_at, vp.created_at);
+        assert_eq!(
+            v.voice_profile_for_person("ada-lovelace").unwrap().id,
+            vid
+        );
+
+        // Empty embedding (the common case until audio exists) is
+        // omitted from frontmatter and still round-trips.
+        let vid2 = uuid::Uuid::new_v4();
+        let vp2 = VoiceProfile {
+            id: vid2,
+            person_id: "grace-hopper".into(),
+            embedding: vec![],
+            sample_count: 0,
+            confidence: 0.0,
+            last_updated: Utc::now(),
+            created_at: Utc::now(),
+        };
+        v.upsert_voice_profile(&vp2).unwrap();
+        assert!(v.get_voice_profile(&vid2).unwrap().embedding.is_empty());
+        assert_eq!(v.list_voice_profiles().len(), 2);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
