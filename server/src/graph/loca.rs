@@ -16,7 +16,16 @@ use async_trait::async_trait;
 use loka_core::{PersistentStore, TermDictionary, Triple, TripleStore};
 
 use super::{GraphStore, SparqlBindings, SparqlHead, SparqlResult, SparqlValue};
-use crate::models::{Conflict, Message, Person, Task};
+use crate::models::{Conflict, Handle, Message, Person, Task};
+
+/// Strip surrounding quotes + unescape `\"` from a stored literal term.
+fn unquote(s: &str) -> String {
+    let t = s
+        .strip_prefix('"')
+        .and_then(|x| x.strip_suffix('"'))
+        .unwrap_or(s);
+    t.replace("\\\"", "\"")
+}
 
 const NS: &str = "http://querykey.dev/ns/";
 const RDF_TYPE: &str = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
@@ -114,16 +123,71 @@ impl GraphStore for LocaGraph {
     }
 
     async fn get_all_persons(&self) -> anyhow::Result<Vec<Person>> {
-        // TODO(port): typed read-back from triples. loka_sparql executes
-        // over TripleStore+TermDictionary, not PersistentStore — needs a
-        // persistent query bridge. See todo.md.
-        Ok(Vec::new())
+        // Typed read-back via the POS index: find every subject typed
+        // as Person, then gather its attribute triples.
+        let type_p = match self.store.lookup(RDF_TYPE).ok().flatten() {
+            Some(x) => x,
+            None => return Ok(Vec::new()),
+        };
+        let person_c = match self.store.lookup(&format!("{NS}Person")).ok().flatten() {
+            Some(x) => x,
+            None => return Ok(Vec::new()),
+        };
+        let dn_p = self.store.lookup(&format!("{NS}displayName")).ok().flatten();
+        let role_p = self.store.lookup(&format!("{NS}role")).ok().flatten();
+        let handle_prefix = format!("{NS}handle/");
+
+        let mut out = Vec::new();
+        for t in self.store.find_by_predicate_object(type_p, person_c) {
+            let subj = t.subject;
+            let subj_iri = self.store.resolve(subj).ok().flatten().unwrap_or_default();
+            let id = subj_iri.rsplit('/').next().unwrap_or("").to_string();
+            let mut display_name = String::new();
+            let mut role = String::new();
+            let mut handles: Vec<Handle> = Vec::new();
+            for a in self.store.find_by_subject(subj) {
+                let pred = self.store.resolve(a.predicate).ok().flatten().unwrap_or_default();
+                let obj = unquote(&self.store.resolve(a.object).ok().flatten().unwrap_or_default());
+                if Some(a.predicate) == dn_p {
+                    display_name = obj;
+                } else if Some(a.predicate) == role_p {
+                    role = obj;
+                } else if let Some(platform) = pred.strip_prefix(&handle_prefix) {
+                    handles.push(Handle {
+                        platform: platform.to_string(),
+                        identifier: obj,
+                    });
+                }
+            }
+            out.push(Person {
+                id,
+                display_name,
+                handles,
+                role,
+                contact_cascade: Vec::new(),
+                // The derived graph is a lossy index; timestamps are not
+                // round-tripped here — the canonical record is the
+                // markdown file (docs/markdown-schema.md). TODO(port):
+                // hydrate full Person from markdown, not from triples.
+                created_at: chrono::DateTime::<chrono::Utc>::from_timestamp(0, 0)
+                    .unwrap_or_else(chrono::Utc::now),
+            });
+        }
+        Ok(out)
     }
     async fn get_tasks_for_person(&self, _person_id: &str) -> anyhow::Result<Vec<Task>> {
-        Ok(Vec::new()) // TODO(port): see get_all_persons note
+        // Intentionally not reconstructed from the derived graph. Task
+        // carries fields (uuid, timestamps, confidence, ambiguity) that
+        // store_task does not project — the derived graph is a lossy
+        // secondary index, not the store of record. The correct read
+        // path is the canonical markdown (docs/markdown-schema.md),
+        // which is not implemented yet. TODO(port): markdown task read.
+        Ok(Vec::new())
     }
     async fn get_unresolved_conflicts(&self) -> anyhow::Result<Vec<Conflict>> {
-        Ok(Vec::new()) // TODO(port): see get_all_persons note
+        // Same rationale as get_tasks_for_person: hydrate from canonical
+        // markdown, not the lossy derived graph. TODO(port).
+        Ok(Vec::new())
     }
 
     async fn query(&self, sparql: &str) -> anyhow::Result<SparqlResult> {

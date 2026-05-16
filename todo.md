@@ -346,6 +346,10 @@ separate publishing chore.
   TripleStore+TermDictionary and runs `loka_sparql::execute`.
   Smoke-verified: stored person → SPARQL returned its triples.
   (`TODO(perf)`: cache/incrementally maintain the snapshot.)
+- [x] **Typed graph read-back (persons)** — `get_all_persons` rebuilt
+  from the POS index (find_by_predicate_object + find_by_subject);
+  smoke-verified. Tasks/conflicts intentionally left as markdown-read
+  TODOs (the derived graph is lossy; markdown is the store of record).
 - [ ] **Discord bot port** — serenity/twilight (`server-go-old`
   reference); currently a no-op stub.
 - [ ] **MCP endpoint** — expose the server as an MCP server (day-one
