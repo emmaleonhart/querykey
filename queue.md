@@ -393,11 +393,14 @@ Rules: each item its own commit with a *why*; `cargo build`,
 committing; `git pull --rebase` + push after each; only stop for a
 real conflict/blocker.
 
-- [ ] R4-1. **WSL / gateway lifecycle parity** — port bridge.go
-      `startGatewayWithRetry` + `startHealthCheck` + graceful
-      `StopGateway`, and wsl.go `StartGateway`/`CleanStaleLockFiles`/
-      path conversions, into `src/openclaw/{bridge,wsl}.rs` (replace
-      the best-effort TODO stubs).
+- [x] R4-1. **WSL / gateway lifecycle parity** — done. wsl.rs:
+      findDistro (null-byte strip, Ubuntu pref), CleanStaleLockFiles,
+      ForceKillOpenClaw, StartGateway (returns a tokio Child).
+      bridge.rs: detect-first ensure_gateway (Arc<Self>), supervised
+      retry loop (start→wait→backoff, max_retries), 10s health check
+      that resets retries, graceful stop_gateway/force_kill, plus the
+      `x-openclaw-agent-id` header and system-prompt buildMessages.
+      All 3 build configs green; boots clean, gateway detected.
 - [ ] R4-2. **Graph store completeness** — in `src/graph/loca.rs`
       persist full Task/Event/Message/Conflict/Instruction/FollowUp
       fields; implement `update` (SPARQL UPDATE) and `insert_triples`

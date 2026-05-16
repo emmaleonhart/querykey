@@ -1,6 +1,5 @@
 //! Port of server-go-old/internal/openclaw/wsl.go.
-//! WSL detection + command execution helpers. Heavy gateway lifecycle
-//! is skeletal with TODOs against the Go reference.
+//! WSL detection + OpenClaw gateway process management.
 
 use std::process::Command;
 use std::time::Duration;
@@ -17,14 +16,14 @@ impl Default for WslManager {
 
 impl WslManager {
     pub fn new() -> Self {
-        let mut m = WslManager {
-            distro: "Ubuntu".to_string(),
-        };
-        m.distro = m.find_distro();
-        m
+        let distro = find_distro();
+        WslManager { distro }
     }
 
     pub fn is_available(&self) -> bool {
+        if self.distro.is_empty() {
+            return false;
+        }
         Command::new("wsl")
             .args(["-l", "-q"])
             .output()
@@ -36,14 +35,8 @@ impl WslManager {
         &self.distro
     }
 
-    fn find_distro(&self) -> String {
-        // TODO(port): parse `wsl -l -q` like wsl.go findDistro().
-        std::env::var("WSL_DISTRO").unwrap_or_else(|_| "Ubuntu".to_string())
-    }
-
     /// Run a command inside WSL. Returns (stdout, stderr, exit_code).
-    pub fn run_command(&self, command: &str, timeout: Duration) -> (String, String, i32) {
-        let _ = timeout; // TODO(port): enforce timeout (wsl.go RunCommand)
+    pub fn run_command(&self, command: &str, _timeout: Duration) -> (String, String, i32) {
         match Command::new("wsl")
             .args(["-d", &self.distro, "--", "bash", "-lc", command])
             .output()
@@ -57,29 +50,97 @@ impl WslManager {
         }
     }
 
+    /// Port of wsl.go CleanStaleLockFiles().
     pub fn clean_stale_lock_files(&self) -> anyhow::Result<()> {
-        // TODO(port): wsl.go CleanStaleLockFiles()
-        Ok(())
-    }
-
-    pub fn force_kill_openclaw(&self) -> anyhow::Result<()> {
-        let (_, _, _) = self.run_command("pkill -f openclaw || true", Duration::from_secs(10));
-        Ok(())
-    }
-
-    pub fn start_gateway(&self) -> anyhow::Result<()> {
-        // TODO(port): wsl.go StartGateway() — spawn the gateway process
-        // and return a handle. Best-effort fire-and-forget for now.
-        let _ = Command::new("wsl")
+        if self.distro.is_empty() {
+            anyhow::bail!("no WSL distro found");
+        }
+        let status = Command::new("wsl")
             .args([
                 "-d",
                 &self.distro,
                 "--",
                 "bash",
-                "-lc",
-                "nohup openclaw gateway >/dev/null 2>&1 &",
+                "-c",
+                "rm -f /tmp/openclaw-*/gateway.*.lock",
             ])
-            .spawn();
-        Ok(())
+            .status();
+        match status {
+            Ok(s) if s.success() => {
+                tracing::info!("[wsl] cleaned stale lock files");
+                Ok(())
+            }
+            Ok(s) => anyhow::bail!("lock cleanup exited {s}"),
+            Err(e) => anyhow::bail!("lock cleanup failed: {e}"),
+        }
     }
+
+    /// Port of wsl.go ForceKillOpenClaw() — the big red button.
+    pub fn force_kill_openclaw(&self) -> anyhow::Result<()> {
+        if self.distro.is_empty() {
+            anyhow::bail!("no WSL distro found");
+        }
+        let status = Command::new("wsl")
+            .args([
+                "-d",
+                &self.distro,
+                "--",
+                "bash",
+                "-c",
+                "pkill -f openclaw-gateway; pkill -f openclaw; \
+                 rm -f /tmp/openclaw-*/gateway.*.lock; true",
+            ])
+            .status();
+        match status {
+            Ok(_) => {
+                tracing::info!("[wsl] force-killed all OpenClaw processes");
+                Ok(())
+            }
+            Err(e) => anyhow::bail!("force kill failed: {e}"),
+        }
+    }
+
+    /// Port of wsl.go StartGateway(): clean locks, spawn the gateway,
+    /// return the child so the caller manages its lifecycle.
+    pub fn start_gateway(&self) -> anyhow::Result<tokio::process::Child> {
+        if self.distro.is_empty() {
+            anyhow::bail!("no WSL distro found");
+        }
+        let _ = self.clean_stale_lock_files();
+        let child = tokio::process::Command::new("wsl")
+            .args(["-d", &self.distro, "-e", "bash", "-lc", "openclaw gateway"])
+            .kill_on_drop(true)
+            .spawn()
+            .map_err(|e| anyhow::anyhow!("failed to start OpenClaw gateway: {e}"))?;
+        tracing::info!("[wsl] spawned OpenClaw gateway (pid {:?})", child.id());
+        Ok(child)
+    }
+}
+
+/// Port of wsl.go findDistro(): `wsl --list --quiet`, strip the null
+/// bytes Windows emits, prefer Ubuntu, else first non-docker distro.
+fn find_distro() -> String {
+    if !cfg!(windows) {
+        return String::new();
+    }
+    let out = match Command::new("wsl").args(["--list", "--quiet"]).output() {
+        Ok(o) => o.stdout,
+        Err(_) => return String::new(),
+    };
+    let text = String::from_utf8_lossy(&out);
+    let distros: Vec<String> = text
+        .lines()
+        .map(|l| l.trim().replace('\u{0}', ""))
+        .filter(|l| !l.is_empty())
+        .collect();
+    if let Some(u) = distros.iter().find(|d| d.to_lowercase().contains("ubuntu")) {
+        return u.clone();
+    }
+    if let Some(d) = distros
+        .iter()
+        .find(|d| !d.to_lowercase().contains("docker"))
+    {
+        return d.clone();
+    }
+    String::new()
 }

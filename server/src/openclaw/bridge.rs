@@ -3,9 +3,18 @@
 
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tokio::task::JoinHandle;
 
 use super::WslManager;
+
+/// Secretary tone (CLAUDE.md "Agent tone: secretary, not consultant").
+/// Port of bridge.go's systemPrompt (kept concise).
+const SYSTEM_PROMPT: &str = "You are QueryKey's local secretary agent. \
+Be a secretary, not a consultant: short, direct, never wordy. Ask one \
+clear question when unsure rather than guessing. Surface confidence and \
+say when you don't know.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
@@ -21,12 +30,25 @@ pub struct Status {
     pub error: String,
 }
 
+/// Managed-gateway lifecycle state (port of bridge.go's mutex-guarded
+/// gatewayCmd / retries / health ticker).
+#[derive(Default)]
+struct GatewayState {
+    retries: u32,
+    stop_requested: bool,
+    supervisor: Option<JoinHandle<()>>,
+    health_task: Option<JoinHandle<()>>,
+}
+
 pub struct Bridge {
     gateway_url: String,
     agent_id: String,
     auth_token: String,
     http: reqwest::Client,
     wsl: WslManager,
+    state: Mutex<GatewayState>,
+    max_retries: u32,
+    retry_delay: Duration,
 }
 
 impl Bridge {
@@ -40,15 +62,35 @@ impl Bridge {
                 .build()
                 .expect("reqwest client"),
             wsl: WslManager::new(),
+            state: Mutex::new(GatewayState::default()),
+            max_retries: 5,
+            retry_delay: Duration::from_secs(3),
         }
     }
 
+    /// Port of bridge.go setHeaders(): agent-id header + bearer auth.
     fn auth(&self, rb: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        let rb = rb.header("x-openclaw-agent-id", &self.agent_id);
         if self.auth_token.is_empty() {
             rb
         } else {
             rb.bearer_auth(&self.auth_token)
         }
+    }
+
+    /// Port of bridge.go buildMessages(): system prompt + history + user.
+    fn build_messages(&self, user: &str, history: &[ChatMessage]) -> Vec<ChatMessage> {
+        let mut msgs = Vec::with_capacity(history.len() + 2);
+        msgs.push(ChatMessage {
+            role: "system".to_string(),
+            content: SYSTEM_PROMPT.to_string(),
+        });
+        msgs.extend_from_slice(history);
+        msgs.push(ChatMessage {
+            role: "user".to_string(),
+            content: user.to_string(),
+        });
+        msgs
     }
 
     /// Probe the gateway. Mirrors bridge.go Detect().
@@ -87,11 +129,7 @@ impl Bridge {
         message: &str,
         history: &[ChatMessage],
     ) -> anyhow::Result<String> {
-        let mut msgs = history.to_vec();
-        msgs.push(ChatMessage {
-            role: "user".to_string(),
-            content: message.to_string(),
-        });
+        let msgs = self.build_messages(message, history);
         let body = serde_json::json!({
             "model": self.agent_id,
             "messages": msgs,
@@ -124,11 +162,7 @@ impl Bridge {
     where
         F: FnMut(&str),
     {
-        let mut msgs = history.to_vec();
-        msgs.push(ChatMessage {
-            role: "user".to_string(),
-            content: message.to_string(),
-        });
+        let msgs = self.build_messages(message, history);
         let body = serde_json::json!({
             "model": self.agent_id,
             "messages": msgs,
@@ -187,22 +221,111 @@ impl Bridge {
         self.chat(&prompt, &[]).await
     }
 
-    /// Attempt to auto-start the gateway in WSL. TODO(port): retry loop
-    /// + health polling — see bridge.go startGatewayWithRetry().
-    pub async fn ensure_gateway(&self) {
-        if self.wsl.is_available() {
-            tracing::info!("[openclaw] attempting WSL gateway start (best-effort)");
-            let _ = self.wsl.start_gateway();
-        } else {
-            tracing::warn!("[openclaw] WSL not available; gateway not started");
+    /// Port of bridge.go EnsureGateway(): detect first; if reachable,
+    /// nothing to do; else (WSL available) start the supervised
+    /// retry+health loop. Takes Arc<Self> so the background tasks can
+    /// hold the bridge.
+    pub async fn ensure_gateway(self: Arc<Self>) {
+        if self.detect().await.available {
+            tracing::info!("[openclaw] gateway already running at {}", self.gateway_url);
+            return;
+        }
+        if !self.wsl.is_available() {
+            tracing::warn!("[openclaw] WSL not available, cannot auto-start gateway");
+            return;
+        }
+        {
+            let mut s = self.state.lock().unwrap();
+            s.stop_requested = false;
+            if s.supervisor.is_some() {
+                return; // already supervising
+            }
+        }
+        let me = self.clone();
+        let supervisor = tokio::spawn(async move { me.gateway_supervisor().await });
+        self.state.lock().unwrap().supervisor = Some(supervisor);
+        self.clone().start_health_check();
+    }
+
+    /// Port of bridge.go startGatewayWithRetry()'s loop: start → wait
+    /// for the gateway to exit → backoff → retry, capped by
+    /// `max_retries` (the health check resets the counter while it's
+    /// reachable, so a healthy gateway keeps being respawned).
+    async fn gateway_supervisor(self: Arc<Self>) {
+        loop {
+            {
+                let mut s = self.state.lock().unwrap();
+                if s.stop_requested {
+                    return;
+                }
+                s.retries += 1;
+                if s.retries > self.max_retries {
+                    tracing::warn!(
+                        "[openclaw] gave up after {} attempts",
+                        self.max_retries
+                    );
+                    return;
+                }
+                tracing::info!(
+                    "[openclaw] starting gateway (attempt {}/{})",
+                    s.retries,
+                    self.max_retries
+                );
+            }
+            match self.wsl.start_gateway() {
+                Ok(mut child) => {
+                    let _ = child.wait().await;
+                    tracing::warn!("[openclaw] gateway exited");
+                }
+                Err(e) => tracing::warn!("[openclaw] failed to start: {e}"),
+            }
+            if self.state.lock().unwrap().stop_requested {
+                return;
+            }
+            tokio::time::sleep(self.retry_delay).await;
         }
     }
 
-    pub fn stop_gateway(&self) {
-        // TODO(port): graceful gateway stop — see bridge.go StopGateway()
+    /// Port of bridge.go startHealthCheck(): every 10s, if the gateway
+    /// is reachable, reset the retry counter.
+    fn start_health_check(self: Arc<Self>) {
+        let me = self.clone();
+        let task = tokio::spawn(async move {
+            let mut tick = tokio::time::interval(Duration::from_secs(10));
+            loop {
+                tick.tick().await;
+                if me.state.lock().unwrap().stop_requested {
+                    return;
+                }
+                if me.detect().await.available {
+                    me.state.lock().unwrap().retries = 0;
+                }
+            }
+        });
+        self.state.lock().unwrap().health_task = Some(task);
     }
 
+    /// Port of bridge.go StopGateway(): stop supervising + kill the
+    /// gateway. Killing it in WSL unblocks the supervisor's wait().
+    pub fn stop_gateway(&self) {
+        let (sup, health) = {
+            let mut s = self.state.lock().unwrap();
+            s.stop_requested = true;
+            (s.supervisor.take(), s.health_task.take())
+        };
+        if let Some(h) = health {
+            h.abort();
+        }
+        let _ = self.wsl.force_kill_openclaw();
+        if let Some(h) = sup {
+            h.abort();
+        }
+        tracing::info!("[openclaw] gateway stopped");
+    }
+
+    /// Port of bridge.go ForceKill(): StopGateway + kill everything.
     pub fn force_kill(&self) -> anyhow::Result<()> {
+        self.stop_gateway();
         self.wsl.force_kill_openclaw()
     }
 }

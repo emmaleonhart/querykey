@@ -183,7 +183,7 @@ async fn openclaw_kill(State(s): State<Arc<AppState>>) -> Json<Value> {
 }
 
 async fn openclaw_restart(State(s): State<Arc<AppState>>) -> Json<Value> {
-    s.bridge.ensure_gateway().await;
+    s.bridge.clone().ensure_gateway().await;
     Json(json!({ "ok": true }))
 }
 
