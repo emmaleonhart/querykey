@@ -341,8 +341,11 @@ separate publishing chore.
 - [x] **Incremental agent streaming** — real SSE delta parsing in
   `src/openclaw/bridge.rs` (port of bridge.go ChatStream); `ws.rs`
   broadcasts each delta live as `stream_chunk`.
-- [ ] **Persistent SPARQL query bridge** — read-back of the derived
-  graph (`loka_sparql` runs over in-memory TripleStore today).
+- [x] **Persistent SPARQL query bridge** — `query()` snapshots the
+  PersistentStore (`iter()` + `load_terms_into`, id-consistent) into a
+  TripleStore+TermDictionary and runs `loka_sparql::execute`.
+  Smoke-verified: stored person → SPARQL returned its triples.
+  (`TODO(perf)`: cache/incrementally maintain the snapshot.)
 - [ ] **Discord bot port** — serenity/twilight (`server-go-old`
   reference); currently a no-op stub.
 - [ ] **MCP endpoint** — expose the server as an MCP server (day-one

@@ -13,9 +13,9 @@
 //! parity is deferred, not faked.
 
 use async_trait::async_trait;
-use loka_core::{PersistentStore, Triple};
+use loka_core::{PersistentStore, TermDictionary, Triple, TripleStore};
 
-use super::{GraphStore, SparqlResult};
+use super::{GraphStore, SparqlBindings, SparqlHead, SparqlResult, SparqlValue};
 use crate::models::{Conflict, Message, Person, Task};
 
 const NS: &str = "http://querykey.dev/ns/";
@@ -127,14 +127,48 @@ impl GraphStore for LocaGraph {
     }
 
     async fn query(&self, sparql: &str) -> anyhow::Result<SparqlResult> {
-        // Validate the query so callers get a real parse error, but
-        // execution over the persistent store is not yet bridged.
-        loka_sparql::parse(sparql).map_err(|e| anyhow::anyhow!("sparql parse: {e}"))?;
-        tracing::warn!(
-            "[loca] SPARQL parsed but persistent execution not yet wired \
-             (TODO: persistent query bridge); returning empty result"
-        );
-        Ok(SparqlResult::default())
+        let q = loka_sparql::parse(sparql)
+            .map_err(|e| anyhow::anyhow!("sparql parse: {e}"))?;
+
+        // Bridge: loka_sparql::execute runs over an in-memory
+        // TripleStore + TermDictionary. Snapshot the PersistentStore
+        // (its triples carry persistent TermIds; load_terms_into copies
+        // the persistent dictionary id-for-id via insert_with_id, so
+        // the two stay consistent). Single-user PRM graphs are small;
+        // TODO(perf): cache/incrementally maintain this snapshot.
+        let mut ts = TripleStore::new();
+        for t in self.store.iter() {
+            ts.insert(t).map_err(|e| anyhow::anyhow!("snapshot: {e}"))?;
+        }
+        let mut dict = TermDictionary::new();
+        self.store.load_terms_into(&mut dict);
+
+        let qr = loka_sparql::execute(&q, &ts, &dict)
+            .map_err(|e| anyhow::anyhow!("sparql exec: {e}"))?;
+
+        let vars = qr.columns.clone();
+        let mut bindings = Vec::with_capacity(qr.rows.len());
+        for row in &qr.rows {
+            let mut m = std::collections::HashMap::new();
+            for (var, tid) in row {
+                let resolved = dict.resolve(*tid).unwrap_or("").to_string();
+                // Quoted terms are literals; bare terms are IRIs.
+                let (value_type, value) = if resolved.starts_with('"') {
+                    (
+                        "literal".to_string(),
+                        resolved.trim_matches('"').to_string(),
+                    )
+                } else {
+                    ("uri".to_string(), resolved)
+                };
+                m.insert(var.clone(), SparqlValue { value_type, value });
+            }
+            bindings.push(m);
+        }
+        Ok(SparqlResult {
+            head: SparqlHead { vars },
+            results: SparqlBindings { bindings },
+        })
     }
     async fn update(&self, _sparql: &str) -> anyhow::Result<()> {
         Ok(()) // TODO(port): SPARQL UPDATE over PersistentStore
