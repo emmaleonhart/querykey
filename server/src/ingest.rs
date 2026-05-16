@@ -83,7 +83,22 @@ impl Pipeline {
     }
 
     fn broadcast_results(&self, a: &AnalysisResult) {
+        // Mirrors pipeline.go broadcastResults: tasks + events go into
+        // added_nodes, conflicts into new_conflicts. Skipping any entity
+        // here means the Flutter app never sees it appear live.
+        let mut added_nodes = Vec::with_capacity(a.tasks.len() + a.events.len());
+        for t in &a.tasks {
+            if let Ok(v) = serde_json::to_value(t) {
+                added_nodes.push(v);
+            }
+        }
+        for e in &a.events {
+            if let Ok(v) = serde_json::to_value(e) {
+                added_nodes.push(v);
+            }
+        }
         let diff = GraphDiff {
+            added_nodes,
             new_conflicts: a.conflicts.clone(),
             ..Default::default()
         };
