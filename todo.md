@@ -1,5 +1,40 @@
 # QueryKey — Master TODO
 
+## Current status — START HERE (2026-05-15)
+
+**Working today (Rounds 1–5, all on `main`):**
+- **Server:** Rust (`server/`, crate `querykey-server`) — the *only*
+  server; the Go implementation was fully ported then deleted
+  (recoverable from git history). Builds clean & warning-free in all
+  three configs: `cargo build`, `--features loca`, `--features
+  discord`.
+- **Canonical store:** the **markdown vault** (`server/src/vault/`,
+  `$VAULT_DIR`, default `./vault`) — Person/Task/Event as YAML
+  frontmatter + body, lossless round-trip (unit-tested), survives
+  restarts. This is the store of record.
+- **Derived graph:** Loca/SutraDB, rebuilt from the vault on startup;
+  SPARQL query bridge + typed read-backs. **Fuseki is gone.**
+- **Agent:** model-agnostic via an **MCP endpoint** (`/mcp`); OpenClaw
+  bridge with incremental SSE streaming + supervised gateway
+  lifecycle. Ingest: relaxed parse → vault → graph + typed GraphDiff
+  over the WebSocket hub.
+- **Specs/context:** `docs/markdown-schema.md` (as-built),
+  `docs/card-format.md`, vision corpus in `chat/public/`.
+
+**Next big pieces (not started):**
+1. **P2P card layer** — `docs/card-format.md` (offer/looking-for
+   cards = your key/query, asymmetric git-tracking, 24h delay).
+2. **GitHub identity / sync** behind a swappable handle abstraction.
+3. Conflict / OpenQuestion / FollowUp on-disk forms; `[[wikilink]]`
+   resolution; status-workflow enforcement; calendar; audio pipeline.
+
+**How to work here:** [`queue.md`](queue.md) is the barrel-through
+queue — do work from there. This `todo.md` is the long roadmap
+(reference, not a worklist). **Discord is deprioritized** → Phase Z.
+**Flutter** is the frontend (firm).
+
+---
+
 > **Status of this file.** QueryKey is a **rationalist social network**
 > that doubles as a local-first PRM / lightweight CRM / JIRA-style task
 > tracker, for one person, run from your own desktop. The phase
@@ -11,10 +46,10 @@
 > people in your contact graph."
 >
 > Authoritative near-term plan: [`queue.md`](queue.md). Settled
-> decisions (do not relitigate): **Flutter** UI; **Rust** server
-> target (current Go server deprecated, no rewrite this round);
-> **model-agnostic local agent, Gemma default** (OpenClaw is today's
-> bridge, an implementation detail).
+> decisions (do not relitigate): **Flutter** UI; **Rust** is the
+> server (Go fully removed in Round 4); **model-agnostic local agent,
+> Gemma default** via MCP (OpenClaw is today's bridge, an
+> implementation detail).
 
 ## Core Behavior
 
