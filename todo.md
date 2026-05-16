@@ -22,16 +22,28 @@
   `docs/card-format.md`, vision corpus in `chat/public/`.
 
 **Next big pieces:**
-1. **P2P card layer** — format + local layer DONE (Round 7): format/
-   parse, `.gitignore` asymmetry, 24h propagation safety valve +
-   revert, read-only `peers/`, swappable GitHub identity, the
-   `/api/card|identity|peers` endpoints. **Open: the P2P transport**
-   (what moves a card between peers) + discovery + card↔graph
-   agent-drafting — now *the* gating question (`docs/card-format.md`).
-2. calendar; audio pipeline. (Conflict/OpenQuestion/FollowUp forms —
-   R6. Semantic `[[wikilink]]`/`[[property:target]]` — R8.
-   Status-workflow enforcement — R9. Instruction/VoiceProfile forms
-   — R10: the full canonical entity set is now on disk.)
+1. **Calendar structure** — Round 11 (in progress): recurrence on
+   Event + a merged agenda window query (fixed events + tasks with
+   deadlines, movable-vs-fixed).
+2. **Agent-drafted card↔graph** — Round 12. The local agent reads the
+   PRM and drafts a key/query for you to approve. **Reopened by user
+   2026-05-16** (only this sub-piece — the P2P **transport** +
+   discovery stay parked as the unresolved design question;
+   `docs/card-format.md`).
+3. **P2P card layer** — format + local layer DONE (Round 7).
+   **Open/parked: the P2P transport** (what moves a card between
+   peers) + discovery — the gating design question; do not barrel on
+   a guess.
+
+(Done: Conflict/OpenQuestion/FollowUp forms — R6. Semantic
+`[[wikilink]]`/`[[property:target]]` — R8. Status-workflow
+enforcement — R9. Instruction/VoiceProfile forms — R10: the full
+canonical entity set is on disk.)
+
+**Deprioritized (back of the list, per user 2026-05-16):** the audio
+pipeline (transcription/diarization). Would later fill VoiceProfile
+embeddings, but it is design-heavy (model selection unresolved) and
+explicitly *not* near-term. See the audio items further down.
 
 **How to work here:** [`queue.md`](queue.md) is the barrel-through
 queue — do work from there. This `todo.md` is the long roadmap

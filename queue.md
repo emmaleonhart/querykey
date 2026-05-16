@@ -605,6 +605,14 @@ deepening the PRM compounds; the social layer can wait for a real
 transport decision. Future sessions: prioritize PRM/vault/graph
 structure over anything P2P until the user reopens the social track.
 
+**UPDATE (2026-05-16, later):** the user **reopened one sub-piece** —
+the **agent-drafted card↔graph** projection (the local agent reads
+the PRM and drafts a key/query for approval; Round 12). This is the
+PRM *output* side and is now in scope. **The P2P transport +
+discovery remain parked** — that distinction is the whole point: we
+build the agent that drafts the card, not the wire that ships it.
+Audio pipeline explicitly moved to the back of `todo.md`.
+
 ---
 
 ## Round 8 — semantic wikilinks (2026-05-16, PRM-priority)
@@ -724,7 +732,9 @@ social steering, flag before barrelling it.
   *format* is now built (Round 7) — the one real open design question
   is now the **P2P transport** (what actually moves a card between
   peers) + discovery; the format deliberately does not assume it.
-- **Priority (2026-05-16): PRM structure > social layer.** The P2P
-  track is parked pending a transport *design* decision; barrel PRM/
-  vault/graph structure until the user reopens social. See "Direction
-  (2026-05-16)" above.
+- **Priority (2026-05-16): PRM structure > social layer.** PRM/vault/
+  graph structure is the focus. The **agent-drafted card↔graph**
+  sub-piece was reopened by the user (Round 12) — it's the PRM output
+  side, in scope. The **P2P transport + discovery stay parked**
+  pending a *design* decision; do not barrel them on a guess. Audio
+  pipeline → back of `todo.md`. See "Direction (2026-05-16)" above.
