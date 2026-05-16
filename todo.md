@@ -352,8 +352,10 @@ separate publishing chore.
   TODOs (the derived graph is lossy; markdown is the store of record).
 - [ ] **Discord bot port** — serenity/twilight (`server-go-old`
   reference); currently a no-op stub.
-- [ ] **MCP endpoint** — expose the server as an MCP server (day-one
-  infra per the vision).
+- [x] **MCP endpoint** — minimal JSON-RPC-over-HTTP at `POST /mcp`
+  (`initialize` / `tools/list` / `tools/call`), tools: query_graph,
+  list_persons, server_health. Dependency-free; smoke-verified.
+  `TODO`: stdio+SSE transports, agents.md-governed write tools.
 - [ ] **Local mode** — server on your machine (privacy-first; default)
 - [ ] **Cloud / hybrid modes** — only relevant alongside Phase 8
 - [ ] **WebSocket sync** — typed graph-diff broadcast (fan-out works)

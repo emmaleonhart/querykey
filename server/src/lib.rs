@@ -7,6 +7,7 @@ pub mod config;
 pub mod discord;
 pub mod graph;
 pub mod ingest;
+pub mod mcp;
 pub mod models;
 pub mod openclaw;
 pub mod ws;

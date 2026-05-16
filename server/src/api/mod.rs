@@ -57,6 +57,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/openclaw/restart", post(openclaw_restart))
         // Graph (SPARQL passthrough)
         .route("/api/graph/query", post(graph_query))
+        // MCP server endpoint (model-agnostic agent entrypoint)
+        .route("/mcp", post(crate::mcp::mcp_handler))
         .layer(cors)
         .with_state(state)
 }
