@@ -157,13 +157,13 @@ struct FollowUpFm {
 
 // ---------- frontmatter (de)serialization ----------
 
-fn compose(yaml: &str, body: &str) -> String {
+pub(crate) fn compose(yaml: &str, body: &str) -> String {
     format!("---\n{}---\n\n{}\n", yaml, body.trim_end())
 }
 
 /// Split `--- yaml --- body`. Returns (yaml, body). If there is no
 /// frontmatter the whole input is treated as body.
-fn split(content: &str) -> (String, String) {
+pub(crate) fn split(content: &str) -> (String, String) {
     let c = content.strip_prefix('\u{feff}').unwrap_or(content);
     if let Some(rest) = c.strip_prefix("---\n") {
         if let Some(end) = rest.find("\n---") {
@@ -182,10 +182,10 @@ fn split(content: &str) -> (String, String) {
     (String::new(), c.trim_end().to_string())
 }
 
-fn rfc3339(dt: &DateTime<Utc>) -> String {
+pub(crate) fn rfc3339(dt: &DateTime<Utc>) -> String {
     dt.to_rfc3339()
 }
-fn parse_dt(s: &str) -> DateTime<Utc> {
+pub(crate) fn parse_dt(s: &str) -> DateTime<Utc> {
     DateTime::parse_from_rfc3339(s)
         .map(|d| d.with_timezone(&Utc))
         .unwrap_or_else(|_| DateTime::<Utc>::from_timestamp(0, 0).unwrap_or_else(Utc::now))
@@ -207,11 +207,60 @@ impl Vault {
         ] {
             fs::create_dir_all(root.join(sub))?;
         }
-        Ok(Self { root })
+        let v = Self { root };
+        v.ensure_privacy_gitignore()?;
+        Ok(v)
     }
 
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    // ----- privacy asymmetry (docs/card-format.md) -----
+    //
+    // Load-bearing: your own card.md is git-TRACKED (you need history
+    // to revert a bad edit); other people's cards and the derived
+    // cache are git-IGNORED (no surveillance archive of how someone's
+    // card changed over time). Enforced by writing a `.gitignore` into
+    // the vault root so the asymmetry holds even if QueryKey isn't run.
+
+    const PRIVACY_MARK: &'static str = "# QueryKey vault privacy asymmetry";
+
+    fn ensure_privacy_gitignore(&self) -> anyhow::Result<()> {
+        let block = format!(
+            "{mark} — see docs/card-format.md.\n\
+             # Your own card.md is TRACKED (history = undo). Other\n\
+             # people's cards and the derived cache are NOT.\n\
+             /peers/\n\
+             /.querykey/\n",
+            mark = Self::PRIVACY_MARK,
+        );
+        let path = self.root.join(".gitignore");
+        match fs::read_to_string(&path) {
+            Ok(existing) if existing.contains(Self::PRIVACY_MARK) => {} // idempotent
+            Ok(existing) => {
+                let sep = if existing.ends_with('\n') { "\n" } else { "\n\n" };
+                fs::write(&path, format!("{existing}{sep}{block}"))?;
+            }
+            Err(_) => fs::write(&path, block)?,
+        }
+        Ok(())
+    }
+
+    // ----- your broadcast card -----
+
+    pub fn card_path(&self) -> PathBuf {
+        self.root.join("card.md")
+    }
+
+    pub fn get_card(&self) -> Option<crate::card::Card> {
+        let s = fs::read_to_string(self.card_path()).ok()?;
+        crate::card::parse(&s)
+    }
+
+    pub fn upsert_card(&self, c: &crate::card::Card) -> anyhow::Result<()> {
+        fs::write(self.card_path(), crate::card::render(c))?;
+        Ok(())
     }
 
     fn write(&self, sub: &str, slug: &str, yaml: String, body: &str) -> anyhow::Result<()> {
