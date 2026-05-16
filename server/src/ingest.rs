@@ -86,10 +86,10 @@ impl Pipeline {
         }
     }
 
-    /// Canonical-first: tasks/events are written to the **vault**
-    /// (the store of record) then projected into the derived graph.
-    /// Conflicts have no on-disk form yet (open sub-question in
-    /// docs/markdown-schema.md), so they stay graph-only for now.
+    /// Canonical-first: tasks/events/conflicts are written to the
+    /// **vault** (the store of record) then projected into the derived
+    /// graph. As of R6 conflicts have an on-disk form too, so they go
+    /// vault-first like everything else (was: graph-only).
     async fn store_results(&self, a: &AnalysisResult) {
         for t in &a.tasks {
             if let Err(e) = self.vault.upsert_task(t) {
@@ -103,7 +103,10 @@ impl Pipeline {
             }
         }
         for c in &a.conflicts {
-            let _ = self.graph.store_conflict(c).await;
+            if let Err(err) = self.vault.upsert_conflict(c) {
+                tracing::warn!("[ingest] failed to write conflict to vault: {err}");
+            }
+            let _ = self.graph.store_conflict(c).await; // derived projection
         }
     }
 

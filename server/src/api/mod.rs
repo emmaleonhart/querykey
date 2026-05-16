@@ -12,7 +12,9 @@ use tower_http::cors::{Any, CorsLayer};
 
 use crate::graph::GraphStore;
 use crate::ingest::{IngestRequest, Pipeline};
-use crate::models::{Person, Task};
+use crate::models::{
+    ConflictResolution, FollowUp, GraphDiff, Person, QuestionStatus, Task,
+};
 use crate::openclaw::Bridge;
 use crate::ws::{ws_handler, Hub};
 
@@ -182,32 +184,113 @@ async fn update_task(
     Json(serde_json::to_value(task).unwrap())
 }
 
+// Conflicts/questions/followups now have a canonical on-disk form
+// (R6). Reads come from the vault at full fidelity; resolutions are
+// real markdown mutations (read → patch → write → project/broadcast),
+// mirroring update_task. No more faked success / empty lists.
+
 async fn list_conflicts(State(s): State<Arc<AppState>>) -> Json<Value> {
-    let conflicts = s.graph.get_unresolved_conflicts().await.unwrap_or_default();
+    let conflicts: Vec<_> = s
+        .vault
+        .list_conflicts()
+        .into_iter()
+        .filter(|c| c.resolution == ConflictResolution::Unresolved)
+        .collect();
     Json(json!({ "conflicts": conflicts }))
 }
 
-// Conflicts/questions/followups belong to the open-questions model on
-// the canonical markdown layer (not yet built). These return honest
-// "not implemented" rather than faking success; lists are empty
-// because nothing is persisted yet.
-const NI: &str = "not implemented — canonical markdown open-questions model (docs/markdown-schema.md) not built yet";
-
-async fn resolve_conflict(Path(id): Path<String>) -> Json<Value> {
-    Json(json!({ "id": id, "status": "not_implemented", "detail": NI }))
+#[derive(Deserialize)]
+struct ConflictResolve {
+    resolution: ConflictResolution,
+    #[serde(default)]
+    resolved_by: String,
 }
 
-async fn list_questions() -> Json<Value> {
-    Json(json!({ "questions": [] }))
+async fn resolve_conflict(
+    State(s): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(body): Json<ConflictResolve>,
+) -> Json<Value> {
+    let uuid = match uuid::Uuid::parse_str(&id) {
+        Ok(u) => u,
+        Err(_) => return Json(json!({ "error": format!("bad conflict id: {id}") })),
+    };
+    let mut c = match s.vault.get_conflict(&uuid) {
+        Some(c) => c,
+        None => return Json(json!({ "error": "conflict not found" })),
+    };
+    c.resolution = body.resolution;
+    c.resolved_by = body.resolved_by;
+    c.resolved_at = Some(chrono::Utc::now());
+    if let Err(e) = s.vault.upsert_conflict(&c) {
+        return Json(json!({ "error": e.to_string() }));
+    }
+    let _ = s.graph.store_conflict(&c).await; // derived projection
+    s.hub.broadcast_graph_diff(&GraphDiff {
+        resolved_conflicts: vec![c.id.to_string()],
+        ..Default::default()
+    });
+    Json(serde_json::to_value(c).unwrap())
 }
-async fn resolve_question(Path(id): Path<String>) -> Json<Value> {
-    Json(json!({ "id": id, "status": "not_implemented", "detail": NI }))
+
+async fn list_questions(State(s): State<Arc<AppState>>) -> Json<Value> {
+    let questions: Vec<_> = s
+        .vault
+        .list_questions()
+        .into_iter()
+        .filter(|q| q.status == QuestionStatus::Open)
+        .collect();
+    Json(json!({ "questions": questions }))
 }
-async fn list_followups() -> Json<Value> {
-    Json(json!({ "followups": [] }))
+
+#[derive(Deserialize)]
+struct QuestionResolve {
+    #[serde(default)]
+    resolution: String,
+    #[serde(default)]
+    resolved_by: String,
+    #[serde(default)]
+    resolved_via: String,
 }
-async fn create_followup(Json(_body): Json<Value>) -> Json<Value> {
-    Json(json!({ "status": "not_implemented", "detail": NI }))
+
+async fn resolve_question(
+    State(s): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(body): Json<QuestionResolve>,
+) -> Json<Value> {
+    let mut q = match s.vault.get_question(&id) {
+        Some(q) => q,
+        None => return Json(json!({ "error": "question not found" })),
+    };
+    q.status = QuestionStatus::Resolved;
+    q.resolution = body.resolution;
+    q.resolved_by = body.resolved_by;
+    q.resolved_via = body.resolved_via;
+    q.resolved_at = Some(chrono::Utc::now());
+    if let Err(e) = s.vault.upsert_question(&q) {
+        return Json(json!({ "error": e.to_string() }));
+    }
+    Json(serde_json::to_value(q).unwrap())
+}
+
+async fn list_followups(State(s): State<Arc<AppState>>) -> Json<Value> {
+    Json(json!({ "followups": s.vault.list_followups() }))
+}
+
+async fn create_followup(
+    State(s): State<Arc<AppState>>,
+    Json(mut f): Json<FollowUp>,
+) -> Json<Value> {
+    if f.id.is_empty() {
+        f.id = uuid::Uuid::new_v4().to_string();
+    }
+    if f.created_at.timestamp() == 0 {
+        f.created_at = chrono::Utc::now();
+    }
+    if let Err(e) = s.vault.upsert_followup(&f) {
+        return Json(json!({ "error": e.to_string() }));
+    }
+    Json(serde_json::to_value(f).unwrap())
 }
 
 async fn openclaw_kill(State(s): State<Arc<AppState>>) -> Json<Value> {
