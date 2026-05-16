@@ -13,4 +13,5 @@ pub mod mcp;
 pub mod models;
 pub mod openclaw;
 pub mod vault;
+pub mod wikilink;
 pub mod ws;
