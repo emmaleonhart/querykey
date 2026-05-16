@@ -1,14 +1,21 @@
 # Architecture Plan
 
-> **Framing note (2026-05).** This document was written for the earlier
-> "Secretarybird" team-coordination framing of the project. QueryKey is now a
-> local-first social network / personal relationship manager (PRM) — see
-> `README.md` and `CLAUDE.md`. Most of the architecture described here carries
-> over almost unchanged: the ingestion pipeline, OpenClaw integration, graph
-> store, audio pipeline, and real-time WebSocket sync all still apply. Read
-> "team member" / "everyone on the team" as "person in your contact graph",
-> and read "Secretarybird Server" as "QueryKey Server". A deeper rewrite of
-> this doc is on the roadmap; until then, this note is the bridge.
+> **Historical notes — superseded (updated 2026-05, Round 2).** This
+> document predates the QueryKey pivot and is kept only as raw notes.
+> **The authoritative architecture is in `queue.md`, `CLAUDE.md`,
+> `README.md`, and `todo.md`**, plus the new `docs/markdown-schema.md`
+> and `docs/card-format.md`. Do not treat the body below as current.
+> Specifically superseded:
+> - **Graph store is NOT Fuseki/SPARQL.** It is **Loca/SutraDB** and
+>   the graph is **derived from canonical markdown**, not the store of
+>   record. Ignore any triple-store/RDF-as-canonical framing here.
+> - **AI engine is model-agnostic via an MCP server** (Gemma default);
+>   OpenClaw is just today's bridge, not the architecture.
+> - **Personal-first, not team coordination.** Read "team member" as
+>   "a person in your contact graph"; the multi-user story is the
+>   opt-in **peer-to-peer card** layer, built after the solo PRM.
+> - "Secretarybird Server" → "QueryKey Server"; small-business framing
+>   → one person's own life.
 
 ## Design Philosophy
 
