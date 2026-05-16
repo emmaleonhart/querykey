@@ -450,6 +450,34 @@ GitHub identity; MCP stdio/SSE; Phase-Z Discord). In-code comments
 that reference `server-go-old/` are left as historical breadcrumbs
 (the Go reference is in git history) — not chased, per scope.
 
+---
+
+## Round 5 — Canonical markdown source of truth (load-bearing)
+
+**User directive (2026-05-15):** barrel through implementing the
+markdown source-of-truth model (`docs/markdown-schema.md`). This is
+*the* load-bearing piece: markdown files are canonical; the Loca graph
+becomes a derived, rebuildable index; task/conflict mutation and full
+hydration route through markdown (fixes the lossy-graph reads and the
+honest `not_implemented` mutations).
+
+- [x] R5-1. **`vault` module** — done. `src/vault/mod.rs`: YAML
+      frontmatter + body (de)serialize, idempotent/lossless (stable
+      key order; per-entity Fm structs; title in frontmatter so
+      nothing is body-derived). `Vault` upsert/get/list for Person /
+      Task / Event under `<root>/{people,tasks,events,notes}/`.
+      Round-trip unit test passes (caught + fixed a trailing-newline
+      bug). serde_yaml dep added. All 3 builds green, zero warnings.
+      (`VAULT_DIR` config wired in R5-2.)
+- [ ] R5-2. **Canonical-first wiring** — `AppState.vault`; API
+      create/list/get + **real** `update_task` write the vault then
+      project into the derived graph; reads come from the vault (full
+      fidelity — timestamps no longer lossy). `main` opens the vault
+      and **rebuilds the graph from it on startup** (derived contract).
+- [ ] R5-3. **Ingest → vault** + docs — pipeline `store_results`
+      writes the vault then projects; flip `docs/markdown-schema.md`
+      status to *implemented*; update CLAUDE/README/todo/queue.
+
 ## Notes for future sessions
 
 - The user dictates long stream-of-consciousness messages via voice. Do
