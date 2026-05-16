@@ -14,9 +14,10 @@
 
 use async_trait::async_trait;
 use loka_core::{PersistentStore, Triple};
+use uuid::Uuid;
 
 use super::{GraphStore, SparqlResult};
-use crate::models::{Conflict, Message, Person, Task};
+use crate::models::{Conflict, ConflictResolution, Message, Person, Task, TaskStatus};
 
 const NS: &str = "http://querykey.dev/ns/";
 const RDF_TYPE: &str = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
@@ -124,6 +125,30 @@ impl GraphStore for LocaGraph {
     }
     async fn get_unresolved_conflicts(&self) -> anyhow::Result<Vec<Conflict>> {
         Ok(Vec::new()) // TODO(port): see get_all_persons note
+    }
+
+    async fn update_task_status(
+        &self,
+        _id: Uuid,
+        _status: TaskStatus,
+    ) -> anyhow::Result<Option<Task>> {
+        // TODO(port): SPARQL UPDATE delete+insert of querykey:status
+        // (handlers.go handleUpdateTask). Needs the persistent query
+        // bridge so we can read back the modified task. See todo.md
+        // Phase 11.
+        Ok(None)
+    }
+
+    async fn resolve_conflict_with(
+        &self,
+        _id: Uuid,
+        _resolution: ConflictResolution,
+        _resolved_by: &str,
+    ) -> anyhow::Result<Option<Conflict>> {
+        // TODO(port): SPARQL UPDATE of querykey:resolution / resolvedBy
+        // / resolvedAt (handlers.go handleResolveConflict). Same
+        // persistent bridge requirement.
+        Ok(None)
     }
 
     async fn query(&self, sparql: &str) -> anyhow::Result<SparqlResult> {

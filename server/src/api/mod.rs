@@ -12,7 +12,7 @@ use tower_http::cors::{Any, CorsLayer};
 
 use crate::graph::GraphStore;
 use crate::ingest::{IngestRequest, Pipeline};
-use crate::models::{Person, Task};
+use crate::models::{ConflictResolution, GraphDiff, Person, Task, WsMessage};
 use crate::openclaw::Bridge;
 use crate::ws::{ws_handler, Hub};
 
@@ -144,12 +144,30 @@ struct TaskPatch {
 }
 
 async fn update_task(
-    State(_s): State<Arc<AppState>>,
+    State(s): State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(patch): Json<TaskPatch>,
 ) -> Json<Value> {
-    // TODO(port): SPARQL UPDATE of task fields (handlers.go handleUpdateTask).
-    Json(json!({ "id": id, "updated": patch.status.is_some() }))
+    let Ok(uuid) = uuid::Uuid::parse_str(&id) else {
+        return Json(json!({ "id": id, "error": "invalid task id" }));
+    };
+    let Some(status) = patch.status else {
+        return Json(json!({ "id": id, "updated": false }));
+    };
+    match s.graph.update_task_status(uuid, status).await {
+        Ok(Some(task)) => {
+            // Mirrors hub.BroadcastMessage(WSMessage{Type:"task_updated"})
+            // from handlers.go.
+            s.hub.broadcast_message(WsMessage {
+                msg_type: "task_updated".to_string(),
+                content: id.clone(),
+                data: serde_json::to_value(&task).ok(),
+            });
+            Json(json!({ "id": id, "updated": true, "task": task }))
+        }
+        Ok(None) => Json(json!({ "id": id, "updated": false, "found": false })),
+        Err(e) => Json(json!({ "id": id, "error": e.to_string() })),
+    }
 }
 
 async fn list_conflicts(State(s): State<Arc<AppState>>) -> Json<Value> {
@@ -157,9 +175,36 @@ async fn list_conflicts(State(s): State<Arc<AppState>>) -> Json<Value> {
     Json(json!({ "conflicts": conflicts }))
 }
 
-async fn resolve_conflict(Path(id): Path<String>) -> Json<Value> {
-    // TODO(port): persist resolution (handlers.go handleResolveConflict).
-    Json(json!({ "id": id, "resolved": true }))
+#[derive(Deserialize)]
+struct ResolveBody {
+    resolution: ConflictResolution,
+    #[serde(default)]
+    resolved_by: String,
+}
+
+async fn resolve_conflict(
+    State(s): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(body): Json<ResolveBody>,
+) -> Json<Value> {
+    let Ok(uuid) = uuid::Uuid::parse_str(&id) else {
+        return Json(json!({ "id": id, "error": "invalid conflict id" }));
+    };
+    match s
+        .graph
+        .resolve_conflict_with(uuid, body.resolution, &body.resolved_by)
+        .await
+    {
+        Ok(Some(conflict)) => {
+            s.hub.broadcast_graph_diff(&GraphDiff {
+                resolved_conflicts: vec![id.clone()],
+                ..Default::default()
+            });
+            Json(json!({ "id": id, "resolved": true, "conflict": conflict }))
+        }
+        Ok(None) => Json(json!({ "id": id, "resolved": false, "found": false })),
+        Err(e) => Json(json!({ "id": id, "error": e.to_string() })),
+    }
 }
 
 async fn list_questions() -> Json<Value> {

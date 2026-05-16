@@ -9,7 +9,9 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::models::{Conflict, Message, Person, Task};
+use uuid::Uuid;
+
+use crate::models::{Conflict, ConflictResolution, Message, Person, Task, TaskStatus};
 
 pub mod memory;
 #[cfg(feature = "loca")]
@@ -59,6 +61,24 @@ pub trait GraphStore: Send + Sync {
     async fn get_all_persons(&self) -> anyhow::Result<Vec<Person>>;
     async fn get_tasks_for_person(&self, person_id: &str) -> anyhow::Result<Vec<Task>>;
     async fn get_unresolved_conflicts(&self) -> anyhow::Result<Vec<Conflict>>;
+
+    /// Update a single task's status. Returns the updated task if found,
+    /// or `None` if no task with `id` exists. Mirrors handlers.go
+    /// handleUpdateTask (status-only patch path).
+    async fn update_task_status(
+        &self,
+        id: Uuid,
+        status: TaskStatus,
+    ) -> anyhow::Result<Option<Task>>;
+
+    /// Mark a conflict resolved. Returns the updated conflict if found.
+    /// Mirrors handlers.go handleResolveConflict.
+    async fn resolve_conflict_with(
+        &self,
+        id: Uuid,
+        resolution: ConflictResolution,
+        resolved_by: &str,
+    ) -> anyhow::Result<Option<Conflict>>;
 
     /// SPARQL SELECT passthrough (POST /api/graph/query).
     async fn query(&self, sparql: &str) -> anyhow::Result<SparqlResult>;

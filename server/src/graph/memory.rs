@@ -4,9 +4,10 @@
 
 use async_trait::async_trait;
 use std::sync::Mutex;
+use uuid::Uuid;
 
 use super::{GraphStore, SparqlResult};
-use crate::models::{Conflict, ConflictResolution, Message, Person, Task};
+use crate::models::{Conflict, ConflictResolution, Message, Person, Task, TaskStatus};
 
 #[derive(Default)]
 pub struct InMemoryGraph {
@@ -85,6 +86,36 @@ impl GraphStore for InMemoryGraph {
             .filter(|c| c.resolution == ConflictResolution::Unresolved)
             .cloned()
             .collect())
+    }
+
+    async fn update_task_status(
+        &self,
+        id: Uuid,
+        status: TaskStatus,
+    ) -> anyhow::Result<Option<Task>> {
+        let mut v = self.tasks.lock().unwrap();
+        let Some(task) = v.iter_mut().find(|t| t.id == id) else {
+            return Ok(None);
+        };
+        task.status = status;
+        task.updated_at = chrono::Utc::now();
+        Ok(Some(task.clone()))
+    }
+
+    async fn resolve_conflict_with(
+        &self,
+        id: Uuid,
+        resolution: ConflictResolution,
+        resolved_by: &str,
+    ) -> anyhow::Result<Option<Conflict>> {
+        let mut v = self.conflicts.lock().unwrap();
+        let Some(conflict) = v.iter_mut().find(|c| c.id == id) else {
+            return Ok(None);
+        };
+        conflict.resolution = resolution;
+        conflict.resolved_by = resolved_by.to_string();
+        conflict.resolved_at = Some(chrono::Utc::now());
+        Ok(Some(conflict.clone()))
     }
 
     async fn query(&self, _sparql: &str) -> anyhow::Result<SparqlResult> {
