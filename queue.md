@@ -377,6 +377,47 @@ read path for tasks/conflicts (the derived graph is intentionally lossy
 for those); perf — cache/incrementally maintain the SPARQL snapshot.
 None block the server; tracked in `todo.md` Phase 11.
 
+---
+
+## Round 4 — Rust server to parity (goal: NO MORE GO)
+
+**User directive (2026-05-15):** `queue.md` is the barrel-through file
+(`todo.md` is the roadmap, not barreled). Build out *all the Rust
+server stuff* until `server-go-old/` is no longer needed and can be
+deleted. **Flutter stays the frontend (firm).** Discord deep logic is
+**deprioritized** to `todo.md` Phase Z — the feature-gated serenity
+skeleton stays as-is; do NOT barrel Discord here.
+
+Rules: each item its own commit with a *why*; `cargo build`,
+`--features loca`, `--features discord` must all stay green before
+committing; `git pull --rebase` + push after each; only stop for a
+real conflict/blocker.
+
+- [ ] R4-1. **WSL / gateway lifecycle parity** — port bridge.go
+      `startGatewayWithRetry` + `startHealthCheck` + graceful
+      `StopGateway`, and wsl.go `StartGateway`/`CleanStaleLockFiles`/
+      path conversions, into `src/openclaw/{bridge,wsl}.rs` (replace
+      the best-effort TODO stubs).
+- [ ] R4-2. **Graph store completeness** — in `src/graph/loca.rs`
+      persist full Task/Event/Message/Conflict/Instruction/FollowUp
+      fields; implement `update` (SPARQL UPDATE) and `insert_triples`
+      (N-Triples via `loka_core::ntriples`) over the PersistentStore.
+- [ ] R4-3. **API handler parity** — real `list_tasks`, `update_task`,
+      `resolve_conflict`, `questions`/`followups` against the graph
+      (drop the stub/echo TODOs in `src/api/`).
+- [ ] R4-4. **Ingest pipeline parity** — match pipeline.go: normalize,
+      parse_analysis (incl. events/instructions/follow-ups), store all,
+      broadcast a typed GraphDiff (added nodes/edges).
+- [ ] R4-5. **WS hub parity** — typed GraphDiff broadcast shape per
+      hub.go / models.GraphDiff.
+- [ ] R4-6. **dump-messages** — port the non-Discord parts; if it is
+      wholly Discord-coupled, leave the stub and note the dependency on
+      Phase Z (do not block Go removal on it).
+- [ ] R4-7. **Parity review + DELETE `server-go-old/`** — once the Rust
+      server covers everything non-deprioritized, delete the Go tree
+      (history preserved in git, like `secretarybird-old/` was), and
+      update `CLAUDE.md`/`README.md`/`todo.md`/this file: no more Go.
+
 ## Notes for future sessions
 
 - The user dictates long stream-of-consciousness messages via voice. Do

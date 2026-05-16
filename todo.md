@@ -193,36 +193,23 @@ The core differentiator. Accept anything, normalize it.
 - [ ] **Markdown reconciliation** — extracted structure round-trips to
   the on-disk markdown task model (pending that format decision)
 
-## Phase 4 — In-App Messaging & Discord
+## Phase 4 — In-App Messaging
 
 ### App-Internal DM System (primary channel)
 
 - [ ] **In-app conversation view** — your chat thread with the agent
 - [ ] **Unified inbox** — all conversations with the agent across
-  platforms (app, Discord, WhatsApp, …) in one threaded view
+  platforms in one threaded view
 - [ ] **Multi-channel delivery** — agent tries the app first, then
-  Discord, then other platforms
+  other platforms
 - [ ] **Response aggregation** — your reply from any platform shows up
   in the same conversation
 
-### Discord (first external ingest surface)
-
-- [ ] **Bot setup** — Discord application, permissions, OAuth
-- [ ] **Account bootstrap via Discord** — interacting with the bot can
-  create/sign in your account
-- [ ] **Channel monitoring** — read messages in monitored channels/DMs
-- [ ] **DM interaction** — bot DMs people with follow-ups, confirmations,
-  contradiction alerts; replies recorded as follow-up answers
-- [ ] **Message logging** — log messages from monitored surfaces
-- [ ] **Hourly batch processing** — collect continuously, process hourly
-  by default; critical events (explicit contradictions, direct DMs)
-  processed immediately; keeps agent cost manageable
-- [ ] **Surface → knowledge graph** — parsed messages feed the graph
-
-### Future Messaging Platforms
-
-- [ ] **WhatsApp** (Business API), **Instagram** (DM API), **Slack**
-- [ ] Any platform the bot reaches you on → you can sign in from there
+> **Discord ingest moved to the back** — see *Phase Z* below. It is
+> genuinely useful but explicitly deprioritized (the user is unsure how
+> much they'll use it). It is **not** the "first external ingest
+> surface" anymore. Other external messaging platforms (WhatsApp,
+> Instagram, Slack) ride behind Discord.
 
 ## Phase 5 — Calendar & Scheduling
 
@@ -400,6 +387,30 @@ See `queue.md` for the canonical list. Highlights:
 - [ ] Per-person outbound channel selection
 
 ---
+
+## Phase Z — Discord ingest (DEPRIORITIZED — back of the roadmap)
+
+> **User decision (2026-05-15):** Discord is very useful but the user
+> is **not sure how much they'll use it**, so it sits at the back of
+> the roadmap. The feature-gated `serenity` skeleton already exists
+> (`server/src/discord.rs`, `--features discord`, default OFF) and is
+> intentionally left as a connect-and-log skeleton. **Do not barrel
+> this.** Pull from here only after the core Rust server work in
+> `queue.md` is done. Other external messaging platforms come after.
+
+- [ ] **Bot setup** — Discord application, permissions, OAuth
+- [ ] **Account bootstrap via Discord** — interacting with the bot can
+  create/sign in your account
+- [ ] **Channel monitoring** — read messages in monitored channels/DMs
+- [ ] **DM interaction** — bot DMs people with follow-ups, confirmations,
+  contradiction alerts; replies recorded as follow-up answers
+- [ ] **Message logging** — log messages from monitored surfaces
+- [ ] **Hourly batch processing** — collect continuously, process hourly
+  by default; critical events processed immediately
+- [ ] **Surface → knowledge graph** — parsed messages feed the graph
+- [ ] **Future messaging platforms** — WhatsApp (Business API),
+  Instagram (DM API), Slack; any platform the bot reaches you on →
+  you can sign in from there
 
 ## Notes
 
