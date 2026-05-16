@@ -13,3 +13,8 @@
 # Scheduler runtime (durable cron lock/state) — never commit.
 .claude/scheduled_tasks.lock
 .claude/scheduled_tasks.json
+
+# Rust server build output + runtime Loca databases.
+/server/target/
+**/*.sdb/
+*.sdb

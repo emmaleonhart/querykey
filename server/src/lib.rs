@@ -1,0 +1,12 @@
+//! QueryKey server (Rust). Port of server-go-old/ with the graph store
+//! on Loca/SutraDB instead of the dead Fuseki stub. Modules mirror the
+//! Go layout (see server-go-old/README.md for the mapping).
+
+pub mod api;
+pub mod config;
+pub mod discord;
+pub mod graph;
+pub mod ingest;
+pub mod models;
+pub mod openclaw;
+pub mod ws;
