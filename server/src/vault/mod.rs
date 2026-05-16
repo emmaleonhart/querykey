@@ -191,6 +191,38 @@ pub(crate) fn parse_dt(s: &str) -> DateTime<Utc> {
         .unwrap_or_else(|_| DateTime::<Utc>::from_timestamp(0, 0).unwrap_or_else(Utc::now))
 }
 
+/// A derived relationship edge extracted from a `[[wikilink]]` in an
+/// entity body. The graph is built from these; the markdown is canon.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LinkEdge {
+    pub from_kind: String,
+    pub from_id: String,
+    pub predicate: String,
+    pub to_kind: String,
+    pub to_id: String,
+    /// The target exactly as written (useful when `resolved` is false).
+    pub to_label: String,
+    pub resolved: bool,
+}
+
+/// Resolution/comparison slug: lowercase, non-alphanumeric runs become
+/// a single `-`, trimmed. So `John  Smith`, `john-smith`, and
+/// `John-Smith` all compare equal.
+pub(crate) fn slug(s: &str) -> String {
+    let mut out = String::new();
+    let mut dash = false;
+    for c in s.trim().chars() {
+        if c.is_ascii_alphanumeric() {
+            out.push(c.to_ascii_lowercase());
+            dash = false;
+        } else if !out.is_empty() && !dash {
+            out.push('-');
+            dash = true;
+        }
+    }
+    out.trim_matches('-').to_string()
+}
+
 // ---------- Vault ----------
 
 impl Vault {
@@ -397,6 +429,133 @@ impl Vault {
             .join(Self::peer_dirname(handle))
             .join("card.md");
         crate::card::parse(&fs::read_to_string(p).ok()?)
+    }
+
+    // ----- notes (freeform; the [[wikilink]] carrier) -----
+
+    /// `(slug, body)` for every `notes/*.md`. Notes may have no
+    /// frontmatter — `split` returns the whole file as the body then.
+    pub fn list_notes(&self) -> Vec<(String, String)> {
+        self.read_files("notes")
+            .into_iter()
+            .map(|(slug, c)| (slug, split(&c).1))
+            .collect()
+    }
+
+    // ----- semantic wikilink edges (derived from the bodies) -----
+    //
+    // The canonical, backend-independent core. Every entity body is
+    // scanned for [[Target]] / [[property:Target]]; the target is
+    // resolved to a concrete entity by this vault (it knows them).
+    // Resolution PRECEDENCE (resolves the docs/markdown-schema.md open
+    // question) — first match wins:
+    //   1. an explicit `kind:id` ref (symmetry with frontmatter refs)
+    //   2. person  by id/slug, then by display name
+    //   3. task    by uuid, then by title
+    //   4. event   by uuid, then by title
+    //   5. note    by slug
+    //   6. DANGLING → kind "thing", id = slug(target); resolved=false
+    //      (the edge is never dropped — dangling links are queryable;
+    //      the raw target is kept as the label).
+    // Untyped `[[X]]` uses the predicate `references`.
+
+    pub fn collect_links(&self) -> Vec<LinkEdge> {
+        let persons = self.list_persons();
+        let tasks = self.list_tasks();
+        let events = self.list_events();
+        let notes = self.list_notes();
+
+        let resolve = |raw: &str| -> (String, String, bool) {
+            let t = raw.trim();
+            let key = slug(t);
+            // 1. explicit kind:id
+            if let Some((k, id)) = t.split_once(':') {
+                if matches!(k, "person" | "task" | "event" | "note") {
+                    return (k.to_string(), id.trim().to_string(), true);
+                }
+            }
+            // 2. person
+            for p in &persons {
+                if slug(&p.id) == key || slug(&p.display_name) == key {
+                    return ("person".into(), p.id.clone(), true);
+                }
+            }
+            // 3. task
+            for x in &tasks {
+                if x.id.to_string() == t || slug(&x.title) == key {
+                    return ("task".into(), x.id.to_string(), true);
+                }
+            }
+            // 4. event
+            for x in &events {
+                if x.id.to_string() == t || slug(&x.title) == key {
+                    return ("event".into(), x.id.to_string(), true);
+                }
+            }
+            // 5. note
+            for (s, _) in &notes {
+                if slug(s) == key {
+                    return ("note".into(), s.clone(), true);
+                }
+            }
+            // 6. dangling
+            ("thing".into(), key, false)
+        };
+
+        let mut out = Vec::new();
+        let mut emit = |from_kind: &str, from_id: &str, body: &str| {
+            for wl in crate::wikilink::parse(body) {
+                let (to_kind, to_id, resolved) = resolve(&wl.target);
+                out.push(LinkEdge {
+                    from_kind: from_kind.to_string(),
+                    from_id: from_id.to_string(),
+                    predicate: wl.property.unwrap_or_else(|| "references".into()),
+                    to_kind,
+                    to_id,
+                    to_label: wl.target.trim().to_string(),
+                    resolved,
+                });
+            }
+        };
+
+        for p in &persons {
+            // Person body is a "# Name" heading by design — still scan
+            // it (a user may add freeform relations under the heading).
+            if let Some(c) = self.read_entity_body("people", &p.id) {
+                emit("person", &p.id, &c);
+            }
+        }
+        for t in &tasks {
+            emit("task", &t.id.to_string(), &t.description);
+        }
+        for e in &events {
+            emit("event", &e.id.to_string(), &e.description);
+        }
+        for (s, body) in &notes {
+            emit("note", s, body);
+        }
+        out
+    }
+
+    fn read_entity_body(&self, sub: &str, slug: &str) -> Option<String> {
+        let p = self.root.join(sub).join(format!("{slug}.md"));
+        Some(split(&fs::read_to_string(p).ok()?).1)
+    }
+
+    /// Outgoing links from an entity.
+    pub fn links_from(&self, kind: &str, id: &str) -> Vec<LinkEdge> {
+        self.collect_links()
+            .into_iter()
+            .filter(|e| e.from_kind == kind && e.from_id == id)
+            .collect()
+    }
+
+    /// Backlinks: who points *at* this entity (high PRM value).
+    pub fn links_to(&self, kind: &str, id: &str) -> Vec<LinkEdge> {
+        self.collect_links()
+            .into_iter()
+            .filter(|e| e.resolved && e.to_kind == kind && e.to_id == id)
+            .collect()
     }
 
     fn write(&self, sub: &str, slug: &str, yaml: String, body: &str) -> anyhow::Result<()> {
@@ -1042,6 +1201,88 @@ mod tests {
         assert!(!Vault::peer_dirname("github:bob").contains(':'));
         assert_eq!(v.list_peers().len(), 1);
         assert_eq!(v.get_peer_card("github:bob").unwrap().handle, "github:emma");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn semantic_wikilinks_resolve_with_precedence_and_dangling() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        assert_eq!(slug("John  Smith!!"), "john-smith");
+        assert_eq!(slug("person-john-smith"), "person-john-smith");
+
+        let ada = Person {
+            id: "ada-lovelace".into(),
+            display_name: "Ada Lovelace".into(),
+            handles: vec![],
+            role: String::new(),
+            contact_cascade: vec![],
+            created_at: Utc::now(),
+        };
+        v.upsert_person(&ada).unwrap();
+
+        let tid = uuid::Uuid::new_v4();
+        v.upsert_task(&Task {
+            id: tid,
+            title: "Read the Analytical Engine notes".into(),
+            // typed link by DISPLAY NAME + an untyped one + a dangling.
+            description: "Per [[mentor:Ada Lovelace]], also see [[Ada Lovelace]] \
+                          and the missing [[Babbage Difference Engine]]."
+                .into(),
+            status: TaskStatus::Extracted,
+            assigned_to: String::new(),
+            assigned_by: String::new(),
+            deadline: None,
+            confidence: 0.5,
+            ambiguity_score: 0.0,
+            source_messages: vec![],
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        })
+        .unwrap();
+
+        // A note: explicit kind:id ref takes precedence (rule 1).
+        fs::write(
+            dir.join("notes").join("salon.md"),
+            "# Salon\n\nIntroduced [[knows:person:ada-lovelace]] to the group.\n",
+        )
+        .unwrap();
+
+        let edges = v.collect_links();
+
+        // Task → Ada by display name, typed predicate "mentor".
+        assert!(edges.iter().any(|e| e.from_kind == "task"
+            && e.from_id == tid.to_string()
+            && e.predicate == "mentor"
+            && e.to_kind == "person"
+            && e.to_id == "ada-lovelace"
+            && e.resolved));
+        // Untyped link → predicate defaults to "references".
+        assert!(edges.iter().any(|e| e.from_kind == "task"
+            && e.predicate == "references"
+            && e.to_id == "ada-lovelace"));
+        // Dangling link kept, resolved=false, label preserved.
+        let dangling = edges
+            .iter()
+            .find(|e| !e.resolved)
+            .expect("dangling edge kept");
+        assert_eq!(dangling.to_kind, "thing");
+        assert_eq!(dangling.to_id, "babbage-difference-engine");
+        assert_eq!(dangling.to_label, "Babbage Difference Engine");
+        // Note's explicit `person:ada-lovelace` resolves (rule 1).
+        assert!(edges.iter().any(|e| e.from_kind == "note"
+            && e.from_id == "salon"
+            && e.predicate == "knows"
+            && e.to_kind == "person"
+            && e.to_id == "ada-lovelace"));
+
+        // Backlinks: things pointing AT Ada (PRM payoff).
+        let back = v.links_to("person", "ada-lovelace");
+        assert!(back.len() >= 3);
+        assert!(back.iter().all(|e| e.resolved));
+        assert!(v.links_from("note", "salon").iter().any(|e| e.predicate == "knows"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
