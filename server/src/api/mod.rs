@@ -181,6 +181,13 @@ async fn update_task(
         None => return Json(json!({ "error": "task not found" })),
     };
     if let Some(st) = patch.status {
+        if !crate::workflow::task_transition_ok(task.status, st) {
+            return Json(json!({
+                "error": "invalid status transition",
+                "from": task.status,
+                "to": st,
+            }));
+        }
         task.status = st;
     }
     if let Some(t) = patch.title {
@@ -232,6 +239,13 @@ async fn resolve_conflict(
         Some(c) => c,
         None => return Json(json!({ "error": "conflict not found" })),
     };
+    if !crate::workflow::conflict_transition_ok(c.resolution, body.resolution) {
+        return Json(json!({
+            "error": "invalid conflict resolution transition (a resolved conflict cannot return to unresolved)",
+            "from": c.resolution,
+            "to": body.resolution,
+        }));
+    }
     c.resolution = body.resolution;
     c.resolved_by = body.resolved_by;
     c.resolved_at = Some(chrono::Utc::now());
@@ -275,6 +289,13 @@ async fn resolve_question(
         Some(q) => q,
         None => return Json(json!({ "error": "question not found" })),
     };
+    if !crate::workflow::question_transition_ok(q.status, QuestionStatus::Resolved) {
+        return Json(json!({
+            "error": "invalid question transition",
+            "from": q.status,
+            "to": QuestionStatus::Resolved,
+        }));
+    }
     q.status = QuestionStatus::Resolved;
     q.resolution = body.resolution;
     q.resolved_by = body.resolved_by;
