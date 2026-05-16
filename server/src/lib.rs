@@ -3,6 +3,7 @@
 //! Go layout (see server-go-old/README.md for the mapping).
 
 pub mod api;
+pub mod calendar;
 pub mod card;
 pub mod config;
 pub mod discord;

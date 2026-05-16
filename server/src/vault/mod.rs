@@ -79,6 +79,8 @@ struct EventFm {
     end: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     people: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    recurrence: Option<String>,
     confidence: f64,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     source: Vec<String>,
@@ -765,6 +767,7 @@ impl Vault {
                 .iter()
                 .map(|p| format!("person:{p}"))
                 .collect(),
+            recurrence: e.recurrence.clone(),
             confidence: e.confidence,
             source: e.source_messages.clone(),
             created: rfc3339(&e.created_at),
@@ -788,6 +791,7 @@ impl Vault {
                 .into_iter()
                 .map(|p| p.strip_prefix("person:").unwrap_or(&p).to_string())
                 .collect(),
+            recurrence: fm.recurrence,
             confidence: fm.confidence,
             source_messages: fm.source,
             created_at: parse_dt(&fm.created),
@@ -1515,6 +1519,67 @@ mod tests {
         v.upsert_voice_profile(&vp2).unwrap();
         assert!(v.get_voice_profile(&vid2).unwrap().embedding.is_empty());
         assert_eq!(v.list_voice_profiles().len(), 2);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn event_recurrence_round_trips_and_expands() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        let id = uuid::Uuid::new_v4();
+        let start = DateTime::parse_from_rfc3339("2026-05-04T09:00:00+00:00")
+            .unwrap()
+            .with_timezone(&Utc);
+        v.upsert_event(&Event {
+            id,
+            title: "Weekly 1:1".into(),
+            description: "Recurring sync.".into(),
+            start_time: start,
+            end_time: start + chrono::Duration::minutes(30),
+            participants: vec!["ada-lovelace".into()],
+            recurrence: Some("FREQ=WEEKLY;COUNT=4".into()),
+            confidence: 0.9,
+            source_messages: vec![],
+            created_at: Utc::now(),
+        })
+        .unwrap();
+
+        let got = v.list_events().into_iter().find(|e| e.id == id).unwrap();
+        assert_eq!(got.recurrence.as_deref(), Some("FREQ=WEEKLY;COUNT=4"));
+        assert_eq!(got.participants, vec!["ada-lovelace"]);
+
+        // Non-recurring still round-trips as None (back-compat).
+        let id2 = uuid::Uuid::new_v4();
+        v.upsert_event(&Event {
+            id: id2,
+            title: "One-off".into(),
+            description: String::new(),
+            start_time: start,
+            end_time: start,
+            participants: vec![],
+            recurrence: None,
+            confidence: 0.5,
+            source_messages: vec![],
+            created_at: Utc::now(),
+        })
+        .unwrap();
+        let g2 = v.list_events().into_iter().find(|e| e.id == id2).unwrap();
+        assert_eq!(g2.recurrence, None);
+
+        // The expander sees the rule end-to-end.
+        let occ = crate::calendar::occurrences(
+            got.start_time,
+            got.recurrence.as_deref(),
+            DateTime::parse_from_rfc3339("2026-05-01T00:00:00+00:00")
+                .unwrap()
+                .with_timezone(&Utc),
+            DateTime::parse_from_rfc3339("2026-12-31T00:00:00+00:00")
+                .unwrap()
+                .with_timezone(&Utc),
+        );
+        assert_eq!(occ.len(), 4); // COUNT=4
 
         let _ = std::fs::remove_dir_all(&dir);
     }

@@ -80,6 +80,10 @@ pub struct Event {
     pub end_time: DateTime<Utc>,
     #[serde(default)]
     pub participants: Vec<String>,
+    /// Optional RFC-5545-subset recurrence rule, e.g.
+    /// `FREQ=WEEKLY;INTERVAL=1;COUNT=10`. `None` = one-off event.
+    #[serde(default, skip_serializing_if = "skip_none")]
+    pub recurrence: Option<String>,
     pub confidence: f64,
     #[serde(default)]
     pub source_messages: Vec<String>,

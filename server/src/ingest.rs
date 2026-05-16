@@ -177,6 +177,8 @@ struct RawEvent {
     #[serde(default)]
     end_time: String,
     #[serde(default)]
+    recurrence: String,
+    #[serde(default)]
     confidence: f64,
 }
 #[derive(Default, Deserialize)]
@@ -238,6 +240,7 @@ pub fn parse_analysis(s: &str, ingest_id: &str) -> AnalysisResult {
                 .map(|d| d.with_timezone(&Utc))
                 .unwrap_or(now),
             participants: Vec::new(),
+            recurrence: Some(e.recurrence.trim().to_string()).filter(|s| !s.is_empty()),
             confidence: e.confidence,
             source_messages: vec![ingest_id.to_string()],
             created_at: now,
