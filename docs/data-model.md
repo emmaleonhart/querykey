@@ -1,11 +1,15 @@
 # Data Model & Knowledge Graph
 
-> **Framing note (2026-05).** This document was written for the earlier
-> "Secretarybird" team-coordination framing. QueryKey is now a local-first
-> social network / PRM (see `README.md` and `CLAUDE.md`). The entities below
-> — Person, Handle, Task, Event, Message, Conflict, FollowUp, etc. — carry
-> over almost unchanged. Read "team member" / "everyone on the team" as
-> "person in your contact graph".
+> **Historical notes — superseded in part (updated 2026-05, Round 2).**
+> The *entity set* below (Person, Handle, Task, Event, Message,
+> Conflict, FollowUp, etc.) still applies and is useful. But the
+> *storage framing* is superseded: entities are **derived from
+> canonical markdown files** (YAML frontmatter + body, git-tracked) —
+> the graph is a rebuildable secondary index in **Loca/SutraDB**, not
+> Apache Jena Fuseki. Authoritative docs: `queue.md`, `CLAUDE.md`,
+> `README.md`, `todo.md`, and the forthcoming `docs/markdown-schema.md`.
+> Read "team member" / "everyone on the team" as "a person in your
+> contact graph"; multi-user = the opt-in P2P card layer.
 
 ## Design Principle
 
@@ -15,7 +19,7 @@ The data model must handle the fact that most input is unstructured. A pasted sc
 
 ### ID Strategy
 
-Node IDs should have **human-readable aliases**, not just opaque UUIDs. UUIDs can exist as internal identifiers but every entity that users interact with should have a readable slug or label (e.g., `person:john-smith`, `task:finish-video-2026-03-08`). This is stored in **Apache Jena Fuseki** as a triple store.
+Node IDs should have **human-readable aliases**, not just opaque UUIDs. UUIDs can exist as internal identifiers but every entity that users interact with should have a readable slug or label (e.g., `person:john-smith`, `task:finish-video-2026-03-08`). ~~This is stored in Apache Jena Fuseki as a triple store.~~ **Superseded:** the canonical record is the markdown file (its frontmatter carries the alias); the entity is projected into the derived graph (Loca/SutraDB), not Fuseki.
 
 ## Core Entities
 

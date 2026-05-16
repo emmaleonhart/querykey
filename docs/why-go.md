@@ -7,7 +7,10 @@
 > Rust rewrite supersedes it). The earlier prototype this doc compares
 > against has been deleted from the tree; its salvage analysis now
 > lives in [`versions-comparison.md`](versions-comparison.md). Mentions
-> of the old project name below are historical, not QueryKey.
+> of the old project name below are historical, not QueryKey. Also note
+> the diagrams below show a **Fuseki** SPARQL client — that is stale:
+> the graph store is **Loca/SutraDB**, derived from canonical markdown,
+> not Fuseki.
 
 ## The Old Architecture Was Broken
 
