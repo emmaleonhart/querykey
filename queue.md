@@ -51,77 +51,50 @@ Please keep this section when rebasing with the remote
 
 ## ACTIVE
 
-### Round 14 — queue.md audit + adopt the prune discipline
+### Round 15 — `querykey.toml` vault root + `wiki/` graph layout
 
-**Why:** the user flagged `queue.md` as bloated (882 lines). Audit
-found it was ~700 lines of append-only **completed** Round history
-(Action queue + Rounds 1–13, every one `[x]`/COMPLETE) — the exact
-anti-pattern the life-planning queue and the `cleanvibe` scaffold both
-forbid ("finished work lives in `git log`; delete done items; no
-checkmarks"). querykey's queue had simply never been pruned.
+User vision (2026-05-16): a git repo is a QueryKey vault if it contains
+a **`querykey.toml`** somewhere — the directory holding it **is** the
+vault root (so a repo can also hold non-QueryKey data). Inside the root,
+graph markdown lives under **`wiki/`** with canonical subdirs
+(`contacts/`, `information/`, `projects/`, …); user-made subdirs are
+free-form. The people/things knowledge graph builds off the canonical
+ones; edges from generic `[[links]]` vs semantic `[[property:target]]`
+(R8, already built).
 
-- [audit] **DONE in this commit:** completed-Round detail removed (it
-  is all in `git log` — each round was its own commit). Preserved:
-  RECOVERY QUEUE 2 (user-protected), Vision, the resolved/​open
-  decision registers, the parked-social Direction, Notes for future
-  sessions. The header now states the delete-when-done discipline so
-  this does not regrow. Nothing forward-looking was lost; everything
-  removed is recoverable from `git log` / git history.
-- **Barrel the genuinely-open work (honest scope):** after the prune,
-  almost nothing is *undone* — it is *parked by explicit user
-  steering*, not pending:
-  - **P2P transport + discovery** — the one real open *design*
-    question; do **not** barrel on a guess (user steering).
-  - **Audio / voice pipeline** — moved to the back of `todo.md`.
-  - **Voice-profile / speaker-diarization model selection** — open,
-    waits on audio.
-  - **External tool sync** (Jira / Azure DevOps / GitHub) — open
-    question: still desired? which tier?
-  So "barrel through the queue" here means **keep it pruned and keep
-  it honest**, not invent work. New concrete work enters from `todo.md`
-  → here → `git log`.
+**Decisions taken (sensible defaults — documented, not silent):**
+- `querykey.toml` schema v1: a `[querykey]` table with `version = 1`,
+  optional `name`. Minimal + forward-extensible.
+- Root precedence: (1) explicit `VAULT_DIR` env wins (override /
+  back-compat); (2) else walk **up from cwd** to the nearest
+  `querykey.toml` → its dir is the root (deterministic, like how git
+  finds `.git` / cargo finds `Cargo.toml`); (3) else fallback `./vault`.
+- `wiki/` is the graph subtree; entity dirs move under `<root>/wiki/`.
+  `card.md`, `peers/`, `.querykey/`, `.gitignore` stay at the **vault
+  root** (not graph entities). Legacy `<root>/<entity>/` still read
+  (back-compat) so existing vaults don't break.
+- `people/` → **`contacts/`** (the user's explicit term) under `wiki/`;
+  legacy `people/` still read.
+- **Flagged for the user (do NOT guess — needs your call):** the
+  *semantics* of the `information/` and `projects/` canonical buckets,
+  and whether non-contact entities (tasks/events/…) are themselves
+  graph-bearing or only `contacts/` is. Implement the unambiguous parts;
+  leave these defined-by-you.
 
-### querykey.toml — vault-root marker (open design + build item)
-
-**User vision (2026-05-16):** QueryKey, given *any* git repo, finds a
-file named **`querykey.toml`** located *anywhere* in the repo. The
-directory that contains `querykey.toml` **is** the QueryKey vault root.
-This lets a single git repo also hold data QueryKey does not use — the
-`.toml` marks the subtree that *is* the vault. (Concretely: the
-`life-planning` repo can put `prm/querykey.toml`, making `prm/` the
-vault root while the rest of the repo is non-QueryKey data.)
-
-- Supersedes / complements the current `VAULT_DIR` env approach: root
-  discovery should walk for `querykey.toml` (nearest-to-cwd, or repo
-  scan) and treat its directory as the vault root; `VAULT_DIR` stays a
-  manual override.
-- Open sub-questions before building: `querykey.toml` schema (what
-  goes in it — at minimum a version; possibly vault name, agent file
-  pointer); behavior if multiple `querykey.toml` exist in one repo
-  (nearest wins? error?); precedence vs `VAULT_DIR`.
-- Not yet built. Decompose into concrete steps here when picked up.
-
-### wiki/ — vault graph layout (open design item, pairs with querykey.toml)
-
-**User vision (2026-05-16):** inside the vault root, the knowledge-graph
-markdown lives under a **`wiki/`** directory. `wiki/` has **canonical
-subdirectories** — `contacts/`, `information/`, `projects/`, … — and the
-user may add their own subdirs too. The canonical ones (especially
-`contacts/`) are processed *in a specific way* and are what the
-people/things **knowledge graph is built from**; arbitrary user subdirs
-are free-form and not necessarily graph-bearing. Edges come from generic
-`[[links]]` vs semantic `[[property:target]]` links (the R8 wikilink
-feature already built).
-
-- **Open:** reconcile with the *current* implemented vault layout
-  (`people/ tasks/ events/ notes/ conflicts/ questions/ followups/
-  instructions/ voiceprofiles/` at the vault root). Decide the mapping
-  (e.g. `wiki/contacts/` ↔ today's `people/`; `wiki/information/` ↔
-  `notes/`; where `projects/` fits) and which subdirs are
-  canonical/graph-bearing vs free-form. This is a vault-module change +
-  a migration; not built.
-- Pairs with the `querykey.toml` root marker above: `querykey.toml`
-  finds the vault root; `wiki/` is the graph subtree inside it.
+**Ordered steps (each its own commit; `cargo build` + `--features loca`
++ `--features discord` green before each; push after each):**
+- R15-1. `querykey.toml` root resolution in `config.rs`: add
+  `resolve_vault_dir()` (env override → walk-up discovery → `./vault`)
+  + minimal `querykey.toml` parse (add `toml` dep). Wire into
+  `Config::load`. Pure unit tests for precedence + walk-up (tempdir).
+- R15-2. `wiki/` layout in `src/vault/`: create/read/write entity dirs
+  under `<root>/wiki/`; legacy non-`wiki/` dirs still read. Round-trip
+  tests updated.
+- R15-3. Rename canonical people dir → `wiki/contacts/`; legacy
+  `people/` still read. Tests.
+- R15-4. Docs: `README.md`, `CLAUDE.md`, `docs/markdown-schema.md`,
+  `todo.md`, this file — `querykey.toml` + `wiki/` layout documented;
+  `information/`/`projects/` recorded as user-defined-open.
 
 ---
 
