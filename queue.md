@@ -51,50 +51,17 @@ Please keep this section when rebasing with the remote
 
 ## ACTIVE
 
-### Round 15 — `querykey.toml` vault root + `wiki/` graph layout
+(Round 15 — `querykey.toml` vault-root marker + `wiki/` layout +
+people→contacts rename — DONE 2026-05-16; details in `git log`
+R15-1..R15-4, semantics in `README.md` / `CLAUDE.md` /
+`docs/markdown-schema.md`.)
 
-User vision (2026-05-16): a git repo is a QueryKey vault if it contains
-a **`querykey.toml`** somewhere — the directory holding it **is** the
-vault root (so a repo can also hold non-QueryKey data). Inside the root,
-graph markdown lives under **`wiki/`** with canonical subdirs
-(`contacts/`, `information/`, `projects/`, …); user-made subdirs are
-free-form. The people/things knowledge graph builds off the canonical
-ones; edges from generic `[[links]]` vs semantic `[[property:target]]`
-(R8, already built).
-
-**Decisions taken (sensible defaults — documented, not silent):**
-- `querykey.toml` schema v1: a `[querykey]` table with `version = 1`,
-  optional `name`. Minimal + forward-extensible.
-- Root precedence: (1) explicit `VAULT_DIR` env wins (override /
-  back-compat); (2) else walk **up from cwd** to the nearest
-  `querykey.toml` → its dir is the root (deterministic, like how git
-  finds `.git` / cargo finds `Cargo.toml`); (3) else fallback `./vault`.
-- `wiki/` is the graph subtree; entity dirs move under `<root>/wiki/`.
-  `card.md`, `peers/`, `.querykey/`, `.gitignore` stay at the **vault
-  root** (not graph entities). Legacy `<root>/<entity>/` still read
-  (back-compat) so existing vaults don't break.
-- `people/` → **`contacts/`** (the user's explicit term) under `wiki/`;
-  legacy `people/` still read.
-- **Flagged for the user (do NOT guess — needs your call):** the
-  *semantics* of the `information/` and `projects/` canonical buckets,
-  and whether non-contact entities (tasks/events/…) are themselves
-  graph-bearing or only `contacts/` is. Implement the unambiguous parts;
-  leave these defined-by-you.
-
-**Ordered steps (each its own commit; `cargo build` + `--features loca`
-+ `--features discord` green before each; push after each):**
-- R15-1. `querykey.toml` root resolution in `config.rs`: add
-  `resolve_vault_dir()` (env override → walk-up discovery → `./vault`)
-  + minimal `querykey.toml` parse (add `toml` dep). Wire into
-  `Config::load`. Pure unit tests for precedence + walk-up (tempdir).
-- R15-2. `wiki/` layout in `src/vault/`: create/read/write entity dirs
-  under `<root>/wiki/`; legacy non-`wiki/` dirs still read. Round-trip
-  tests updated.
-- R15-3. Rename canonical people dir → `wiki/contacts/`; legacy
-  `people/` still read. Tests.
-- R15-4. Docs: `README.md`, `CLAUDE.md`, `docs/markdown-schema.md`,
-  `todo.md`, this file — `querykey.toml` + `wiki/` layout documented;
-  `information/`/`projects/` recorded as user-defined-open.
+**Flagged for the user — NEXT decision, do NOT guess:** the
+*semantics* of the `wiki/information/` and `wiki/projects/`
+canonical buckets, and whether non-contact entities (tasks / events
+/ …) are themselves graph-bearing or only `contacts/` is. The toml
+marker + wiki/ subtree + contacts/ rename are in; the open buckets
+are the user-defined-open part.
 
 ---
 
@@ -173,8 +140,11 @@ notes, chat logs, and prior conversations.
   peers (shared GitHub org repo? Nostr relay? true P2P) + how you
   discover whose cards to pull. *The* gating social design question;
   **parked by explicit user steering — do not barrel on a guess.**
-- **`querykey.toml` vault-root marker** — see the ACTIVE item above
-  (schema + multi-file behavior + precedence vs `VAULT_DIR`).
+- **`wiki/information/` and `wiki/projects/` semantics** — the
+  canonical buckets are pre-created but their meaning + whether
+  non-contact entities (tasks / events / …) are themselves
+  graph-bearing is **user-defined-open**. Flagged in `todo.md`. Do
+  not guess.
 - **Card format spec** — built (the `## Offering`/`## Looking for`
   contract) but will still evolve; it ossifies once cards are exchanged.
 - Private vs. public card (deferred — more complex; after single-card).
@@ -202,17 +172,19 @@ moved to the back of `todo.md`.
 
 ---
 
-## Rounds 1–13 — COMPLETE (history in `git log`)
+## Rounds 1–13, 15 — COMPLETE (history in `git log`)
 
 The full Round-by-Round detail (the pivot bootstrap; Go→Rust port;
 canonical markdown vault; Conflict/Question/FollowUp +
 Instruction/VoiceProfile on-disk forms; semantic wikilinks;
 status-workflow enforcement; calendar; agent-drafted card;
 P2P card *format*+local layer + GitHub identity; the R13 agent-honesty
-fix) is **in `git log`** — every round was its own commit whose message
-is the record. Per the discipline at the top of this file, completed
-rounds are **not** retained here. Net state is reflected in `README.md`
-(Status), `CLAUDE.md`, `todo.md`, and `docs/`.
+fix; the R15 `querykey.toml` vault-root marker + `wiki/` layout +
+people→contacts rename) is **in `git log`** — every round was its
+own commit whose message is the record. Per the discipline at the
+top of this file, completed rounds are **not** retained here. Net
+state is reflected in `README.md` (Status), `CLAUDE.md`, `todo.md`,
+and `docs/`. (Round 14 was an audit, not a feature.)
 
 ---
 

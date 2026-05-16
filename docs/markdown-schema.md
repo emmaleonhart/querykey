@@ -1,14 +1,30 @@
 # Markdown On-Disk Schema (canonical source of truth)
 
-> **Status: IMPLEMENTED (Round 5, 2026-05-15).** This was the
-> load-bearing decision; it is now built. `server/src/vault/` is the
-> canonical store: the API and ingest pipeline write these markdown
-> files first, then project a derived index into Loca; the server
-> rebuilds that index from the vault on startup; `update_task` mutates
-> the markdown. Round-trips are lossless (unit-tested). `VAULT_DIR`
-> selects the root (default `./vault`). Authoritative alongside
-> `CLAUDE.md` / `queue.md`. The spec below matches the implementation;
-> deviations are noted under "Implementation notes".
+> **Status: IMPLEMENTED (Round 5, 2026-05-15; layout extended in
+> Round 15, 2026-05-16).** `server/src/vault/` is the canonical store:
+> the API and ingest pipeline write these markdown files first, then
+> project a derived index into Loca; the server rebuilds that index
+> from the vault on startup; `update_task` mutates the markdown.
+> Round-trips are lossless (unit-tested).
+>
+> **Vault-root resolution (R15-1):** a git repo *is* a QueryKey vault
+> when it contains a `querykey.toml`; the directory holding it IS the
+> vault root (so a repo can also hold non-QueryKey data). Precedence:
+> (1) `VAULT_DIR` env override, (2) walk up from cwd to the nearest
+> `querykey.toml`, (3) fallback `./vault`. The toml schema v1 is a
+> `[querykey]` table with `version = 1` and optional `name`; unknown
+> fields are ignored (forward-extensible).
+>
+> **Layout (R15-2/3):** graph entities live under `<root>/wiki/`. The
+> people dir is named `contacts/` on disk (the user's term) — the
+> public API still says "people". Pre-R15 vaults (entities at
+> `<root>/<entity>/`) keep working: reads union the canonical dir
+> with every legacy path; upserts always write to the canonical path
+> AND clear every legacy duplicate so they cannot diverge.
+>
+> Authoritative alongside `CLAUDE.md` / `queue.md`. The spec below
+> matches the implementation; deviations are noted under
+> "Implementation notes".
 
 ## Principles
 
@@ -32,16 +48,30 @@
 ## Directory layout
 
 ```
-vault/                      # the user's QueryKey git repo
-  people/<slug>.md          # one file per person
-  tasks/<slug>.md           # one file per task
-  events/<slug>.md          # one file per event
-  notes/<slug>.md           # freeform notes (may reference entities)
+<vault root>/               # contains querykey.toml (the marker)
+  querykey.toml             # vault-root marker — [querykey] version=1
   card.md                   # YOUR broadcast card (git-tracked; see
-                             #   docs/card-format.md)
-  .querykey/                # derived/cache (graph snapshots) — gitignored
+                            #   docs/card-format.md)
+  agents.md                 # optional — governs the local agent
   peers/<handle>/card.md    # other people's cards — GITIGNORED
+  .querykey/                # derived/cache (graph snapshots) — GITIGNORED
+  .gitignore                # auto-written; enforces the privacy asymmetry
+  wiki/                     # the graph subtree (R15-2)
+    contacts/<slug>.md      # one file per person (R15-3 rename)
+    tasks/<uuid>.md         # one file per task
+    events/<uuid>.md        # one file per event
+    notes/<slug>.md         # freeform notes (may reference entities)
+    conflicts/<uuid>.md   questions/<slug>.md   followups/<slug>.md
+    instructions/<uuid>.md   voiceprofiles/<uuid>.md
 ```
+
+The repo holding the vault root can also hold non-QueryKey data;
+QueryKey only owns the paths under `<root>/wiki/` plus the four
+root-level files/dirs above. **Back-compat:** pre-R15 vaults
+(`<root>/people/`, `<root>/tasks/`, …) and R15-2-era vaults
+(`<root>/wiki/people/`) both still read. Writes always go to the
+canonical path; the legacy duplicate is removed on the same
+operation so the copies cannot silently diverge.
 
 Rationale for `peers/` being gitignored: the **asymmetry** from the
 vision — your own card has history (for undo); other people's cards are
@@ -61,7 +91,11 @@ Common fields on every entity:
 | `source` | list | Provenance: ingest item ids / message refs. |
 | `tags` | list | Freeform. |
 
-### Person — `people/<slug>.md`
+### Person — `wiki/contacts/<slug>.md`
+
+(API key is still `people` — only the on-disk dir is renamed.
+Legacy `wiki/people/<slug>.md` and `<root>/people/<slug>.md` are
+still readable.)
 
 ```markdown
 ---
@@ -148,7 +182,7 @@ becomes a derived graph edge from that entity:
 - `[[Target]]` — an **untyped reference**. Predicate: `references`.
 - `[[property:Target]]` — a **semantic triple**: the token before the
   **single** `:` is the predicate. `[[employer:Acme Corp]]` in
-  `people/jane.md` ⇒ `(person:jane) —employer→ (Acme Corp)`.
+  `wiki/contacts/jane.md` ⇒ `(person:jane) —employer→ (Acme Corp)`.
   Deliberately a single colon — *not* Semantic-MediaWiki's `::` (an
   accidental `::` is parsed forgivingly).
 - `[[Target|Alias]]` — Obsidian display alias; the alias does not
@@ -303,11 +337,13 @@ created: 2026-05-16T08:00:00+00:00
 
 ## Implementation notes (Round 5 — as built)
 
-- **Entities implemented:** Person (`people/<id>.md`), Task
-  (`tasks/<uuid>.md`), Event (`events/<uuid>.md`), Conflict
-  (`conflicts/<uuid>.md`), OpenQuestion (`questions/<slug>.md`),
-  FollowUp (`followups/<slug>.md`) — the last three added in Round 6.
-  `notes/` exists.
+- **Entities implemented:** Person (`wiki/contacts/<id>.md`), Task
+  (`wiki/tasks/<uuid>.md`), Event (`wiki/events/<uuid>.md`), Conflict
+  (`wiki/conflicts/<uuid>.md`), OpenQuestion
+  (`wiki/questions/<slug>.md`), FollowUp
+  (`wiki/followups/<slug>.md`) — the last three added in Round 6.
+  `wiki/notes/` exists. Pre-R15 paths (`<root>/<entity>/`) and the
+  R15-2-era `<root>/wiki/people/` path are still readable.
 - **Round 6 wiring:** ingest writes conflicts vault-first then
   projects to the derived graph; `GET /api/conflicts|questions|
   followups` read the vault at full fidelity; `resolve_conflict`,

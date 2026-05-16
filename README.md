@@ -87,7 +87,7 @@ today versus planned.
 |---|---|---|
 | Desktop/mobile app | Flutter (Dart `sdk ^3.10.8`); `provider`, `web_socket_channel`, `http`, `uuid`, `intl` | [`app/`](app/) |
 | Server | **Rust** (crate `querykey-server`: `axum`, `tokio`, `reqwest`) — compiles & runs; structural port with TODOs | [`server/`](server/) |
-| Source of truth | **Markdown files + git** — implemented; YAML frontmatter + body, the graph is derived & rebuilt from it | `server/src/vault/` → `$VAULT_DIR` |
+| Source of truth | **Markdown files + git** — implemented; YAML frontmatter + body, the graph is derived & rebuilt from it. R15 vault layout: `<root>/querykey.toml` marks the vault root; graph entities live under `<root>/wiki/` (with `wiki/contacts/` for people — the user's term). Legacy `<root>/<entity>/` and the R15-2-era `<root>/wiki/people/` still read. | `server/src/vault/` → `<vault root>` |
 | AI engine | **Model-agnostic** — the agent is *whoever operates QueryKey*: **Claude (e.g. via Claude Code) is a first-class agent today**; the default local **Gemma** is for the GUI path and is **not built yet**; Hermes/GPT optional. Exposed via an **MCP server**. *One optional backend:* OpenClaw via a local WSL gateway (port `18789`). `detect()` verifies the real chat API, so a non-agent port is never reported connected (R13). | `server/src/openclaw/` |
 | Knowledge graph | **Loca** (formerly **SutraDB**) — the author's embedded Rust graph-vector-time DB; the graph is **derived from the markdown**, not canonical. Wired via `loka-core` behind `--features loca`; in-memory fallback otherwise. Fuseki is **not** used (removed with the Go server) | `server/src/graph/` + [`../SutraDB`] |
 | Ingest surface | Local markdown + pasted text / screenshots / voice notes (Discord deprioritized — todo.md Phase Z) | `server/src/ingest.rs` |
@@ -105,12 +105,22 @@ This is early. Roughly: planning and data models are complete; the AI bridge
 is functional; most product behavior is scaffolding.
 
 **Working / functional**
-- **Canonical markdown vault** (`server/src/vault/`, `$VAULT_DIR`): the
-  store of record. API + ingest write `people/tasks/events` markdown
-  (YAML frontmatter + body) first; the Loca graph is a derived index
-  rebuilt from the vault on startup. `update_task` mutates the markdown;
-  reads are full-fidelity (the lossy-graph / epoch-timestamp problem is
-  gone). Round-trip is lossless (unit-tested) and survives restarts.
+- **Canonical markdown vault** (`server/src/vault/`): the store of
+  record. API + ingest write contacts/tasks/events markdown (YAML
+  frontmatter + body) first; the Loca graph is a derived index
+  rebuilt from the vault on startup. `update_task` mutates the
+  markdown; reads are full-fidelity (the lossy-graph / epoch-timestamp
+  problem is gone). Round-trip is lossless (unit-tested) and survives
+  restarts. **Vault-root resolution (R15-1):** a repo IS a QueryKey
+  vault when it contains a `querykey.toml`; that dir IS the root. The
+  `VAULT_DIR` env still overrides for explicit cases; otherwise the
+  server walks up from cwd to find the marker (deterministic, matches
+  `.git` / `Cargo.toml` discovery), falling back to `./vault`.
+  **Layout (R15-2/3):** graph entities live under `<root>/wiki/`
+  (people specifically at `wiki/contacts/`); `card.md`, `agents.md`,
+  `peers/`, `.querykey/` stay at the vault root. Legacy paths still
+  read; upserts always write to the canonical path AND clear every
+  legacy duplicate so the copies can't diverge.
 - **Rust server (`server/`) is the only server** — Go fully ported then
   deleted (recoverable from git history). Compiles in all three configs
   (`cargo build`, `--features loca`, `--features discord`), zero warnings;
