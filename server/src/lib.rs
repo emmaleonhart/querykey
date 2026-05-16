@@ -7,6 +7,7 @@ pub mod card;
 pub mod config;
 pub mod discord;
 pub mod graph;
+pub mod identity;
 pub mod ingest;
 pub mod mcp;
 pub mod models;
