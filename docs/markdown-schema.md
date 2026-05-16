@@ -240,6 +240,47 @@ created: 2026-05-15T10:30:00+00:00
 Still good to drop the book off Saturday?
 ```
 
+### Instruction — `instructions/<uuid>.md`
+
+Who said what to whom. Body is the human `content` (the actual
+utterance); `is_task`/`task` link it to a Task when it produced one.
+
+```markdown
+---
+id: instruction:7c2a…-uuid
+type: instruction
+speaker: alice
+audience: [bob, carol]
+is_task: true
+task: task:ship-the-report
+source_message: ingest:2026-05-16-batch
+created: 2026-05-16T09:00:00+00:00
+---
+
+Ship the report by Friday. No extensions.
+```
+
+### Voice profile — `voiceprofiles/<uuid>.md`
+
+Speaker identity for diarization — the most "machine" entity. Body is
+a cosmetic heading; everything is frontmatter. `embedding` is a YAML
+int sequence, **omitted entirely until the audio pipeline fills it**
+(the common case today); not meant for hand-editing.
+
+```markdown
+---
+id: voiceprofile:9f1b…-uuid
+type: voice_profile
+person: person:ada-lovelace
+sample_count: 12
+confidence: 0.83
+last_updated: 2026-05-16T10:00:00+00:00
+created: 2026-05-16T08:00:00+00:00
+---
+
+# Voice profile — person:ada-lovelace
+```
+
 ## Derived graph contract
 
 - The graph is generated **from** these files; it is never the source
@@ -292,7 +333,12 @@ Still good to drop the book off Saturday?
   `/api/links` + backlinks live from the vault.
 - Conflict / OpenQuestion / FollowUp — **DONE (Round 6).** Canonical
   on-disk forms + vault-first wiring; lossless round-trip unit-tested.
-- Instruction / VoiceProfile on-disk forms — **TBD**; still
-  unimplemented. They do not block any canonical path that is live.
+- Instruction / VoiceProfile on-disk forms — **DONE (Round 10).**
+  `instructions/<uuid>.md` (body = the utterance `content`) and
+  `voiceprofiles/<uuid>.md` (machine entity: all frontmatter,
+  embedding as a YAML int sequence omitted until audio fills it).
+  Instruction is written by ingest; both have read/upsert API.
+  Lossless round-trip unit-tested. **The full canonical entity set
+  is now on disk** — no entity is graph-only or unimplemented.
   (Round 9 also covers the new entities — the resolved-conflict rule
   is enforced; see the `status` transition entry above.)

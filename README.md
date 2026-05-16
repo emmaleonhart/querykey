@@ -131,8 +131,11 @@ is functional; most product behavior is scaffolding.
 - **Status-workflow enforcement** — DONE (Round 9): Task/Conflict/
   Question state machines enforced at the API mutation boundary (a
   resolved conflict can't be un-resolved; `done` can't rewind to
-  `extracted`) — hand-edited markdown stays legal. Instruction/
-  VoiceProfile on-disk forms remain TBD.
+  `extracted`) — hand-edited markdown stays legal.
+- **Full canonical entity set on disk** — DONE (Round 10):
+  Instruction + VoiceProfile vault forms added; nothing is graph-only
+  or unimplemented anymore. Instruction is written by ingest; both
+  have read/upsert API.
 - **Peer-to-peer card layer** — format + local layer DONE (Round 7):
   card format/parse, the `.gitignore` asymmetry, the 24h propagation
   safety valve + revert-before-propagation, read-only `peers/`,

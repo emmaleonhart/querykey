@@ -675,6 +675,34 @@ unimplemented canonical entities), then calendar/audio; the
 agent-drafted card↔graph projection remains design-heavy/social-
 leaning (parked-social steering applies — flag before barrelling).
 
+---
+
+## Round 10 — Instruction/VoiceProfile forms (2026-05-16, PRM-priority)
+
+Third PRM-priority round. Complete the canonical entity set: the last
+two data-model entities had no on-disk form.
+
+- [x] R10-1. Vault forms — `instructions/<uuid>.md` (body = the
+      utterance `content`), `voiceprofiles/<uuid>.md` (machine
+      entity: all frontmatter, embedding as a YAML int seq omitted
+      until audio). `voice_profile_for_person`. Round-trip test incl.
+      multi-line content + empty-embedding. Commit `6301716`.
+- [x] R10-2. Wiring — ingest now parses + writes instructions
+      (AnalysisResult.instructions was never populated before);
+      `GET /api/instructions`, `GET/PUT /api/voiceprofiles`,
+      `GET /api/persons/:id/voiceprofile`. Commit `71ab05c`.
+- [x] R10-3. Docs — `docs/markdown-schema.md` gets Instruction +
+      VoiceProfile sections; the TBD item flipped to DONE ("the full
+      canonical entity set is now on disk"); CLAUDE/README/todo
+      updated. (This commit.)
+
+**Round 10 status.** COMPLETE. The full canonical entity set is on
+disk — nothing graph-only or unimplemented. Remaining PRM-side todos
+are calendar + audio pipeline (audio would finally fill VoiceProfile
+embeddings). The agent-drafted card↔graph projection is the other
+big piece but is design-heavy and social-leaning — per the parked-
+social steering, flag before barrelling it.
+
 ## Notes for future sessions
 
 - The user dictates long stream-of-consciousness messages via voice. Do
