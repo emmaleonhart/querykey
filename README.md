@@ -30,9 +30,17 @@ those relationships in good standing.
 
 Principles:
 
-- **Local-first for privacy.** The server runs on your own machine. Nothing has
-  to leave your desktop. The privacy that matters is not just yours — it's the
-  privacy of the people you talk about too.
+- **Not a privacy-focused network — a *soft, peer-to-peer* one (read this first).**
+  By design QueryKey **collects and processes personal information about the
+  people in your life** — that is what a PRM/CRM *is*; it does not minimize what
+  it knows. Your vault (your notes, contacts, relationships) is **your own git
+  repo — tracked, committed, cloud-synced for you**; storing personal data there
+  is the design, not a leak. The privacy stance is **soft**, exactly three
+  commitments: (1) it doesn't *carelessly* spread people's personal information;
+  (2) there is **no centralized store** that gives anyone access to it; (3)
+  anything that travels beyond a local user moves **peer-to-peer**, never through
+  a central server. Local-first follows from this: the server runs on your
+  machine; nothing *has* to leave it.
 - **The tool serves you.** You never reformat your life to fit a form. You
   communicate the way you already do; the system meets you there.
 - **AI does the hard work, and admits when it's unsure.** Extraction carries
@@ -52,13 +60,15 @@ Principles:
   you choose) can attend over your graph and act on your files.
 - **Rationalist by disposition.** Confidence scores, "I'm not sure, want me
   to ask?", and an auditable record are the central UX, not a footnote.
-- **Optionally peer-to-peer — and private by default.** You can use it 100%
+- **Solo by default; peer-to-peer when you opt in.** You can use it 100%
   solo. But each person can also broadcast a **card** (a markdown file: what
   they're *offering* and *looking for* — their *key* and *query*). Cards sync
   directly peer-to-peer (no central server; GitHub bootstraps identity).
-  Your own card is git-tracked (so you can revert); other people's cards are
-  git-*ignored* on your machine (use them in the moment, don't archive their
-  history). Card changes propagate on a **24-hour delay** — a drunk mistake
+  Your own card is git-tracked (so you can revert); **other people's *cards*
+  are git-*ignored*** on your machine (use them in the moment, don't archive
+  their broadcast history). Note the distinction: *your PRM* — your own
+  notes/contacts about people — **is** tracked in your vault by design; it's
+  other people's *broadcast cards* whose history you don't keep. Card changes propagate on a **24-hour delay** — a drunk mistake
   at 11pm is fixable by morning and no one ever saw it. The network inverts
   the usual model: **absence of history is the default; persistence takes
   deliberate effort by an observer.**

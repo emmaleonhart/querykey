@@ -111,6 +111,18 @@ heading names stable — parsers key off them.
 
 ## The privacy model (the actual differentiator)
 
+**Design stance (state this plainly, do not soften it into "privacy-
+focused").** QueryKey **is not a privacy-focused network**. It
+deliberately collects and processes personal information about people —
+that is the point of a PRM/CRM. What follows is a *soft* model with
+exactly three commitments — no *careless* spread, **no central store**,
+peer-to-peer-only egress — **not** data minimization. Distinguish two
+things that are easy (and damaging) to conflate: *your PRM vault* — your
+own notes/contacts/relationships about people — is **tracked and
+committed in your own repo by design**; it is *other people's broadcast
+cards* whose history you don't archive. The asymmetry below is about the
+latter only.
+
 This inverts how social networks normally work. Normally the network
 owns your history and you fight to delete things. Here:
 

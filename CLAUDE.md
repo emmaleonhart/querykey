@@ -38,7 +38,8 @@ Provisional directory for agent data during development. Committed to the repo s
 - `dev_scheduling/receipts/discord/` — JSON message logs extracted by the Discord bot via GitHub Actions
 
 ### Key Design Decisions
-- **Local-first for privacy.** The server runs on your own machine. Nothing has to leave your desktop. The privacy that matters is not just yours — it's the privacy of the people you talk about too.
+- **NOT privacy-focused — soft & peer-to-peer (read this).** By design QueryKey collects/processes personal information about other people (that is what a PRM *is*; it does not minimize what it knows). The soft stance is exactly three things: (1) no *careless* spreading of personal info; (2) **no centralized store** of it; (3) anything beyond a local user moves **peer-to-peer**, never via a central server. Local-first follows: server on your machine, nothing *has* to leave.
+- **A user's vault is their own tracked git repo — committing personal data into it is the design, NOT a leak.** Never gitignore / `git reset` / uncommit / "privacy-scrub" a user's vault PRM. The *software project* repo (this one) must contain **zero** personal data; a *user-vault* repo (e.g. the `life-planning` prototype) tracks people's data by design. Conflating the two, or reverting a user's committed vault data on a privacy guess, is a serious error — it happened once and the user had to force-push to defend her work.
 - **The tool serves you.** You never reformat your life to fit a form. You communicate the way you already do; the system meets you there.
 - **Node IDs**: Human-readable aliases, not just opaque UUIDs.
 - **Unified inbox**: The app has its own DM thread with the bot, and replies from any platform (Discord, WhatsApp, Instagram, etc.) show up in the same conversation view.
