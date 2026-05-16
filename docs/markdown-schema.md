@@ -128,6 +128,75 @@ Climbing session, the usual gym.
 Frontmatter optional beyond `id`/`type`. The body is the point;
 `[[wikilinks]]` to entity slugs are how a note attaches to the graph.
 
+### Conflict — `conflicts/<uuid>.md`
+
+Two pieces of information that contradict each other (a reassignment, a
+deadline change, …). The body is the human `explanation`; resolution
+state lives in frontmatter so it survives a restart and is hand-editable.
+
+```markdown
+---
+id: conflict:8f3a…-uuid
+type: conflict
+conflict_type: deadline_change
+message_a: msg-a-ref
+message_b: msg-b-ref
+task: task:return-johns-book
+resolution: a_wins        # unresolved → a_wins | b_wins | merged | dismissed
+resolved_by: immanuelle
+created: 2026-05-15T09:00:00+00:00
+resolved: 2026-05-15T10:00:00+00:00
+---
+
+Alice said Friday, Bob said Monday. Needs a human call.
+```
+
+### Open question — `questions/<slug>.md`
+
+The queue of things the system needs answered. Body is the
+human-facing `question`; `urgency` drives surfacing.
+
+```markdown
+---
+id: question:deadline-for-johns-book
+type: question
+target: person:john-smith
+context: Casual mention; deadline is a guess.
+urgency: by_time          # asap | by_time | end_of_day | whenever
+urgency_deadline: 2026-05-20T00:00:00+00:00
+trigger_type: ambiguity
+trigger_id: task:return-johns-book
+status: open               # open → resolved | expired
+created: 2026-05-15T09:00:00+00:00
+---
+
+When does John actually need the book back?
+```
+
+### Follow-up — `followups/<slug>.md`
+
+A nudge the agent sends (and tracks delivery of) on the user's behalf.
+Body is the `question`; `delivery_attempts` is a nested frontmatter list.
+
+```markdown
+---
+id: followup:ping-john-about-book
+type: followup
+trigger_type: unconfirmed_task
+trigger_id: task:return-johns-book
+target: person:john-smith
+context: No reply to the first nudge.
+delivery_attempts:
+  - channel: discord
+    status: delivered
+    sent_at: 2026-05-15T11:00:00+00:00
+status: sent               # pending → sent → answered | expired
+created: 2026-05-15T10:30:00+00:00
+---
+
+Still good to drop the book off Saturday?
+```
+
 ## Derived graph contract
 
 - The graph is generated **from** these files; it is never the source
@@ -140,7 +209,18 @@ Frontmatter optional beyond `id`/`type`. The body is the point;
 ## Implementation notes (Round 5 — as built)
 
 - **Entities implemented:** Person (`people/<id>.md`), Task
-  (`tasks/<uuid>.md`), Event (`events/<uuid>.md`). `notes/` exists.
+  (`tasks/<uuid>.md`), Event (`events/<uuid>.md`), Conflict
+  (`conflicts/<uuid>.md`), OpenQuestion (`questions/<slug>.md`),
+  FollowUp (`followups/<slug>.md`) — the last three added in Round 6.
+  `notes/` exists.
+- **Round 6 wiring:** ingest writes conflicts vault-first then
+  projects to the derived graph; `GET /api/conflicts|questions|
+  followups` read the vault at full fidelity; `resolve_conflict`,
+  `resolve_question`, and `create_followup` are real markdown
+  mutations (read → patch → write → project/broadcast), replacing the
+  R4 `not_implemented` stubs. Conflict's body is its `explanation`;
+  OpenQuestion/FollowUp bodies are the `question`; the `conflict_type`
+  is in frontmatter (`type` is reserved for the entity kind).
 - **`title` lives in frontmatter** for Task/Event (the model carries a
   separate `title` and `description`); the **body is the description**.
   This keeps round-trips lossless rather than deriving a title from the
@@ -161,7 +241,10 @@ Frontmatter optional beyond `id`/`type`. The body is the point;
   isn't enforced yet).
 - Freeform-body `[[wikilinks]]` resolution vs. explicit frontmatter
   refs (precedence, dangling links).
-- Conflict / Instruction / OpenQuestion / FollowUp / VoiceProfile
-  on-disk forms — **TBD**; these currently stay graph-only (conflicts)
-  or unimplemented. They do not block the Person/Task/Event canonical
-  path that is now live.
+- Conflict / OpenQuestion / FollowUp — **DONE (Round 6).** Canonical
+  on-disk forms + vault-first wiring; lossless round-trip unit-tested.
+- Instruction / VoiceProfile on-disk forms — **TBD**; still
+  unimplemented. They do not block any canonical path that is live.
+- `status` workflow enforcement for the new entities (e.g. a resolved
+  conflict can't return to `unresolved`) is not enforced — same
+  open item as Task `status` transitions above.

@@ -25,8 +25,9 @@
 1. **P2P card layer** — `docs/card-format.md` (offer/looking-for
    cards = your key/query, asymmetric git-tracking, 24h delay).
 2. **GitHub identity / sync** behind a swappable handle abstraction.
-3. Conflict / OpenQuestion / FollowUp on-disk forms; `[[wikilink]]`
-   resolution; status-workflow enforcement; calendar; audio pipeline.
+3. `[[wikilink]]` resolution; status-workflow enforcement;
+   Instruction/VoiceProfile on-disk forms; calendar; audio pipeline.
+   (Conflict/OpenQuestion/FollowUp on-disk forms — done, Round 6.)
 
 **How to work here:** [`queue.md`](queue.md) is the barrel-through
 queue — do work from there. This `todo.md` is the long roadmap

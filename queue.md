@@ -490,10 +490,55 @@ truth is built and wired: the vault is the store of record, the Loca
 graph is a derived index rebuilt from it on startup, `update_task`
 mutates markdown, reads are full-fidelity, round-trip is unit-tested
 and survives restarts. All three build configs green, zero warnings,
-each item its own commit, all pushed. Still open (non-blocking):
-Conflict/OpenQuestion/FollowUp on-disk forms, `[[wikilink]]`
-resolution, status-workflow enforcement; the P2P card layer and GitHub
-identity remain the next big pieces.
+each item its own commit, all pushed. The Round-5 close-out's
+Conflict/OpenQuestion/FollowUp gap is now closed in Round 6 below;
+`[[wikilink]]` resolution + status-workflow enforcement remain
+non-blocking opens; the P2P card layer and GitHub identity remain the
+next big pieces.
+
+---
+
+## Round 6 — finish the canonical-vault entity set (2026-05-16)
+
+**Context.** A divergent PR (#1 "Other machine") turned up: stale
+parallel work that branched *before* Rounds 3–5. Diagnosed and
+resolved — it was strictly behind `main` (merging it would have
+resurrected the deleted Go tree and deleted the canonical vault); the
+only net-new artifact, `.gitattributes` (LF normalization, stops the
+Windows CRLF rewrite-storm `main` still suffered), was cherry-picked
+(`-x`, provenance preserved). PR to be closed once the salvage is on
+`origin/main`; the `other-machine` branch deleted after.
+
+Then barrelled the natural Round-5 follow-on: the last three entities
+with no on-disk form (conflicts were graph-only; questions/followups
+were `not_implemented`).
+
+- [x] R6-0. Cherry-pick `.gitattributes` from PR #1; close PR + delete
+      branch. **Push blocked by the auto-mode classifier** (direct
+      push to `main` from a vague instruction) — PR close/branch
+      delete are *gated on the push landing* so the salvage isn't
+      lost. Awaiting `! git push origin main` or a push permission.
+- [x] R6-1. **Vault on-disk forms** — `conflicts/<uuid>.md`,
+      `questions/<slug>.md`, `followups/<slug>.md`, mirroring the
+      Person/Task/Event pattern (per-entity Fm struct, stable key
+      order, body = the one human field). Lossless round-trip unit
+      test (enums, optional timestamps, nested delivery_attempts).
+      All 3 builds green, zero warnings. Commit `acd5b99`.
+- [x] R6-2. **Vault-first wiring** — ingest writes conflicts
+      vault-first then projects; `GET /api/conflicts|questions|
+      followups` read the vault at full fidelity; `resolve_conflict`
+      / `resolve_question` / `create_followup` are real markdown
+      mutations (was `not_implemented`); conflict resolve broadcasts
+      `GraphDiff{resolved_conflicts}`. Commit `73c3845`.
+- [x] R6-3. **Docs** — `docs/markdown-schema.md` (schemas + as-built
+      notes; the three moved from "Still open" → DONE),
+      CLAUDE/README/todo updated. (This commit.)
+
+**Round 6 status.** Code + docs complete, all builds green, each item
+its own commit. The *only* open thread is R6-0's push: until
+`origin/main` has the commits, PR #1 stays open and `other-machine`
+is not deleted (deliberate — don't lose the salvage). Next big
+pieces unchanged: P2P card layer, GitHub identity.
 
 ## Notes for future sessions
 

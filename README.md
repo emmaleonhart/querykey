@@ -119,10 +119,12 @@ is functional; most product behavior is scaffolding.
 - **MCP server** (`/mcp`): JSON-RPC `initialize`/`tools/list`/`tools/call`.
 
 **Honest limitations / not yet built**
-- **Conflict/OpenQuestion/FollowUp on-disk forms** are TBD — those stay
-  graph-only (conflicts) or unimplemented; the Person/Task/Event
-  canonical path is live. `[[wikilink]]` resolution + status-workflow
-  enforcement are future.
+- **Conflict/OpenQuestion/FollowUp on-disk forms** — DONE (Round 6):
+  canonical markdown + vault-first wiring; `resolve_conflict`,
+  `resolve_question`, `create_followup` are real markdown mutations
+  (no more `not_implemented`). Instruction/VoiceProfile on-disk forms
+  remain TBD; `[[wikilink]]` resolution + status-workflow enforcement
+  are future.
 - **Peer-to-peer card layer** (offer/looking-for cards, asymmetric
   git-tracking, 24h delay) — *after* the solo PRM (`docs/card-format.md`).
 - **GitHub identity/sync** bootstrap behind a swappable handle abstraction.
