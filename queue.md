@@ -7,6 +7,12 @@
 
 ---
 
+## RECOVERY QUEUE 2
+
+See the new bigger chat I just imported, please extract it and move forward since it has more vision, once the timing is complete we can move onto the other stuff. Remembering here that the queue might not be ptoperly cleared with the size of it, but not sure
+
+Please keep this section when rebasing with the remote
+
 ## RECOVERY DUMP — written 2026-05-15
 
 The user's laptop battery was about to die in the middle of a planning
