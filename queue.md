@@ -189,22 +189,30 @@ notes, chat logs, and prior conversations.
 |---|---|---|
 | Disposition of `secretarybird-old/` | **Delete** after comparison doc | Hackathon refs vanish in one move. Code preserved in git history. |
 | Server language | **Rust** (target) | Current Go server (`server/`) marked deprecated. No rewrite this round. |
-| AI engine framing | **Model-agnostic local agent, Gemma default** | OpenClaw/Hermes pushed out of high-level docs. OpenClaw stays as an implementation detail until Rust rewrite. |
+| AI engine framing | **Model-agnostic via MCP, Gemma default** | MCP server present day one; any agent can attach. OpenClaw is an implementation detail until the Rust rewrite. |
 | UI framework | **Flutter** | Locked. Not up for debate. |
+
+## Open decisions (resolved in Round 2 — from the vision/strategy chat)
+
+> Source: `chat/public/vision - rationalist p2p social network
+> (Claude).md`. These were previously "still open"; the user clarified
+> them directly.
+
+| Decision | Choice | Notes |
+|---|---|---|
+| Graph store | **Loca (formerly SutraDB)** | Author's own embedded Rust graph-vector-time DB. **Fuseki is NOT used** — its presence in docs/stub was an error; stub slated for removal. |
+| Canonical store | **Markdown + git; graph is derived** | Markdown files are the source of truth; RDF/graph generated *from* them, rebuildable. |
+| On-disk format | **YAML frontmatter + freeform body** | Obsidian-style; usable without QueryKey. Spec to be finalized before ingestion code. |
+| Social model | **Pure P2P card exchange** | Offer/looking-for cards; own card git-tracked, others' git-ignored; 24h propagation delay; no central server. |
+| Identity / discovery | **GitHub (swappable)** | Usernames as handles, follow-on-GitHub discovery, behind a thin handle abstraction. |
+| Sequencing | **PRM → P2P; MCP day one** | Private PRM built first (builds the graph the cards window into); card layer second. |
 
 ## Open decisions (still open)
 
-- Local markdown file format / on-disk schema for tasks, events, notes.
-  Frontmatter? Org-mode style? Plain bullets? Decide before writing
-  ingestion code.
-- Graph store under the Rust rewrite. Fuseki was the prior pick;
-  reconsider given the local-first / single-user reorientation (an
-  embedded triple store, an embedded RDF store, or just SQLite +
-  application-level relations may all be fine).
-- Whether / how the rationalist-social-network angle is exposed to other
-  users. Federated? Local-only? Optional sharing of selected nodes? This
-  is a product question, not a code question — decide before any
-  network code.
+- **Card format spec** — the highest-leverage remaining design
+  question; it ossifies fast once cards are exchanged. Spec before any
+  P2P code.
+- Private vs. public card (deferred — more complex; after single-card).
 - Audio pipeline ownership in the Rust world.
 - Voice-profile / speaker-diarization model selection.
 - External tool sync (Jira / Azure DevOps / GitHub) — still desired? In
@@ -246,6 +254,40 @@ the deferred, out-of-scope items below (Go→Rust rewrite, markdown
 on-disk model, graph-store decision) and the still-open product/design
 questions — none of which were in scope for this round.
 
+---
+
+## Round 2 — vision clarified (2026-05-15, evening)
+
+A strategy conversation (now committed at `chat/public/vision -
+rationalist p2p social network (Claude).md`) clarified and **corrected**
+the architecture. The four canonical docs (`README.md`, `CLAUDE.md`,
+`todo.md`, this file) were updated to match: Fuseki removed, graph is
+**derived from canonical markdown** and stored in **Loca/SutraDB**, an
+**MCP server** is day-one infra, identity bootstraps via **GitHub**,
+and the social layer is a **pure-P2P card** model (own card tracked,
+others' ignored, 24h delay) built *after* the solo PRM.
+
+### Round 2 action queue (next — barrel through these)
+
+These are documentation/spec + cleanup. Still **not** in scope: the
+Go→Rust rewrite, and *implementing* the on-disk model or P2P code
+(spec them first). Each item = its own commit, pull `--ff-only`, push.
+
+- [ ] R2-1. Reorganize the 4 canonical docs from the vision chat
+      (README/CLAUDE/todo/queue). ← done in this session.
+- [ ] R2-2. Purge stale pre-pivot framing from `docs/architecture.md`
+      and `docs/data-model.md` (Fuseki, team-coordination); align with
+      markdown-canonical / Loca-derived / MCP / P2P.
+- [ ] R2-3. Write `docs/markdown-schema.md` — the canonical on-disk
+      spec: YAML frontmatter fields + body conventions for Person /
+      Task / Event / Note. The load-bearing decision.
+- [ ] R2-4. Write `docs/card-format.md` — the P2P card spec:
+      offer/looking-for structure, git-tracking asymmetry, the 24h
+      delay model, GitHub identity. Spec only; no exchange code.
+- [ ] R2-5. Remove the dead Fuseki stub from the Go server (keep it
+      compilable) so the tree stops implying Fuseki is the plan.
+- [ ] R2-6. Commit + push each of the above.
+
 ## Notes for future sessions
 
 - The user dictates long stream-of-consciousness messages via voice. Do
@@ -257,3 +299,10 @@ questions — none of which were in scope for this round.
 - Do not reintroduce hackathon references anywhere.
 - Flutter is settled. Rust is the new server target. Local-agent /
   Gemma is the new AI framing. These are not open questions.
+- **Fuseki is NOT used.** If you see Fuseki anywhere it is stale; the
+  graph store is **Loca/SutraDB**, derived from canonical markdown.
+- Markdown + git is the source of truth; the graph is rebuildable from
+  it. MCP server is day-one infra. Identity bootstraps via GitHub
+  (swappable). Social layer is pure-P2P cards, built after the PRM.
+- Don't relitigate the Round 2 resolved decisions above. The one real
+  open design question is the **card format spec**.

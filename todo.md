@@ -42,13 +42,14 @@ not just yours: it's the privacy of the people you talk about too.
 
 ### Your Data Is Markdown On Your Disk
 
-Tasks, events, and notes are intended to live as **plain markdown
-files** on your machine that you can read and edit by hand. The agent
-operates *on* those files; it does not lock your life inside an app
-database. **The on-disk format is an open design question** (see
-`queue.md` open decisions): frontmatter vs. org-style vs. plain bullets.
-Document the model before writing ingestion code; do not implement the
-on-disk model this round.
+Markdown files on your machine, tracked in a **git repository**, are
+the **canonical source of truth** — you can read and edit them by
+hand. The knowledge graph is **derived from them**, never the other
+way round. Working format: **YAML frontmatter** for structured fields
+(person, date, tags, status) + freeform markdown body — the Obsidian
+convention, so files are useful even without QueryKey installed.
+Finalize the schema spec before writing ingestion code; do not
+implement the on-disk model this round.
 
 ### Open Questions System
 
@@ -93,11 +94,14 @@ Current focus: **Windows Desktop**.
 Implements the entities from `docs/data-model.md`. Node IDs should have
 **human-readable aliases** — not just opaque UUIDs.
 
-> **Graph store is an OPEN decision.** Apache Jena Fuseki was the prior
-> pick (and a Fuseki client stub exists), but given the local-first /
-> single-user reorientation, an embedded triple/RDF store or just
-> SQLite + application-level relations may be a better fit. Decide
-> before building real persistence. (queue.md open decisions.)
+> **Graph store is DECIDED: Loca (formerly SutraDB).** The author's
+> own embedded **Rust** graph-vector-time DB (separate project). The
+> graph is **derived from the markdown** (RDF/graph generated out of
+> the files), not the store of record — it must be rebuildable from
+> the files. The time dimension matters (relationship history).
+> **Fuseki is NOT used**; the Go `server/internal/graph/` Fuseki stub
+> is stale pre-pivot scaffolding slated for removal — do not build on
+> it.
 
 ### Account
 
@@ -143,12 +147,17 @@ admin row. (Multi-account / others-have-logins is Phase 8, optional.)
 ## Phase 2 — Local AI Agent Integration
 
 The local AI agent does the hard work so you don't have to. It is
-**model-agnostic** — default **Gemma**, switchable to other local (or
-optionally hosted) models. *Today's bridge is OpenClaw via a WSL
-gateway under `server/internal/openclaw/`; treat it as an
+**model-agnostic** — default **Gemma** (cheap, private, local),
+switchable to Claude/GPT for power users. *Today's bridge is OpenClaw
+via a WSL gateway under `server/internal/openclaw/`; treat it as an
 implementation detail behind a model-agnostic interface, to be
 superseded by the Rust rewrite. Callers must never name a model.*
 
+- [ ] **MCP server — present from day one.** QueryKey exposes itself
+  as an MCP server so *any* agent can attend over the graph and act on
+  the markdown files. This is infrastructure, not a late feature; it
+  is what makes the model-agnostic story real and frames QueryKey as a
+  platform, not a single-model app.
 - [ ] **Agent client** — model-agnostic interface to the local agent
 - [ ] **Entity extraction** — people, projects, deadlines from text
 - [ ] **Task detection** — implicit and explicit
@@ -265,19 +274,39 @@ The core differentiator. Accept anything, normalize it.
 - [ ] **Voice profile enrollment** — voice samples for speaker ID;
   improves as more audio is processed
 
-## Phase 8 — Shared / Multi-Person Mode (OPTIONAL, deprioritized)
+## Phase 8 — Peer-to-Peer Card Layer (after the solo PRM)
 
-> Not the spine of the product. QueryKey is **not** a team-coordination
-> tool you are forced to adopt. This phase exists only if the
-> rationalist-social-network angle is later exposed to other people.
-> Whether/how that happens (federated? local-only? selective node
-> sharing?) is an unresolved **product** question — decide before any
-> networking code (queue.md open decisions).
+> **Built second, on purpose.** The private PRM (Phases 1–7) is useful
+> with zero other users and *builds the graph the cards are a window
+> into*. The card layer is what makes using a relationship tracker
+> socially legitimate — it changes the meaning of the tool, it is not
+> just a feature. Not a team-coordination tool you are forced into.
 
-- [ ] Others can have real accounts
-- [ ] Multi-person DMs (bot DMs several people about different things)
-- [ ] Shared open-questions resolution across people
-- [ ] Cloud / hybrid run modes for always-on multi-person use
+The **card**: each user broadcasts one markdown file — what they're
+**offering** (their *key*) and **looking for** (their *query*). It is a
+*selective window into the private graph you already built*, not a
+separate publishing chore.
+
+- [ ] **Card format spec first** — human-readable markdown,
+  machine-parseable, expressive enough for offer/looking-for. Spec it
+  in the docs before any exchange code; it ossifies fast once used.
+- [ ] **Own card is git-tracked** — full local history enables
+  revert/undo.
+- [ ] **Others' cards are git-ignored on your machine** — usable in
+  the moment, never archived. Intentional asymmetry; no surveillance.
+- [ ] **24-hour propagation delay** — privacy safety valve (late-night
+  mistake fixable by morning, unseen). Revert before propagation is
+  immediate, no delay.
+- [ ] **Pure peer-to-peer** — no central server, no global source of
+  truth. Soft, non-cryptographic guarantee; community-appropriate.
+- [ ] **GitHub bootstraps identity + discovery** — usernames as
+  handles, follow-on-GitHub as the find mechanism, behind a swappable
+  handle abstraction ("a user is a canonical handle currently resolved
+  via GitHub"; later: DIDs/Nostr).
+- [ ] **Private vs. public card** — planned, explicitly *not now*
+  (more complex; revisit after the single-card model works).
+- [ ] Others can have real accounts; multi-person open-questions;
+  cloud/hybrid run modes — only as the network warrants.
 
 ## Phase 9 — External Tool Sync
 
@@ -304,8 +333,9 @@ The core differentiator. Accept anything, normalize it.
 > no rewrite this round). The Go OpenClaw/WSL bridge is the reference
 > implementation for re-solving the local-agent bridge in Rust.
 
-- [ ] **QueryKey Server (Rust, target)** — ingestion, knowledge graph,
-  real-time sync, local-agent coordination
+- [ ] **QueryKey Server (Rust, target)** — ingestion, the **derived**
+  graph (Loca/SutraDB, generated from the canonical markdown), MCP
+  endpoint, real-time sync, local-agent coordination
 - [ ] **Local mode** — server on your machine (privacy-first; the default)
 - [ ] **Cloud / hybrid modes** — only relevant alongside Phase 8
 - [ ] **WebSocket sync** — real-time graph diffs to connected clients
@@ -321,13 +351,19 @@ The core differentiator. Accept anything, normalize it.
 
 See `queue.md` for the canonical list. Highlights:
 
-- [ ] **Graph store** — Fuseki (prior pick) vs. embedded store vs.
-  SQLite + app relations, given local-first/single-user
-- [ ] **On-disk markdown task format** — frontmatter / org-style / bullets
-- [ ] **Whether/how the rationalist-social-network angle is exposed to
-  other users** — federated? local-only? selective sharing? (product)
-- [ ] Server language is **Rust** (resolved); Go server deprecated
-- [ ] AI is a **model-agnostic local agent, Gemma default** (resolved)
+- [x] **Graph store** — RESOLVED: **Loca/SutraDB** (author's Rust
+  graph-vector-time DB), graph **derived from markdown**. Fuseki not
+  used; stub slated for removal.
+- [x] **On-disk markdown format** — RESOLVED (working): **YAML
+  frontmatter + freeform body**, Obsidian-compatible. Spec to be
+  finalized before ingestion code.
+- [x] **How the social angle is exposed** — RESOLVED: pure **P2P card**
+  exchange, asymmetric git-tracking, 24h delay, GitHub-bootstrapped
+  identity. Built *after* the solo PRM. (Private-vs-public card still
+  deferred.)
+- [x] Server language is **Rust** (resolved); Go server deprecated
+- [x] AI is **model-agnostic via MCP, Gemma default** (resolved)
+- [ ] Card format spec (the high-leverage remaining design question)
 - [ ] Speaker diarization / voice embedding model selection
 - [ ] Multi-language conversation handling
 - [ ] Privacy and data retention (especially audio + voice embeddings)
