@@ -21,7 +21,12 @@
       "PowerShell(wc *)",
       "PowerShell(ls \"C:\\\\Users\\\\ambie\\\\Documents\\\\Github\\\\querykey\" | Where-Object { $_.PSIsContainer })",
       "Bash(xargs -I {} head -5 {})",
-      "Bash(xargs grep *)"
+      "Bash(xargs grep *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git checkout *)",
+      "Bash(git rebase *)"
     ]
   }
 }
