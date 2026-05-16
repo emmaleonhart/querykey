@@ -310,3 +310,43 @@ fn extract_json(s: &str) -> String {
         _ => "{}".to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // The honesty contract (no gateway needed): an agent failure must
+    // be visible to the caller, never masked as an empty success.
+    #[test]
+    fn agent_failure_is_surfaced_not_a_silent_empty() {
+        let failed = IngestResult {
+            ingest_id: "ing-1".into(),
+            agent_error: Some(
+                "gateway alive but POST /v1/chat/completions 404s".into(),
+            ),
+            analysis: AnalysisResult::default(),
+        };
+        let v = serde_json::to_value(&failed).unwrap();
+        assert!(
+            v["agent_error"].as_str().unwrap().contains("404"),
+            "the caller must be told extraction did not happen"
+        );
+        // analysis is still empty — but agent_error proves it is NOT a
+        // confident "nothing to extract".
+        assert!(v["tasks"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn successful_ingest_has_no_agent_error_key() {
+        let ok = IngestResult {
+            ingest_id: "ing-2".into(),
+            agent_error: None,
+            analysis: AnalysisResult::default(),
+        };
+        let v = serde_json::to_value(&ok).unwrap();
+        assert!(
+            v.get("agent_error").is_none(),
+            "success responses stay byte-identical (field skipped)"
+        );
+    }
+}

@@ -78,7 +78,7 @@ today versus planned.
 | Desktop/mobile app | Flutter (Dart `sdk ^3.10.8`); `provider`, `web_socket_channel`, `http`, `uuid`, `intl` | [`app/`](app/) |
 | Server | **Rust** (crate `querykey-server`: `axum`, `tokio`, `reqwest`) — compiles & runs; structural port with TODOs | [`server/`](server/) |
 | Source of truth | **Markdown files + git** — implemented; YAML frontmatter + body, the graph is derived & rebuilt from it | `server/src/vault/` → `$VAULT_DIR` |
-| AI engine | **Model-agnostic** via an **MCP server** (default agent: local **Gemma** — cheap & private; Claude/GPT optional). *Today's implementation:* OpenClaw via a local WSL gateway (port `18789`) | `server/src/openclaw/` |
+| AI engine | **Model-agnostic** — the agent is *whoever operates QueryKey*: **Claude (e.g. via Claude Code) is a first-class agent today**; the default local **Gemma** is for the GUI path and is **not built yet**; Hermes/GPT optional. Exposed via an **MCP server**. *One optional backend:* OpenClaw via a local WSL gateway (port `18789`). `detect()` verifies the real chat API, so a non-agent port is never reported connected (R13). | `server/src/openclaw/` |
 | Knowledge graph | **Loca** (formerly **SutraDB**) — the author's embedded Rust graph-vector-time DB; the graph is **derived from the markdown**, not canonical. Wired via `loka-core` behind `--features loca`; in-memory fallback otherwise. Fuseki is **not** used (removed with the Go server) | `server/src/graph/` + [`../SutraDB`] |
 | Ingest surface | Local markdown + pasted text / screenshots / voice notes (Discord deprioritized — todo.md Phase Z) | `server/src/ingest.rs` |
 | Identity / sync | **GitHub** (usernames as identity, repo as sync) — a thin, swappable abstraction | (planned) |
@@ -119,6 +119,17 @@ is functional; most product behavior is scaffolding.
 - **MCP server** (`/mcp`): JSON-RPC `initialize`/`tools/list`/`tools/call`.
 
 **Honest limitations / not yet built**
+- **Agent honesty (gateway detection + ingest)** — DONE (Round 13):
+  `detect()` verifies the real OpenAI-compatible chat endpoint, not
+  just `/health` (the OpenClaw Control UI answers `/health` too);
+  ingest surfaces an explicit `agent_error` instead of masking an
+  agent failure as an empty success. Found by eating our own cooking
+  (pointing QueryKey at a real life-planning data lake). **The agent
+  is model-agnostic / whoever operates QueryKey** — Claude (e.g.
+  Claude Code) is a first-class agent *now*; Gemma is the
+  not-yet-built GUI default. The "operating agent does extraction →
+  canonical markdown, no gateway" path is the natural next step
+  (not yet built).
 - **Conflict/OpenQuestion/FollowUp on-disk forms** — DONE (Round 6):
   canonical markdown + vault-first wiring; `resolve_conflict`,
   `resolve_question`, `create_followup` are real markdown mutations

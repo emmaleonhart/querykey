@@ -808,7 +808,7 @@ Rules (this repo's workflow): each item its own commit with a *why*;
 zero warnings, before each commit; keep the 30 lib tests green + add
 tests; `git pull --rebase` + push after each.
 
-- [ ] R13-1. **`detect()` verifies chat capability, not just liveness.**
+- [x] R13-1. **`detect()` verifies chat capability, not just liveness.**
       `/health` 200 ≠ agent ready (the Control-UI SPA answers it).
       Add a capability probe of the actual dependency
       (`POST /v1/chat/completions`, minimal body, e.g. `max_tokens:1`)
@@ -820,7 +820,7 @@ tests; `git pull --rebase` + push after each.
       but chat API absent (got 404 / HTML — is this the OpenClaw
       Control UI, not the agent API?)"*. `main.rs` log must reflect
       the real state.
-- [ ] R13-2. **Ingest must not silently swallow an agent failure.**
+- [x] R13-2. **Ingest must not silently swallow an agent failure.**
       Replace the `unwrap_or_default()` in `Pipeline::process()` with
       explicit handling: on agent error, the `IngestResult` carries an
       explicit `agent_error: Option<String>` (or an
@@ -828,7 +828,7 @@ tests; `git pull --rebase` + push after each.
       <why>"*, never an empty success. HTTP can stay 200 (ingest
       didn't crash) but the body must be honest. Log a `warn!`. This
       is the core principle fix.
-- [ ] R13-3. **Tests + docs.** Unit test: an analyze-failure path
+- [x] R13-3. **Tests + docs.** Unit test: an analyze-failure path
       surfaces the error rather than an empty `AnalysisResult`
       presented as success (use a seam that needs no live gateway).
       Update `README.md` Status, `CLAUDE.md`, `todo.md`, this file,
@@ -836,11 +836,21 @@ tests; `git pull --rebase` + push after each.
       **model-agnostic / agent-is-whoever-operates-it** framing
       (Claude-now, Gemma-later-for-GUI) so it stops being implicit.
 
-**Not in this round:** the "operating agent eats the lake directly"
-track (Claude/this session doing extraction → canonical markdown
-without the gateway). That is the natural *next* thing and is the
-real "QueryKey eats the lake" path, but it is separate from making
-the tool honest. Flag to the user before barrelling it.
+**Round 13 status.** COMPLETE (2026-05-16). 36 lib tests green
+(30 + 6 bridge classifier; +2 ingest honesty contract);
+`cargo build`, `--features loca`, `--features discord` all clean,
+zero warnings; each item its own commit, all pushed to
+`origin/main`. `detect()` can no longer report a non-agent port as
+"connected"; ingest can no longer mask an agent failure as an empty
+success. The model-agnostic / agent-is-whoever-operates-it framing
+(Claude now, Gemma later for the GUI) is now explicit in
+README/CLAUDE/todo, not implicit.
+
+**Not in this round (the natural next thing):** the "operating
+agent eats the lake directly" track — Claude/this session doing
+extraction → canonical markdown without any gateway. That is the
+real "QueryKey eats the lake" payoff path and is separate from
+making the tool honest. Flag to the user before barrelling it.
 
 ## Notes for future sessions
 

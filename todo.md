@@ -14,10 +14,14 @@
   restarts. This is the store of record.
 - **Derived graph:** Loca/SutraDB, rebuilt from the vault on startup;
   SPARQL query bridge + typed read-backs. **Fuseki is gone.**
-- **Agent:** model-agnostic via an **MCP endpoint** (`/mcp`); OpenClaw
-  bridge with incremental SSE streaming + supervised gateway
-  lifecycle. Ingest: relaxed parse → vault → graph + typed GraphDiff
-  over the WebSocket hub.
+- **Agent:** model-agnostic — the agent is *whoever operates
+  QueryKey* (**Claude/Claude Code is first-class now**; Gemma is the
+  not-yet-built GUI default; Hermes/GPT optional). MCP endpoint
+  (`/mcp`); OpenClaw WSL gateway is one optional backend. **Honest
+  about availability (R13):** `detect()` verifies the real chat API
+  (not just `/health`); ingest surfaces `agent_error`, never a silent
+  empty. Ingest: relaxed parse → vault → graph + typed GraphDiff over
+  the WebSocket hub.
 - **Specs/context:** `docs/markdown-schema.md` (as-built),
   `docs/card-format.md`, vision corpus in `chat/public/`.
 
@@ -35,7 +39,9 @@
 (Done: Conflict/OpenQuestion/FollowUp forms — R6. Semantic
 `[[wikilink]]`/`[[property:target]]` — R8. Status-workflow
 enforcement — R9. Instruction/VoiceProfile forms — R10: the full
-canonical entity set is on disk.)
+canonical entity set is on disk. Calendar — R11. Agent-drafted
+card — R12. Agent-honesty fix [detect capability + no silent-empty
+ingest] — R13.)
 
 **Deprioritized (back of the list, per user 2026-05-16):** the audio
 pipeline (transcription/diarization). Would later fill VoiceProfile
