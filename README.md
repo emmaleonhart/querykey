@@ -77,7 +77,7 @@ today versus planned.
 |---|---|---|
 | Desktop/mobile app | Flutter (Dart `sdk ^3.10.8`); `provider`, `web_socket_channel`, `http`, `uuid`, `intl` | [`app/`](app/) |
 | Server | **Rust** (crate `querykey-server`: `axum`, `tokio`, `reqwest`) — compiles & runs; structural port with TODOs | [`server/`](server/) |
-| Source of truth | Markdown files + git history (planned on-disk model) | user's disk / git repo |
+| Source of truth | **Markdown files + git** — implemented; YAML frontmatter + body, the graph is derived & rebuilt from it | `server/src/vault/` → `$VAULT_DIR` |
 | AI engine | **Model-agnostic** via an **MCP server** (default agent: local **Gemma** — cheap & private; Claude/GPT optional). *Today's implementation:* OpenClaw via a local WSL gateway (port `18789`) | `server/src/openclaw/` |
 | Knowledge graph | **Loca** (formerly **SutraDB**) — the author's embedded Rust graph-vector-time DB; the graph is **derived from the markdown**, not canonical. Wired via `loka-core` behind `--features loca`; in-memory fallback otherwise. Fuseki is **not** used (removed with the Go server) | `server/src/graph/` + [`../SutraDB`] |
 | Ingest surface | Local markdown + pasted text / screenshots / voice notes (Discord deprioritized — todo.md Phase Z) | `server/src/ingest.rs` |
@@ -95,6 +95,12 @@ This is early. Roughly: planning and data models are complete; the AI bridge
 is functional; most product behavior is scaffolding.
 
 **Working / functional**
+- **Canonical markdown vault** (`server/src/vault/`, `$VAULT_DIR`): the
+  store of record. API + ingest write `people/tasks/events` markdown
+  (YAML frontmatter + body) first; the Loca graph is a derived index
+  rebuilt from the vault on startup. `update_task` mutates the markdown;
+  reads are full-fidelity (the lossy-graph / epoch-timestamp problem is
+  gone). Round-trip is lossless (unit-tested) and survives restarts.
 - **Rust server (`server/`) is the only server** — Go fully ported then
   deleted (recoverable from git history). Compiles in all three configs
   (`cargo build`, `--features loca`, `--features discord`), zero warnings;
@@ -113,10 +119,10 @@ is functional; most product behavior is scaffolding.
 - **MCP server** (`/mcp`): JSON-RPC `initialize`/`tools/list`/`tools/call`.
 
 **Honest limitations / not yet built**
-- **Canonical markdown write path** (YAML frontmatter + body; git-tracked)
-  — the derived graph is a rebuildable index; task/conflict *mutations*
-  and full hydration go through markdown, which is **not built yet** (the
-  load-bearing next piece — `docs/markdown-schema.md`).
+- **Conflict/OpenQuestion/FollowUp on-disk forms** are TBD — those stay
+  graph-only (conflicts) or unimplemented; the Person/Task/Event
+  canonical path is live. `[[wikilink]]` resolution + status-workflow
+  enforcement are future.
 - **Peer-to-peer card layer** (offer/looking-for cards, asymmetric
   git-tracking, 24h delay) — *after* the solo PRM (`docs/card-format.md`).
 - **GitHub identity/sync** bootstrap behind a swappable handle abstraction.

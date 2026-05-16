@@ -480,8 +480,20 @@ honest `not_implemented` mutations).
       (a status mutation survived a full reboot via the markdown) and
       the startup `projected vault → graph` rebuild. All 3 builds
       green, zero warnings.
-- [ ] R5-3. **Docs** — flip `docs/markdown-schema.md` to *implemented*;
-      update CLAUDE/README/todo/queue; mark Round 5 complete.
+- [x] R5-3. **Docs** — done. `docs/markdown-schema.md` flipped to
+      IMPLEMENTED with as-built notes + still-open list;
+      CLAUDE/README/todo updated (canonical vault is live, lossy-graph
+      problem gone); runtime vault gitignored.
+
+**Round 5 COMPLETE (2026-05-15).** The canonical markdown source of
+truth is built and wired: the vault is the store of record, the Loca
+graph is a derived index rebuilt from it on startup, `update_task`
+mutates markdown, reads are full-fidelity, round-trip is unit-tested
+and survives restarts. All three build configs green, zero warnings,
+each item its own commit, all pushed. Still open (non-blocking):
+Conflict/OpenQuestion/FollowUp on-disk forms, `[[wikilink]]`
+resolution, status-workflow enforcement; the P2P card layer and GitHub
+identity remain the next big pieces.
 
 ## Notes for future sessions
 

@@ -18,3 +18,8 @@
 /server/target/
 **/*.sdb/
 *.sdb
+
+# Runtime markdown vault (the user's own canonical data; not repo
+# content — like the .sdb derived index). Default VAULT_DIR is ./vault.
+/vault/
+/server/vault/

@@ -1,10 +1,14 @@
 # Markdown On-Disk Schema (canonical source of truth)
 
-> **Status: spec / decided-direction (Round 2, 2026-05-15).** This is
-> the load-bearing decision in QueryKey: everything downstream (the
-> ingestion pipeline, the agent acting on files, the derived graph)
-> depends on it. It is a *spec*; the on-disk model is **not implemented
-> yet**. Authoritative alongside `CLAUDE.md` / `queue.md`.
+> **Status: IMPLEMENTED (Round 5, 2026-05-15).** This was the
+> load-bearing decision; it is now built. `server/src/vault/` is the
+> canonical store: the API and ingest pipeline write these markdown
+> files first, then project a derived index into Loca; the server
+> rebuilds that index from the vault on startup; `update_task` mutates
+> the markdown. Round-trips are lossless (unit-tested). `VAULT_DIR`
+> selects the root (default `./vault`). Authoritative alongside
+> `CLAUDE.md` / `queue.md`. The spec below matches the implementation;
+> deviations are noted under "Implementation notes".
 
 ## Principles
 
@@ -133,14 +137,31 @@ Frontmatter optional beyond `id`/`type`. The body is the point;
 - The time dimension is first-class (git history + `created`/`updated`
   + event times) because relationship history matters.
 
-## Open sub-questions (decide before implementing)
+## Implementation notes (Round 5 — as built)
 
-- Exact `status` / `ambiguity` enumerations and their transitions.
-- How freeform-body `[[wikilinks]]` resolve vs. explicit frontmatter
+- **Entities implemented:** Person (`people/<id>.md`), Task
+  (`tasks/<uuid>.md`), Event (`events/<uuid>.md`). `notes/` exists.
+- **`title` lives in frontmatter** for Task/Event (the model carries a
+  separate `title` and `description`); the **body is the description**.
+  This keeps round-trips lossless rather than deriving a title from the
+  body. Person's body is a `# Display Name` heading.
+- **`confidence`/`source` are once-per-file** (frontmatter), per the
+  editability lean — not inline per-field.
+- **Slugs:** Person uses its human id; Task/Event use the UUID. (Title
+  → human-slug generation is a future nicety.)
+- **Idempotent:** `compose`/`split` trim the body consistently so
+  write→read→write is stable; a unit test asserts lossless Person/Task
+  round-trip (timestamps, handles, deadline, multi-line body).
+- **Derived graph:** the server projects vault → Loca on every write
+  and rebuilds the whole graph from the vault on startup.
+
+## Still open (not blocking)
+
+- `status` / `ambiguity` transition rules (enums exist; the *workflow*
+  isn't enforced yet).
+- Freeform-body `[[wikilinks]]` resolution vs. explicit frontmatter
   refs (precedence, dangling links).
-- Whether `confidence`/`source` live inline per-field for fine-grained
-  provenance, or once per file (leaning once-per-file for editability).
-- Conflict/Instruction/OpenQuestion/FollowUp/VoiceProfile file shapes
-  (entities exist in `docs/data-model.md`; on-disk forms TBD).
-
-These do not block writing the spec; they block *implementation*.
+- Conflict / Instruction / OpenQuestion / FollowUp / VoiceProfile
+  on-disk forms — **TBD**; these currently stay graph-only (conflicts)
+  or unimplemented. They do not block the Person/Task/Event canonical
+  path that is now live.

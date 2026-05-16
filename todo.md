@@ -48,8 +48,9 @@ hand. The knowledge graph is **derived from them**, never the other
 way round. Working format: **YAML frontmatter** for structured fields
 (person, date, tags, status) + freeform markdown body — the Obsidian
 convention, so files are useful even without QueryKey installed.
-Finalize the schema spec before writing ingestion code; do not
-implement the on-disk model this round.
+**Implemented (Round 5):** `server/src/vault/` for Person/Task/Event;
+the graph is derived and rebuilt from the vault on startup. See
+`docs/markdown-schema.md` (as-built) and `queue.md` Round 5.
 
 ### Open Questions System
 
@@ -190,8 +191,9 @@ The core differentiator. Accept anything, normalize it.
 - [ ] **Voice note** — record a memo, transcribe, extract
 - [ ] **Recorded conversation** — streaming transcription + diarization
 - [ ] **Normalization** — all inputs → common IngestItem format
-- [ ] **Markdown reconciliation** — extracted structure round-trips to
-  the on-disk markdown task model (pending that format decision)
+- [x] **Markdown reconciliation** — extracted structure is written to
+  the canonical vault then projected to the graph (Round 5,
+  `server/src/vault/`); round-trip is lossless (unit-tested).
 
 ## Phase 4 — In-App Messaging
 
@@ -365,9 +367,10 @@ See `queue.md` for the canonical list. Highlights:
 - [x] **Graph store** — RESOLVED: **Loca/SutraDB** (author's Rust
   graph-vector-time DB), graph **derived from markdown**. Fuseki not
   used; stub slated for removal.
-- [x] **On-disk markdown format** — RESOLVED (working): **YAML
-  frontmatter + freeform body**, Obsidian-compatible. Spec to be
-  finalized before ingestion code.
+- [x] **On-disk markdown format** — RESOLVED & **IMPLEMENTED**
+  (Round 5): YAML frontmatter + freeform body, Obsidian-compatible,
+  lossless round-trip. `server/src/vault/`; `docs/markdown-schema.md`
+  has the as-built notes.
 - [x] **How the social angle is exposed** — RESOLVED: pure **P2P card**
   exchange, asymmetric git-tracking, 24h delay, GitHub-bootstrapped
   identity. Built *after* the solo PRM. (Private-vs-public card still
