@@ -75,6 +75,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/card", get(get_card).put(put_card))
         .route("/api/card/published", get(get_card_published))
         .route("/api/card/revert", post(revert_card))
+        .route("/api/card/draft", post(draft_card))
         .route("/api/identity", get(get_identity))
         .route("/api/peers", get(list_peers_h))
         .route("/api/peers/:handle/card", get(get_peer_card_h))
@@ -405,6 +406,39 @@ async fn put_card(
         return Json(json!({ "error": e.to_string() }));
     }
     Json(card_state(&s))
+}
+
+// The agent drafts the card's key/query from the PRM it built; the
+// user approves via PUT /api/card (NOT saved here — and the 24h
+// propagation valve guards anyway). Falls back to a deterministic
+// heuristic when no agent is reachable, so it works offline.
+async fn draft_card(State(s): State<Arc<AppState>>) -> Json<Value> {
+    let digest = s.vault.prm_digest();
+    let base = digest.current_card.clone().unwrap_or_else(|| crate::card::Card {
+        handle: String::new(),
+        name: String::new(),
+        website: String::new(),
+        bio: String::new(),
+        offering: vec![],
+        looking_for: vec![],
+        updated: chrono::Utc::now(),
+        visibility: crate::card::default_visibility(),
+    });
+    let agents = s.vault.agents_md();
+    let prompt = crate::card::draft_prompt(&digest, agents.as_deref());
+    let (card, source) = match s.bridge.chat(&prompt, &[]).await {
+        Ok(reply) => match crate::card::parse_draft_reply(&reply, &base) {
+            Some(c) => (c, "agent"),
+            None => (crate::card::heuristic_draft(&digest, &base), "heuristic"),
+        },
+        Err(_) => (crate::card::heuristic_draft(&digest, &base), "heuristic"),
+    };
+    Json(json!({
+        "draft": card,
+        "source": source,
+        "saved": false,
+        "note": "review, then approve via PUT /api/card",
+    }))
 }
 
 async fn get_card_published(State(s): State<Arc<AppState>>) -> Json<Value> {

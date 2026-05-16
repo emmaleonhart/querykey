@@ -14,7 +14,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::vault::{compose, parse_dt, rfc3339, split};
+use crate::vault::{compose, parse_dt, rfc3339, split, PrmDigest};
 
 pub(crate) fn default_visibility() -> String {
     "public".into()
@@ -159,6 +159,140 @@ pub fn parse(content: &str) -> Option<Card> {
     })
 }
 
+// ---- agent-drafted card (PRM → key/query) ----
+//
+// The local agent, which has been building the PRM by observing the
+// user, drafts the card's key/query; the user reviews and approves
+// (the existing PUT /api/card — plus the 24h propagation valve). The
+// agent only proposes bio/offering/looking_for; identity fields are
+// carried from `base` (the user's, not the model's, to set). No
+// model is named here — any agent, governed by `agents.md`.
+
+/// The model-agnostic drafting instruction: attend over the PRM
+/// digest within the (optional) `agents.md` envelope, reply JSON.
+pub fn draft_prompt(digest: &PrmDigest, agents_md: Option<&str>) -> String {
+    let mut p = String::new();
+    if let Some(a) = agents_md {
+        p.push_str("# agents.md (your governing envelope)\n");
+        p.push_str(a.trim());
+        p.push_str("\n\n");
+    }
+    p.push_str(
+        "You are drafting the user's QueryKey card from the private \
+         relationship/task graph below. The card is a lean signal: a \
+         `key` (what they can offer) and a `query` (what they're \
+         looking for). Be concrete, humble and brief; do NOT invent \
+         facts unsupported by the digest. Reply with ONLY a JSON \
+         object: {\"bio\": one-line string, \"offering\": [string], \
+         \"looking_for\": [string]}.\n\n# PRM digest\n",
+    );
+    p.push_str(&format!(
+        "people: {}, tasks: {}, events: {}, notes: {}\n",
+        digest.person_count, digest.task_count, digest.event_count, digest.note_count
+    ));
+    if !digest.offers.is_empty() {
+        p.push_str(&format!("explicit offers: {}\n", digest.offers.join("; ")));
+    }
+    if !digest.wants.is_empty() {
+        p.push_str(&format!("explicit wants: {}\n", digest.wants.join("; ")));
+    }
+    if !digest.predicates.is_empty() {
+        p.push_str(&format!(
+            "relation vocabulary: {}\n",
+            digest.predicates.join(", ")
+        ));
+    }
+    if !digest.top_people.is_empty() {
+        let tp: Vec<String> = digest
+            .top_people
+            .iter()
+            .map(|x| {
+                if x.role.is_empty() {
+                    x.display_name.clone()
+                } else {
+                    format!("{} ({})", x.display_name, x.role)
+                }
+            })
+            .collect();
+        p.push_str(&format!("most-referenced people: {}\n", tp.join("; ")));
+    }
+    if !digest.active_tasks.is_empty() {
+        p.push_str(&format!("active tasks: {}\n", digest.active_tasks.join("; ")));
+    }
+    if let Some(c) = &digest.current_card {
+        p.push_str(&format!(
+            "\n# current card (refine, don't reset)\nbio: {}\noffering: {}\nlooking_for: {}\n",
+            c.bio,
+            c.offering.join("; "),
+            c.looking_for.join("; ")
+        ));
+    }
+    p
+}
+
+#[derive(Deserialize)]
+struct DraftReply {
+    #[serde(default)]
+    bio: String,
+    #[serde(default)]
+    offering: Vec<String>,
+    #[serde(default)]
+    looking_for: Vec<String>,
+}
+
+/// Parse the agent's JSON reply into a draft card. Identity fields
+/// (handle/name/website/visibility) are carried from `base` — the
+/// agent only proposes bio/offering/looking_for. `None` if the reply
+/// has no JSON object.
+pub fn parse_draft_reply(reply: &str, base: &Card) -> Option<Card> {
+    let start = reply.find('{')?;
+    let end = reply.rfind('}')?;
+    if end < start {
+        return None;
+    }
+    let dr: DraftReply = serde_json::from_str(&reply[start..=end]).ok()?;
+    Some(Card {
+        handle: base.handle.clone(),
+        name: base.name.clone(),
+        website: base.website.clone(),
+        bio: if dr.bio.trim().is_empty() {
+            base.bio.clone()
+        } else {
+            dr.bio.trim().to_string()
+        },
+        offering: dr.offering,
+        looking_for: dr.looking_for,
+        updated: Utc::now(),
+        visibility: base.visibility.clone(),
+    })
+}
+
+/// Deterministic fallback when no agent is reachable: surface the
+/// graph's explicit offer/want signals verbatim — epistemically
+/// humble, proposes only what the user themselves tagged
+/// (`[[offers:…]]` / `[[wants:…]]`) — plus a stub bio to edit.
+pub fn heuristic_draft(digest: &PrmDigest, base: &Card) -> Card {
+    let bio = if !base.bio.is_empty() {
+        base.bio.clone()
+    } else if digest.offers.is_empty() && digest.wants.is_empty() {
+        "(draft stub — add your key/query, or tag relations with \
+         [[offers:…]] / [[wants:…]] so the agent can draft them)"
+            .to_string()
+    } else {
+        String::new()
+    };
+    Card {
+        handle: base.handle.clone(),
+        name: base.name.clone(),
+        website: base.website.clone(),
+        bio,
+        offering: digest.offers.clone(),
+        looking_for: digest.wants.clone(),
+        updated: Utc::now(),
+        visibility: base.visibility.clone(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -194,6 +328,77 @@ mod tests {
 
         // Idempotent: render(parse(render(c))) == render(c).
         assert_eq!(render(&parse(&text).unwrap()), text);
+    }
+
+    fn empty_card() -> Card {
+        Card {
+            handle: "github:emma".into(),
+            name: "Emma".into(),
+            website: String::new(),
+            bio: String::new(),
+            offering: vec![],
+            looking_for: vec![],
+            updated: Utc::now(),
+            visibility: "public".into(),
+        }
+    }
+
+    fn digest(offers: &[&str], wants: &[&str]) -> PrmDigest {
+        PrmDigest {
+            person_count: 4,
+            task_count: 2,
+            event_count: 1,
+            note_count: 3,
+            top_people: vec![],
+            predicates: vec!["offers".into(), "knows".into()],
+            offers: offers.iter().map(|s| s.to_string()).collect(),
+            wants: wants.iter().map(|s| s.to_string()).collect(),
+            active_tasks: vec!["Finish R12".into()],
+            current_card: None,
+        }
+    }
+
+    #[test]
+    fn heuristic_uses_explicit_signals_only() {
+        let d = digest(&["Rust / embedded DB help"], &["Flutter reviewers"]);
+        let c = heuristic_draft(&d, &empty_card());
+        assert_eq!(c.offering, vec!["Rust / embedded DB help"]);
+        assert_eq!(c.looking_for, vec!["Flutter reviewers"]);
+        assert_eq!(c.handle, "github:emma"); // identity carried, not invented
+        assert!(c.bio.is_empty()); // had signals, no stub needed
+
+        // No signals → an explicit stub, no fabricated claims.
+        let c2 = heuristic_draft(&digest(&[], &[]), &empty_card());
+        assert!(c2.offering.is_empty() && c2.looking_for.is_empty());
+        assert!(c2.bio.contains("draft stub"));
+    }
+
+    #[test]
+    fn parse_draft_reply_extracts_json_and_carries_identity() {
+        let base = empty_card();
+        let reply = "Sure! Here is the draft:\n\
+            {\"bio\": \"builds local-first tools\", \
+             \"offering\": [\"Rust help\"], \"looking_for\": [\"reviewers\"]}\n\
+            Hope that works.";
+        let c = parse_draft_reply(reply, &base).unwrap();
+        assert_eq!(c.bio, "builds local-first tools");
+        assert_eq!(c.offering, vec!["Rust help"]);
+        assert_eq!(c.looking_for, vec!["reviewers"]);
+        assert_eq!(c.handle, "github:emma"); // never the model's to set
+        assert!(parse_draft_reply("no json here", &base).is_none());
+    }
+
+    #[test]
+    fn draft_prompt_is_model_agnostic_and_includes_envelope() {
+        let p = draft_prompt(&digest(&["X"], &[]), Some("Be terse. Prefer verbs."));
+        assert!(p.contains("agents.md"));
+        assert!(p.contains("Be terse. Prefer verbs."));
+        assert!(p.contains("JSON")); // structured reply contract
+        assert!(p.contains("people: 4, tasks: 2"));
+        assert!(p.contains("explicit offers: X"));
+        // No model/engine named anywhere.
+        let low = p.to_lowercase();
+        assert!(!low.contains("gemma") && !low.contains("openclaw") && !low.contains("gpt"));
     }
 
     #[test]
