@@ -110,23 +110,24 @@ async fn handle_chat(state: &Arc<AppState>, bridge: &Bridge, raw: &str) {
         })
         .collect::<Vec<_>>();
 
-    let hub = &state.hub;
+    let hub = state.hub.clone();
     hub.broadcast_message(WsMessage {
         msg_type: "stream_start".to_string(),
         content: String::new(),
         data: None,
     });
-    let mut acc = String::new();
+    let chunk_hub = hub.clone();
     match bridge
-        .chat_stream(&content, &history, |chunk| acc.push_str(chunk))
+        .chat_stream(&content, &history, move |chunk| {
+            chunk_hub.broadcast_message(WsMessage {
+                msg_type: "stream_chunk".to_string(),
+                content: chunk.to_string(),
+                data: None,
+            });
+        })
         .await
     {
         Ok(()) => {
-            hub.broadcast_message(WsMessage {
-                msg_type: "stream_chunk".to_string(),
-                content: acc,
-                data: None,
-            });
             hub.broadcast_message(WsMessage {
                 msg_type: "stream_end".to_string(),
                 content: String::new(),

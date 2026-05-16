@@ -110,9 +110,11 @@ impl Bridge {
         Ok(content)
     }
 
-    /// Streaming chat. TODO(port): full SSE delta parsing — see
-    /// server-go-old/internal/openclaw/bridge.go ChatStream(). For now
-    /// it does a non-streaming call and delivers the whole reply once.
+    /// Streaming chat against the OpenAI-compatible `/v1/chat/completions`
+    /// endpoint. Ports `bridge.go` ChatStream: POST with `stream:true`,
+    /// parse SSE `data:` lines, decode each as
+    /// `{ choices: [{ delta: { content }}] }`, call `on_chunk` per delta,
+    /// stop on the `[DONE]` sentinel.
     pub async fn chat_stream<F>(
         &self,
         message: &str,
@@ -122,8 +124,50 @@ impl Bridge {
     where
         F: FnMut(&str),
     {
-        let full = self.chat(message, history).await?;
-        on_chunk(&full);
+        let mut msgs = history.to_vec();
+        msgs.push(ChatMessage {
+            role: "user".to_string(),
+            content: message.to_string(),
+        });
+        let body = serde_json::json!({
+            "model": self.agent_id,
+            "messages": msgs,
+            "stream": true,
+        });
+        let resp = self
+            .auth(self.http.post(format!("{}/v1/chat/completions", self.gateway_url)))
+            .json(&body)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        use futures_util::StreamExt;
+        let mut stream = resp.bytes_stream();
+        let mut buf: Vec<u8> = Vec::new();
+        while let Some(chunk) = stream.next().await {
+            let bytes = chunk?;
+            buf.extend_from_slice(&bytes);
+            while let Some(nl) = buf.iter().position(|&b| b == b'\n') {
+                let line_bytes: Vec<u8> = buf.drain(..=nl).collect();
+                let line = std::str::from_utf8(&line_bytes[..line_bytes.len() - 1])
+                    .unwrap_or("")
+                    .trim_end_matches('\r');
+                let Some(data) = line.strip_prefix("data: ") else {
+                    continue;
+                };
+                if data == "[DONE]" {
+                    return Ok(());
+                }
+                let Ok(v) = serde_json::from_str::<serde_json::Value>(data) else {
+                    continue;
+                };
+                if let Some(content) = v["choices"][0]["delta"]["content"].as_str() {
+                    if !content.is_empty() {
+                        on_chunk(content);
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
