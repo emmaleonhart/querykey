@@ -310,10 +310,21 @@ pub struct AgendaItem {
 /// Resolution/comparison slug: lowercase, non-alphanumeric runs become
 /// a single `-`, trimmed. So `John  Smith`, `john-smith`, and
 /// `John-Smith` all compare equal.
+/// Map an API-side entity key to its canonical on-disk dir name.
+/// Most entities use the same name in both forms; "people" is the
+/// exception — it lives at `wiki/contacts/` on disk (R15-3, the
+/// user's term). Code outside this module still says "people".
+fn canonical_dir_name(sub: &str) -> &str {
+    match sub {
+        "people" => "contacts",
+        other => other,
+    }
+}
+
 /// Read every `*.md` in `dir` into `out` keyed by file stem. Later
 /// calls overwrite earlier ones for the same slug — `read_files` uses
-/// this with the canonical wiki/ dir read *second* so it wins when a
-/// migration-in-progress slug exists in both wiki/ and the legacy dir.
+/// this so the canonical dir read *last* wins when a migration-in-
+/// progress slug exists across multiple paths.
 fn read_md_into(dir: &Path, out: &mut BTreeMap<String, String>) {
     let Ok(rd) = fs::read_dir(dir) else {
         return;
@@ -373,9 +384,11 @@ const ROOT_ONLY_SUBDIRS: &[&str] = &[
 impl Vault {
     pub fn open(root: &str) -> anyhow::Result<Self> {
         let root = PathBuf::from(root);
-        // Graph entity dirs live under <root>/wiki/ from R15 onward.
+        // Graph entity dirs live under <root>/wiki/<canonical_name>/
+        // from R15 onward. Some subs have a canonical on-disk name
+        // different from the API key (e.g. "people" → "contacts").
         for sub in ENTITY_SUBDIRS {
-            fs::create_dir_all(root.join("wiki").join(sub))?;
+            fs::create_dir_all(root.join("wiki").join(canonical_dir_name(sub)))?;
         }
         for sub in ROOT_ONLY_SUBDIRS {
             fs::create_dir_all(root.join(sub))?;
@@ -391,45 +404,67 @@ impl Vault {
 
     // ----- entity dir resolution (R15) -----
     //
-    // Writes go to `<root>/wiki/<sub>/<slug>.md` (the canonical path).
-    // Reads check `<root>/wiki/<sub>/` first, then fall back to the
-    // legacy `<root>/<sub>/` so vaults that pre-date R15 still work.
-    // `migrate_legacy_on_write` removes the legacy file after a
-    // successful write so the two paths never silently diverge.
+    // Writes go to `<root>/wiki/<canonical_name>/<slug>.md` — and for
+    // people that canonical name is `contacts/` (R15-3, the user's
+    // term). Reads check the canonical dir first, then *every* legacy
+    // dir in turn: that's `<root>/wiki/people/` (R15-2 intermediate
+    // form) and `<root>/people/` (pre-R15). Same logic for every
+    // other entity — the only one with a renamed canonical dir
+    // currently is "people" → "contacts"; all others use the same
+    // name in both API and on-disk forms, so their "legacy dirs" is
+    // just the pre-R15 root path.
+    //
+    // `migrate_legacy_on_write` removes the slug from *all* legacy
+    // dirs after a successful write to the canonical path, so the
+    // copies cannot silently diverge.
 
     /// Canonical (write) dir for a graph entity subdir.
     fn entity_dir(&self, sub: &str) -> PathBuf {
-        self.root.join("wiki").join(sub)
+        self.root.join("wiki").join(canonical_dir_name(sub))
     }
 
-    /// Legacy (pre-R15) dir for a graph entity subdir.
-    fn legacy_entity_dir(&self, sub: &str) -> PathBuf {
-        self.root.join(sub)
+    /// Every legacy dir to check on a read for this sub, in fall-back
+    /// order. Empty if the sub's canonical dir is also its only dir.
+    fn legacy_entity_dirs(&self, sub: &str) -> Vec<PathBuf> {
+        let mut out: Vec<PathBuf> = Vec::new();
+        // R15-2 intermediate form: wiki/<api-key>/ when the canonical
+        // name differs (i.e. people → contacts, contacts has a prior
+        // form of `wiki/people/`).
+        if canonical_dir_name(sub) != sub {
+            out.push(self.root.join("wiki").join(sub));
+        }
+        // Pre-R15 form: <root>/<api-key>/
+        out.push(self.root.join(sub));
+        out
     }
 
     /// Locate a single entity file by slug, preferring the canonical
-    /// wiki/ location and falling back to the legacy one. Returns
-    /// `None` if neither exists.
+    /// path and falling back to each legacy path in order. Returns
+    /// `None` if no copy exists.
     fn find_entity_file(&self, sub: &str, slug: &str) -> Option<PathBuf> {
         let p = self.entity_dir(sub).join(format!("{slug}.md"));
         if p.is_file() {
             return Some(p);
         }
-        let legacy = self.legacy_entity_dir(sub).join(format!("{slug}.md"));
-        if legacy.is_file() {
-            return Some(legacy);
+        for legacy in self.legacy_entity_dirs(sub) {
+            let lp = legacy.join(format!("{slug}.md"));
+            if lp.is_file() {
+                return Some(lp);
+            }
         }
         None
     }
 
-    /// After a successful write to the canonical wiki/ path, remove
-    /// the same slug from the legacy dir if it exists. Idempotent and
-    /// non-fatal — a stale legacy file is bad data, but failing to
-    /// remove one is not worth surfacing as an error to the caller.
+    /// After a successful write to the canonical dir, remove the same
+    /// slug from every legacy dir. Idempotent and non-fatal — a stale
+    /// legacy file is bad data, but failing to remove one is not
+    /// worth surfacing as an error to the caller.
     fn migrate_legacy_on_write(&self, sub: &str, slug: &str) {
-        let legacy = self.legacy_entity_dir(sub).join(format!("{slug}.md"));
-        if legacy.is_file() {
-            let _ = fs::remove_file(legacy);
+        for legacy in self.legacy_entity_dirs(sub) {
+            let lp = legacy.join(format!("{slug}.md"));
+            if lp.is_file() {
+                let _ = fs::remove_file(lp);
+            }
         }
     }
 
@@ -829,13 +864,19 @@ impl Vault {
     }
 
     fn read_files(&self, sub: &str) -> Vec<(String, String)> {
-        // Union wiki/<sub>/ and legacy <root>/<sub>/, deduped by slug
-        // with the canonical wiki/ winning. Same slug under both paths
-        // is the migration-in-progress state; the legacy copy is
-        // ignored so a transient duplicate doesn't read twice.
+        // Union the canonical dir with every legacy dir, deduped by
+        // slug. Legacy dirs are read in fall-back order *first* so
+        // the canonical write last and wins on conflict. Same slug
+        // appearing in multiple paths is the migration-in-progress
+        // state — the lister returns each slug exactly once.
         let mut by_slug: BTreeMap<String, String> = BTreeMap::new();
-        read_md_into(&self.legacy_entity_dir(sub), &mut by_slug);
-        read_md_into(&self.entity_dir(sub), &mut by_slug); // canonical wins
+        // Iterate legacy in reverse — they're listed in fall-back
+        // (preference) order, so reverse to insert least-preferred
+        // first; the canonical dir read last is the absolute winner.
+        for legacy in self.legacy_entity_dirs(sub).into_iter().rev() {
+            read_md_into(&legacy, &mut by_slug);
+        }
+        read_md_into(&self.entity_dir(sub), &mut by_slug);
         by_slug.into_iter().collect()
     }
 
@@ -1918,25 +1959,34 @@ mod tests {
     // ---- R15-2: wiki/ subtree + legacy back-compat ----
 
     /// New writes land under wiki/<entity>/, not at the legacy root.
+    /// People specifically live at `wiki/contacts/` (R15-3 rename) —
+    /// that path-specific assertion is covered in the R15-3 tests
+    /// below; here we use a non-renamed entity (notes) to exercise
+    /// the generic wiki/-vs-root behavior.
     #[test]
     fn r15_writes_go_under_wiki() {
         let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
-        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+        let _v = Vault::open(dir.to_str().unwrap()).unwrap();
 
-        v.upsert_person(&Person {
-            id: "ada-lovelace".into(),
-            display_name: "Ada Lovelace".into(),
-            handles: vec![],
-            role: String::new(),
-            contact_cascade: vec![],
-            created_at: Utc::now(),
-        })
-        .unwrap();
-
-        assert!(dir.join("wiki").join("people").join("ada-lovelace.md").is_file(),
-            "new person should be written under wiki/people/");
-        assert!(!dir.join("people").join("ada-lovelace.md").is_file(),
-            "new person must NOT also exist at the legacy root path");
+        // Vault::open creates the canonical entity dirs under wiki/.
+        assert!(
+            dir.join("wiki").join("notes").is_dir(),
+            "wiki/notes/ should be created on open"
+        );
+        assert!(
+            dir.join("wiki").join("tasks").is_dir(),
+            "wiki/tasks/ should be created on open"
+        );
+        assert!(
+            dir.join("wiki").join("events").is_dir(),
+            "wiki/events/ should be created on open"
+        );
+        // Non-graph dirs stay at the root.
+        assert!(dir.join("peers").is_dir(), "peers/ stays at root");
+        assert!(dir.join(".querykey").is_dir(), ".querykey/ stays at root");
+        // Legacy non-wiki entity dirs are NOT pre-created.
+        assert!(!dir.join("notes").is_dir(), "no legacy notes/ at root");
+        assert!(!dir.join("tasks").is_dir(), "no legacy tasks/ at root");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -1992,8 +2042,8 @@ mod tests {
         );
         std::fs::write(dir.join("people").join("dup.md"), &legacy).unwrap();
 
-        // Upsert via the API — this writes to wiki/ AND removes the
-        // legacy duplicate.
+        // Upsert via the API — this writes to wiki/contacts/ AND
+        // removes the legacy duplicate (R15-3: people→contacts).
         v.upsert_person(&Person {
             id: "dup".into(),
             display_name: "Fresh Name".into(),
@@ -2005,10 +2055,14 @@ mod tests {
         .unwrap();
 
         // Migrate-on-write removed the legacy copy.
-        assert!(!dir.join("people").join("dup.md").is_file(),
-            "migrate-on-write should remove the legacy duplicate");
-        assert!(dir.join("wiki").join("people").join("dup.md").is_file(),
-            "canonical write lives under wiki/");
+        assert!(
+            !dir.join("people").join("dup.md").is_file(),
+            "migrate-on-write should remove the legacy duplicate"
+        );
+        assert!(
+            dir.join("wiki").join("contacts").join("dup.md").is_file(),
+            "canonical write lives under wiki/contacts/"
+        );
 
         // Single result, with the fresh data.
         let all = v.list_persons();
@@ -2043,14 +2097,185 @@ mod tests {
              created: 2026-01-01T00:00:00Z\n",
             "# legacy\n",
         );
-        std::fs::create_dir_all(dir.join("wiki").join("people")).unwrap();
+        // After R15-3 the canonical dir is wiki/contacts/; the prior
+        // R15-2 form `wiki/people/` is treated as legacy.
+        std::fs::create_dir_all(dir.join("wiki").join("contacts")).unwrap();
         std::fs::create_dir_all(dir.join("people")).unwrap();
-        std::fs::write(dir.join("wiki").join("people").join("fork.md"), &canonical).unwrap();
+        std::fs::write(
+            dir.join("wiki").join("contacts").join("fork.md"),
+            &canonical,
+        )
+        .unwrap();
         std::fs::write(dir.join("people").join("fork.md"), &legacy).unwrap();
 
         let all = v.list_persons();
-        assert_eq!(all.len(), 1, "wiki/ winner only — not duplicated");
+        assert_eq!(all.len(), 1, "canonical wins — not duplicated");
         assert_eq!(all[0].display_name, "Canonical");
+    }
+
+    // ---- R15-3: people → contacts rename ----
+
+    /// New person writes land at `wiki/contacts/`, not `wiki/people/`
+    /// and not the legacy root `people/`.
+    #[test]
+    fn r15_3_writes_go_to_wiki_contacts() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        v.upsert_person(&Person {
+            id: "ada-lovelace".into(),
+            display_name: "Ada Lovelace".into(),
+            handles: vec![],
+            role: String::new(),
+            contact_cascade: vec![],
+            created_at: Utc::now(),
+        })
+        .unwrap();
+
+        assert!(
+            dir.join("wiki")
+                .join("contacts")
+                .join("ada-lovelace.md")
+                .is_file(),
+            "person should be written under wiki/contacts/"
+        );
+        assert!(
+            !dir.join("wiki")
+                .join("people")
+                .join("ada-lovelace.md")
+                .is_file(),
+            "person must NOT be written to the prior wiki/people/ path"
+        );
+        assert!(
+            !dir.join("people").join("ada-lovelace.md").is_file(),
+            "person must NOT be written to the pre-R15 root people/ path"
+        );
+
+        // The canonical dir was created by Vault::open.
+        assert!(dir.join("wiki").join("contacts").is_dir());
+    }
+
+    /// A vault that's at the R15-2 intermediate form (entities under
+    /// wiki/, but people still in `wiki/people/` rather than the
+    /// renamed `wiki/contacts/`) keeps working — reads transparently
+    /// pick up the prior path.
+    #[test]
+    fn r15_3_reads_intermediate_wiki_people_dir() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(dir.join("wiki").join("people")).unwrap();
+        std::fs::write(
+            dir.join("wiki").join("people").join("intermediate-ivy.md"),
+            compose(
+                "id: person:intermediate-ivy\n\
+                 type: person\n\
+                 display_name: Intermediate Ivy\n\
+                 created: 2026-01-01T00:00:00Z\n",
+                "# Intermediate Ivy\n",
+            ),
+        )
+        .unwrap();
+
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        let p = v
+            .get_person("intermediate-ivy")
+            .expect("intermediate wiki/people/ file still readable");
+        assert_eq!(p.display_name, "Intermediate Ivy");
+        let all = v.list_persons();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].id, "intermediate-ivy");
+    }
+
+    /// Migrate-on-write removes BOTH legacy copies (the pre-R15 root
+    /// `people/` AND the R15-2 intermediate `wiki/people/`) when the
+    /// same slug is written through the canonical path.
+    #[test]
+    fn r15_3_upsert_clears_both_legacy_copies() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        let stale = compose(
+            "id: person:two-headed\n\
+             type: person\n\
+             display_name: STALE\n\
+             created: 2026-01-01T00:00:00Z\n",
+            "# stale\n",
+        );
+        std::fs::create_dir_all(dir.join("wiki").join("people")).unwrap();
+        std::fs::create_dir_all(dir.join("people")).unwrap();
+        std::fs::write(
+            dir.join("wiki").join("people").join("two-headed.md"),
+            &stale,
+        )
+        .unwrap();
+        std::fs::write(dir.join("people").join("two-headed.md"), &stale).unwrap();
+
+        v.upsert_person(&Person {
+            id: "two-headed".into(),
+            display_name: "Fresh".into(),
+            handles: vec![],
+            role: String::new(),
+            contact_cascade: vec![],
+            created_at: Utc::now(),
+        })
+        .unwrap();
+
+        assert!(
+            dir.join("wiki")
+                .join("contacts")
+                .join("two-headed.md")
+                .is_file(),
+            "canonical copy at wiki/contacts/ exists"
+        );
+        assert!(
+            !dir.join("wiki")
+                .join("people")
+                .join("two-headed.md")
+                .is_file(),
+            "intermediate wiki/people/ copy removed"
+        );
+        assert!(
+            !dir.join("people").join("two-headed.md").is_file(),
+            "pre-R15 root people/ copy removed"
+        );
+
+        let all = v.list_persons();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].display_name, "Fresh");
+    }
+
+    /// Other entities are NOT renamed — they keep using their API key
+    /// as the canonical dir name. This guards the rename helper from
+    /// accidentally generalising to entities it doesn't apply to.
+    #[test]
+    fn r15_3_non_people_entities_unchanged() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        let tid = uuid::Uuid::new_v4();
+        v.upsert_task(&Task {
+            id: tid,
+            title: "Probe task".into(),
+            description: "body".into(),
+            status: TaskStatus::Extracted,
+            assigned_to: String::new(),
+            assigned_by: String::new(),
+            deadline: None,
+            confidence: 1.0,
+            ambiguity_score: 0.0,
+            source_messages: vec![],
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        })
+        .unwrap();
+
+        // Task lives at wiki/tasks/, not wiki/contacts/ or some weird
+        // remap. (Sanity check on the canonical-name helper.)
+        assert!(dir
+            .join("wiki")
+            .join("tasks")
+            .join(format!("{tid}.md"))
+            .is_file());
     }
 }
 
