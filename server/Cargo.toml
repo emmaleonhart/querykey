@@ -1,0 +1,41 @@
+[package]
+name = "querykey-server"
+version = "0.1.0"
+edition = "2021"
+description = "QueryKey server (Rust). Local-first ingest -> derived graph (Loca) -> real-time sync. Port of server-go-old/."
+license = "MIT"
+
+[[bin]]
+name = "querykey-server"
+path = "src/main.rs"
+
+[[bin]]
+name = "dump-messages"
+path = "src/bin/dump_messages.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "sync", "time", "process"] }
+axum = { version = "0.7", features = ["ws"] }
+tower = "0.5"
+tower-http = { version = "0.5", features = ["cors"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+futures-util = "0.3"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
+thiserror = "1"
+async-trait = "0.1"
+
+# Loca / SutraDB graph store. Optional so the crate always builds even
+# without the sibling SutraDB checkout. Enable with: --features loca
+# (production build). Path dep: secretarybird-pivot/server -> Github/SutraDB.
+loka-core = { path = "../../SutraDB/loka-core", optional = true }
+loka-sparql = { path = "../../SutraDB/loka-sparql", optional = true }
+
+[features]
+default = []
+loca = ["dep:loka-core", "dep:loka-sparql"]
