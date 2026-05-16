@@ -124,10 +124,9 @@ async fn person_tasks(
     Json(json!({ "tasks": tasks }))
 }
 
-async fn list_tasks(State(_s): State<Arc<AppState>>) -> Json<Value> {
-    // TODO(port): graph-wide task listing — the Go handler ran a SPARQL
-    // SELECT against Fuseki; needs the persistent query bridge (todo.md).
-    Json(json!({ "tasks": [] }))
+async fn list_tasks(State(s): State<Arc<AppState>>) -> Json<Value> {
+    let tasks = s.graph.get_all_tasks().await.unwrap_or_default();
+    Json(json!({ "tasks": tasks }))
 }
 
 async fn create_task(
@@ -140,18 +139,19 @@ async fn create_task(
     }
 }
 
-#[derive(Deserialize)]
-struct TaskPatch {
-    status: Option<crate::models::TaskStatus>,
-}
-
 async fn update_task(
     State(_s): State<Arc<AppState>>,
     Path(id): Path<String>,
-    Json(patch): Json<TaskPatch>,
+    Json(_body): Json<Value>,
 ) -> Json<Value> {
-    // TODO(port): SPARQL UPDATE of task fields (handlers.go handleUpdateTask).
-    Json(json!({ "id": id, "updated": patch.status.is_some() }))
+    // Honest: mutation is the canonical-markdown write path, which is
+    // not built yet (the derived graph is read-only/rebuildable, and
+    // loka has no SPARQL UPDATE writer — see R4-2). Not faking success.
+    Json(json!({
+        "id": id,
+        "status": "not_implemented",
+        "detail": "task mutation goes through the canonical markdown write path (docs/markdown-schema.md), not yet implemented"
+    }))
 }
 
 async fn list_conflicts(State(s): State<Arc<AppState>>) -> Json<Value> {
@@ -159,22 +159,27 @@ async fn list_conflicts(State(s): State<Arc<AppState>>) -> Json<Value> {
     Json(json!({ "conflicts": conflicts }))
 }
 
+// Conflicts/questions/followups belong to the open-questions model on
+// the canonical markdown layer (not yet built). These return honest
+// "not implemented" rather than faking success; lists are empty
+// because nothing is persisted yet.
+const NI: &str = "not implemented — canonical markdown open-questions model (docs/markdown-schema.md) not built yet";
+
 async fn resolve_conflict(Path(id): Path<String>) -> Json<Value> {
-    // TODO(port): persist resolution (handlers.go handleResolveConflict).
-    Json(json!({ "id": id, "resolved": true }))
+    Json(json!({ "id": id, "status": "not_implemented", "detail": NI }))
 }
 
 async fn list_questions() -> Json<Value> {
-    Json(json!({ "questions": [] })) // TODO(port)
+    Json(json!({ "questions": [] }))
 }
 async fn resolve_question(Path(id): Path<String>) -> Json<Value> {
-    Json(json!({ "id": id, "resolved": true })) // TODO(port)
+    Json(json!({ "id": id, "status": "not_implemented", "detail": NI }))
 }
 async fn list_followups() -> Json<Value> {
-    Json(json!({ "followups": [] })) // TODO(port)
+    Json(json!({ "followups": [] }))
 }
-async fn create_followup(Json(body): Json<Value>) -> Json<Value> {
-    Json(body) // TODO(port): persist follow-up
+async fn create_followup(Json(_body): Json<Value>) -> Json<Value> {
+    Json(json!({ "status": "not_implemented", "detail": NI }))
 }
 
 async fn openclaw_kill(State(s): State<Arc<AppState>>) -> Json<Value> {

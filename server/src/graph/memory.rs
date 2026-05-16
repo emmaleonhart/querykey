@@ -65,6 +65,10 @@ impl GraphStore for InMemoryGraph {
         Ok(self.persons.lock().unwrap().clone())
     }
 
+    async fn get_all_tasks(&self) -> anyhow::Result<Vec<Task>> {
+        Ok(self.tasks.lock().unwrap().clone())
+    }
+
     async fn get_tasks_for_person(&self, person_id: &str) -> anyhow::Result<Vec<Task>> {
         Ok(self
             .tasks

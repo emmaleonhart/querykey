@@ -238,14 +238,87 @@ impl GraphStore for LocaGraph {
         }
         Ok(out)
     }
-    async fn get_tasks_for_person(&self, _person_id: &str) -> anyhow::Result<Vec<Task>> {
-        // Intentionally not reconstructed from the derived graph. Task
-        // carries fields (uuid, timestamps, confidence, ambiguity) that
-        // store_task does not project — the derived graph is a lossy
-        // secondary index, not the store of record. The correct read
-        // path is the canonical markdown (docs/markdown-schema.md),
-        // which is not implemented yet. TODO(port): markdown task read.
-        Ok(Vec::new())
+    async fn get_all_tasks(&self) -> anyhow::Result<Vec<Task>> {
+        // store_task (R4-2) now projects the full field set, so this
+        // reconstruction is faithful. (Canonical write path remains
+        // markdown per the architecture; this read is over the derived
+        // index.)
+        let type_p = match self.store.lookup(RDF_TYPE).ok().flatten() {
+            Some(x) => x,
+            None => return Ok(Vec::new()),
+        };
+        let task_c = match self.store.lookup(&format!("{NS}Task")).ok().flatten() {
+            Some(x) => x,
+            None => return Ok(Vec::new()),
+        };
+        let strip_iri = |v: &str| v.rsplit('/').next().unwrap_or("").to_string();
+        let mut out = Vec::new();
+        for t in self.store.find_by_predicate_object(type_p, task_c) {
+            let subj = t.subject;
+            let subj_iri = self.store.resolve(subj).ok().flatten().unwrap_or_default();
+            let id = uuid::Uuid::parse_str(subj_iri.rsplit('/').next().unwrap_or(""))
+                .unwrap_or_default();
+            let mut task = Task {
+                id,
+                title: String::new(),
+                description: String::new(),
+                status: crate::models::TaskStatus::Extracted,
+                assigned_to: String::new(),
+                assigned_by: String::new(),
+                deadline: None,
+                confidence: 0.0,
+                ambiguity_score: 0.0,
+                source_messages: Vec::new(),
+                created_at: chrono::DateTime::<chrono::Utc>::from_timestamp(0, 0)
+                    .unwrap_or_else(chrono::Utc::now),
+                updated_at: chrono::DateTime::<chrono::Utc>::from_timestamp(0, 0)
+                    .unwrap_or_else(chrono::Utc::now),
+            };
+            for a in self.store.find_by_subject(subj) {
+                let pred = self.store.resolve(a.predicate).ok().flatten().unwrap_or_default();
+                let raw = self.store.resolve(a.object).ok().flatten().unwrap_or_default();
+                let val = unquote(&raw);
+                match pred.strip_prefix(NS) {
+                    Some("title") => task.title = val,
+                    Some("description") => task.description = val,
+                    Some("status") => {
+                        task.status = serde_json::from_value(serde_json::Value::String(val))
+                            .unwrap_or(crate::models::TaskStatus::Extracted)
+                    }
+                    Some("confidence") => task.confidence = val.parse().unwrap_or(0.0),
+                    Some("ambiguityScore") => task.ambiguity_score = val.parse().unwrap_or(0.0),
+                    Some("assignedTo") => task.assigned_to = strip_iri(&val),
+                    Some("assignedBy") => task.assigned_by = strip_iri(&val),
+                    Some("deadline") => {
+                        task.deadline = chrono::DateTime::parse_from_rfc3339(&val)
+                            .ok()
+                            .map(|d| d.with_timezone(&chrono::Utc))
+                    }
+                    Some("createdAt") => {
+                        if let Ok(d) = chrono::DateTime::parse_from_rfc3339(&val) {
+                            task.created_at = d.with_timezone(&chrono::Utc);
+                        }
+                    }
+                    Some("updatedAt") => {
+                        if let Ok(d) = chrono::DateTime::parse_from_rfc3339(&val) {
+                            task.updated_at = d.with_timezone(&chrono::Utc);
+                        }
+                    }
+                    Some("sourceMessage") => task.source_messages.push(strip_iri(&val)),
+                    _ => {}
+                }
+            }
+            out.push(task);
+        }
+        Ok(out)
+    }
+
+    async fn get_tasks_for_person(&self, person_id: &str) -> anyhow::Result<Vec<Task>> {
+        let all = self.get_all_tasks().await?;
+        Ok(all
+            .into_iter()
+            .filter(|t| t.assigned_to == person_id)
+            .collect())
     }
     async fn get_unresolved_conflicts(&self) -> anyhow::Result<Vec<Conflict>> {
         // Same rationale as get_tasks_for_person: hydrate from canonical

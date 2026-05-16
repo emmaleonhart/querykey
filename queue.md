@@ -409,9 +409,14 @@ real conflict/blocker.
       UPDATE writer in loka; writes go via store_*/insert_triples).
       Event/Instruction/FollowUp persistence needs new GraphStore
       trait methods → folded into R4-4 (pipeline parity).
-- [ ] R4-3. **API handler parity** — real `list_tasks`, `update_task`,
-      `resolve_conflict`, `questions`/`followups` against the graph
-      (drop the stub/echo TODOs in `src/api/`).
+- [x] R4-3. **API handler parity** — `get_all_tasks` added to the
+      GraphStore trait (loca: faithful POS-index reconstruction now
+      that R4-2 projects all fields; memory: vec). `list_tasks` and
+      `/persons/:id/tasks` now return real data (smoke-verified,
+      timestamps round-trip). Mutation endpoints (update_task,
+      resolve_conflict/question, create_followup) made **honest
+      not_implemented** (canonical-markdown write path not built; no
+      faking success). All builds clean, zero warnings.
 - [ ] R4-4. **Ingest pipeline parity** — match pipeline.go: normalize,
       parse_analysis (incl. events/instructions/follow-ups), store all,
       broadcast a typed GraphDiff (added nodes/edges).

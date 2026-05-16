@@ -57,6 +57,7 @@ pub trait GraphStore: Send + Sync {
     async fn store_conflict(&self, c: &Conflict) -> anyhow::Result<()>;
 
     async fn get_all_persons(&self) -> anyhow::Result<Vec<Person>>;
+    async fn get_all_tasks(&self) -> anyhow::Result<Vec<Task>>;
     async fn get_tasks_for_person(&self, person_id: &str) -> anyhow::Result<Vec<Task>>;
     async fn get_unresolved_conflicts(&self) -> anyhow::Result<Vec<Conflict>>;
 
