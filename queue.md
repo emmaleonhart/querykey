@@ -81,12 +81,6 @@ each. Plan-first/delete-when-done: delete each sub-step from this block
 in the same commit; when all done, remove the Round 17 ACTIVE block
 (record = git log + docs):**
 
-- R17-1. **Server read endpoints** (small, vault methods mostly exist):
-  `GET /api/notes` (list) and a generic `GET /api/entities/:kind/:id`
-  returning `{kind,id,title,body,frontmatter}` for
-  person|note|event|project|task (reuse existing vault reads; persons
-  read from the contacts dir per R15). Unit/smoke tests. No behavior
-  change to existing routes.
 - R17-2. **ApiService + models** (`app/lib`): add `getIdentity()`,
   `getCard()`, `putCard()`, `draftCard()`, `revertCard()`,
   `listNotes()`, `listProjects()`, `getEntity(kind,id)`, `listLinks()`;

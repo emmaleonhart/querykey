@@ -773,6 +773,9 @@ version = "0.1.0"
 [[package]]
 name = "loka-sparql"
 version = "0.1.0"
+dependencies = [
+ "loka-core",
+]
 
 [[package]]
 name = "lru-slab"

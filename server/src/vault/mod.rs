@@ -42,6 +42,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Duration, NaiveDate, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 
 use crate::models::{
     Conflict, ConflictResolution, ConflictType, DeliveryAttempt, Event, FollowUp, FollowUpStatus,
@@ -324,6 +325,18 @@ pub struct AgendaItem {
     pub end: Option<String>,  // events only
     pub movable: bool,        // task → true, event → false
     pub recurring: bool,      // this row is one occurrence of a rule
+}
+
+/// Generic entity page returned by `GET /api/entities/:kind/:id` (R17-1).
+/// `frontmatter` is the parsed model struct serialised as JSON (rich
+/// enough for the Flutter detail view; not literally the raw YAML).
+#[derive(Debug, Clone, Serialize)]
+pub struct EntityPage {
+    pub kind: String,
+    pub id: String,
+    pub title: String,
+    pub body: String,
+    pub frontmatter: JsonValue,
 }
 
 /// Resolution/comparison slug: lowercase, non-alphanumeric runs become
@@ -1631,6 +1644,110 @@ impl Vault {
             .filter_map(|(slug, c)| self.project_from(&slug, &c))
             .collect()
     }
+
+    // ----- Generic entity page (R17-1) -----
+    //
+    // `GET /api/entities/:kind/:id` — returns a unified { kind, id,
+    // title, body, frontmatter } view for any wiki page-type. Reuses
+    // all existing vault reads; the `frontmatter` is the parsed model
+    // struct as JSON (rich, not raw YAML). Notes stored on disk as
+    // "information" are exposed under API key "note".
+
+    /// Extract the first `# heading` from a markdown body, or None.
+    fn extract_title(body: &str) -> Option<String> {
+        body.lines()
+            .find(|l| l.starts_with("# "))
+            .map(|l| l.trim_start_matches('#').trim().to_string())
+    }
+
+    /// Compact list for `GET /api/notes`: `[{id, title}]`.
+    pub fn list_notes_meta(&self) -> Vec<JsonValue> {
+        self.read_files("notes")
+            .into_iter()
+            .map(|(slug, content)| {
+                let (_, body) = split(&content);
+                let title = Self::extract_title(&body).unwrap_or_else(|| slug.clone());
+                serde_json::json!({"id": slug, "title": title})
+            })
+            .collect()
+    }
+
+    /// Generic entity page for `GET /api/entities/:kind/:id`.
+    /// Supported kinds: person, note, event, project, task.
+    pub fn get_entity(&self, kind: &str, id: &str) -> Option<EntityPage> {
+        match kind {
+            "person" => {
+                let p = self.get_person(id)?;
+                let body = self.read_entity_body("people", id).unwrap_or_default();
+                let fm = serde_json::to_value(&p).unwrap_or_default();
+                Some(EntityPage {
+                    kind: "person".into(),
+                    id: p.id,
+                    title: p.display_name,
+                    body,
+                    frontmatter: fm,
+                })
+            }
+            "note" => {
+                let (slug, content) = self
+                    .read_files("notes")
+                    .into_iter()
+                    .find(|(s, _)| s == id)?;
+                let (yaml, body) = split(&content);
+                let title = Self::extract_title(&body).unwrap_or_else(|| slug.clone());
+                let fm: JsonValue = if yaml.is_empty() {
+                    serde_json::Value::Object(Default::default())
+                } else {
+                    serde_yaml::from_str::<JsonValue>(&yaml).unwrap_or_default()
+                };
+                Some(EntityPage {
+                    kind: "note".into(),
+                    id: slug,
+                    title,
+                    body,
+                    frontmatter: fm,
+                })
+            }
+            "event" => {
+                let e = self
+                    .list_events()
+                    .into_iter()
+                    .find(|e| e.id.to_string() == id)?;
+                let fm = serde_json::to_value(&e).unwrap_or_default();
+                Some(EntityPage {
+                    kind: "event".into(),
+                    id: e.id.to_string(),
+                    title: e.title.clone(),
+                    body: e.description.clone(),
+                    frontmatter: fm,
+                })
+            }
+            "project" => {
+                let p = self.get_project(id)?;
+                let fm = serde_json::to_value(&p).unwrap_or_default();
+                Some(EntityPage {
+                    kind: "project".into(),
+                    id: p.id.clone(),
+                    title: p.title.clone(),
+                    body: p.body.clone(),
+                    frontmatter: fm,
+                })
+            }
+            "task" => {
+                let uuid = uuid::Uuid::parse_str(id).ok()?;
+                let t = self.get_task(&uuid)?;
+                let fm = serde_json::to_value(&t).unwrap_or_default();
+                Some(EntityPage {
+                    kind: "task".into(),
+                    id: t.id.to_string(),
+                    title: t.title.clone(),
+                    body: t.description.clone(),
+                    frontmatter: fm,
+                })
+            }
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -2875,6 +2992,87 @@ mod tests {
         ).unwrap();
         assert!(!page_other.contains("Weekly Standup"),
             "non-occurrence date does not list the event");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ---- R17-1: get_entity / list_notes_meta ----
+
+    #[test]
+    fn r17_1_get_entity_person_note_project_task() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        // Person
+        v.upsert_person(&Person {
+            id: "ada-lovelace".into(),
+            display_name: "Ada Lovelace".into(),
+            handles: vec![],
+            role: "mathematician".into(),
+            contact_cascade: vec![],
+            created_at: Utc::now(),
+        }).unwrap();
+        let ep = v.get_entity("person", "ada-lovelace").unwrap();
+        assert_eq!(ep.kind, "person");
+        assert_eq!(ep.id, "ada-lovelace");
+        assert_eq!(ep.title, "Ada Lovelace");
+        assert!(ep.body.contains("Ada Lovelace"));
+        assert!(ep.frontmatter.is_object());
+
+        // Note (written directly to wiki/information/)
+        fs::write(
+            dir.join("wiki").join("information").join("my-note.md"),
+            "# Research Note\n\nSome content about the engine.\n",
+        ).unwrap();
+        let en = v.get_entity("note", "my-note").unwrap();
+        assert_eq!(en.kind, "note");
+        assert_eq!(en.id, "my-note");
+        assert_eq!(en.title, "Research Note");
+        assert!(en.body.contains("engine"));
+
+        // list_notes_meta
+        let meta = v.list_notes_meta();
+        assert_eq!(meta.len(), 1);
+        assert_eq!(meta[0]["id"], "my-note");
+        assert_eq!(meta[0]["title"], "Research Note");
+
+        // Project
+        let now = Utc::now();
+        v.upsert_project(&Project {
+            id: "engine-project".into(),
+            title: "Analytical Engine".into(),
+            body: "The project body.".into(),
+            created_at: now,
+            updated_at: now,
+        }).unwrap();
+        let eproj = v.get_entity("project", "engine-project").unwrap();
+        assert_eq!(eproj.kind, "project");
+        assert_eq!(eproj.title, "Analytical Engine");
+        assert!(eproj.body.contains("project body"));
+
+        // Task
+        let tid = uuid::Uuid::new_v4();
+        v.upsert_task(&Task {
+            id: tid,
+            title: "Read the notes".into(),
+            description: "A task body.".into(),
+            status: TaskStatus::Extracted,
+            assigned_to: String::new(),
+            assigned_by: String::new(),
+            deadline: None,
+            confidence: 0.9,
+            ambiguity_score: 0.0,
+            source_messages: vec![],
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }).unwrap();
+        let et = v.get_entity("task", &tid.to_string()).unwrap();
+        assert_eq!(et.kind, "task");
+        assert_eq!(et.title, "Read the notes");
+        assert!(et.body.contains("task body"));
+
+        // Unknown kind returns None.
+        assert!(v.get_entity("unknown", "foo").is_none());
 
         let _ = std::fs::remove_dir_all(&dir);
     }

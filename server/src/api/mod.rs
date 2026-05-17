@@ -88,6 +88,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // vault — backend-independent, never stale).
         .route("/api/links", get(list_links))
         .route("/api/entities/:kind/:id/links", get(entity_links))
+        // Generic wiki page reader (R17-1): notes list + entity detail.
+        // Notes kept under API key "notes" (maps to information/ on disk).
+        .route("/api/notes", get(list_notes_h))
+        .route("/api/entities/:kind/:id", get(get_entity_h))
         // Local-agent management
         .route("/api/openclaw/kill", post(openclaw_kill))
         .route("/api/openclaw/restart", post(openclaw_restart))
@@ -642,6 +646,26 @@ async fn entity_links(
         "from": s.vault.links_from(&kind, &id), // outgoing
         "to": s.vault.links_to(&kind, &id),     // backlinks
     }))
+}
+
+// ---- wiki read endpoints (R17-1) ----
+//
+// Additive, read-only surfaces for the Flutter UI. No behavior change
+// to any existing route. Notes use the "notes" API key (canonical
+// on-disk dir is wiki/information/ per R16-1).
+
+async fn list_notes_h(State(s): State<Arc<AppState>>) -> Json<Value> {
+    Json(json!({ "notes": s.vault.list_notes_meta() }))
+}
+
+async fn get_entity_h(
+    State(s): State<Arc<AppState>>,
+    Path((kind, id)): Path<(String, String)>,
+) -> Json<Value> {
+    match s.vault.get_entity(&kind, &id) {
+        Some(page) => Json(serde_json::to_value(page).unwrap_or_else(|_| json!({}))),
+        None => Json(json!({ "error": "entity not found", "kind": kind, "id": id })),
+    }
 }
 
 async fn openclaw_kill(State(s): State<Arc<AppState>>) -> Json<Value> {
