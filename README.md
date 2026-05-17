@@ -159,7 +159,7 @@ wiki browsing); the rest is scaffolding.
   live against the `life-planning/prm` vault: `/api/card` (+ correct
   `updated`), 135 contacts, 4 projects, 2 notes, 1 event served; test
   suite **69 passed / 0 failed**. (Visual GUI pass is the user's on
-  next `run-UI.bat`; the data path is end-to-end verified.)
+  next `!run-UI.bat`; the data path is end-to-end verified.)
 
 **Honest limitations / not yet built**
 - **Agent honesty (gateway detection + ingest)** — DONE (Round 13):

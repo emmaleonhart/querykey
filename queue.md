@@ -121,9 +121,9 @@ sub-step here in the same commit; remove this block when all done:
 - **Visual GUI confirmation of the UI.** R18 verified the data path
   end-to-end (live: `/api/card` + 135 contacts served from
   `life-planning/prm`) and the screen code by review, but no one has
-  run the actual Flutter Windows window to eyeball Profile/Wiki
-  rendering. Next time the app is run via `run-UI.bat`, confirm the
-  card renders and Wiki→Contacts lists people; file anything off as a
+  run the actual desktop window to eyeball Profile/Wiki rendering.
+  Next time the app is run via `!run-UI.bat`, confirm the card
+  renders and Wiki→Contacts lists people; file anything off as a
   new round.
 - **Loka Studio graph-viz reuse (deferred, user-flagged).** The user
   wants knowledge-graph visualization à la `SutraDB/loka-studio`
