@@ -81,12 +81,6 @@ each. Plan-first/delete-when-done: delete each sub-step from this block
 in the same commit; when all done, remove the Round 17 ACTIVE block
 (record = git log + docs):**
 
-- R17-2. **ApiService + models** (`app/lib`): add `getIdentity()`,
-  `getCard()`, `putCard()`, `draftCard()`, `revertCard()`,
-  `listNotes()`, `listProjects()`, `getEntity(kind,id)`, `listLinks()`;
-  `Card` model (handle/name/website/bio/offering/looking_for/updated/
-  visibility) + propagation; match the existing `_get/_post` house
-  style + snake_case JSON. Add `flutter_markdown` to `pubspec.yaml`.
 - R17-3. **Profile/Card screen** — view the card (bio, Offering(key),
   Looking-for(query), handle/website, propagation status: pending +
   eligible_at) and **edit** it (form → `PUT /api/card`), with

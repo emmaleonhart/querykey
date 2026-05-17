@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/models.dart';
 
-/// REST API client for the Secretarybird server.
+/// REST API client for the QueryKey server.
 class ApiService {
   final String baseUrl;
   final http.Client _client;
@@ -40,6 +40,56 @@ class ApiService {
       'submitted_by': submittedBy,
       if (sourceContext != null) 'source_context': sourceContext,
     });
+  }
+
+  // --- Identity + Card (P2P key/query signal) ---
+
+  Future<Map<String, dynamic>> getIdentity() async {
+    return _get('/api/identity');
+  }
+
+  Future<Map<String, dynamic>> getCard() async {
+    return _get('/api/card');
+  }
+
+  Future<Map<String, dynamic>> putCard(Card card) async {
+    return _post('/api/card', card.toJson());
+  }
+
+  Future<Map<String, dynamic>> draftCard() async {
+    return _post('/api/card/draft', {});
+  }
+
+  Future<Map<String, dynamic>> revertCard() async {
+    return _post('/api/card/revert', {});
+  }
+
+  // --- Wiki read endpoints (R17-1) ---
+
+  Future<List<WikiPageSummary>> listNotes() async {
+    final data = await _get('/api/notes');
+    final list = data['notes'] as List? ?? [];
+    return list.map((n) => WikiPageSummary.fromJson(n, 'note')).toList();
+  }
+
+  Future<List<WikiPageSummary>> listProjects() async {
+    final data = await _get('/api/projects');
+    final list = data['projects'] as List? ?? [];
+    return list.map((p) => WikiPageSummary.fromJson(p, 'project')).toList();
+  }
+
+  Future<EntityPage> getEntity(String kind, String id) async {
+    final data = await _get('/api/entities/$kind/$id');
+    return EntityPage.fromJson(data);
+  }
+
+  Future<List<dynamic>> listLinks() async {
+    final data = await _get('/api/links');
+    return data['links'] as List? ?? [];
+  }
+
+  Future<Map<String, dynamic>> entityLinks(String kind, String id) async {
+    return _get('/api/entities/$kind/$id/links');
   }
 
   // --- Persons ---

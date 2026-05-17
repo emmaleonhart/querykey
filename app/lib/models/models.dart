@@ -1,4 +1,4 @@
-// Data models matching the Go server's models package.
+// Data models matching the Rust server's models.
 // Every entity from docs/data-model.md is represented here.
 
 class Person {
@@ -186,7 +186,136 @@ class OpenQuestion {
       );
 }
 
-/// WebSocket message envelope matching the Go server's WSMessage.
+/// Your broadcast card (P2P key/query signal). Matches the Rust Card struct
+/// and the body sections in card.md (docs/card-format.md, R7).
+class Card {
+  final String handle;
+  final String name;
+  final String website;
+  final String bio;
+  final List<String> offering;
+  final List<String> lookingFor;
+  final DateTime updated;
+  final String visibility;
+
+  Card({
+    required this.handle,
+    this.name = '',
+    this.website = '',
+    this.bio = '',
+    this.offering = const [],
+    this.lookingFor = const [],
+    required this.updated,
+    this.visibility = 'public',
+  });
+
+  factory Card.fromJson(Map<String, dynamic> json) => Card(
+        handle: json['handle'] ?? '',
+        name: json['name'] ?? '',
+        website: json['website'] ?? '',
+        bio: json['bio'] ?? '',
+        offering: (json['offering'] as List?)?.map((e) => e.toString()).toList() ?? [],
+        lookingFor: (json['looking_for'] as List?)?.map((e) => e.toString()).toList() ?? [],
+        updated: json['updated'] != null
+            ? DateTime.tryParse(json['updated']) ?? DateTime.now()
+            : DateTime.now(),
+        visibility: json['visibility'] ?? 'public',
+      );
+
+  Map<String, dynamic> toJson() => {
+        'handle': handle,
+        'name': name,
+        'website': website,
+        'bio': bio,
+        'offering': offering,
+        'looking_for': lookingFor,
+        'visibility': visibility,
+      };
+
+  Card copyWith({
+    String? handle,
+    String? name,
+    String? website,
+    String? bio,
+    List<String>? offering,
+    List<String>? lookingFor,
+    String? visibility,
+  }) =>
+      Card(
+        handle: handle ?? this.handle,
+        name: name ?? this.name,
+        website: website ?? this.website,
+        bio: bio ?? this.bio,
+        offering: offering ?? this.offering,
+        lookingFor: lookingFor ?? this.lookingFor,
+        updated: this.updated,
+        visibility: visibility ?? this.visibility,
+      );
+}
+
+/// 24h propagation safety valve state from GET /api/card.
+class CardPropagation {
+  final bool pending;
+  final DateTime? eligibleAt;
+  final bool published;
+
+  CardPropagation({
+    required this.pending,
+    this.eligibleAt,
+    required this.published,
+  });
+
+  factory CardPropagation.fromJson(Map<String, dynamic> json) => CardPropagation(
+        pending: json['pending'] == true,
+        eligibleAt: json['eligible_at'] != null
+            ? DateTime.tryParse(json['eligible_at'])
+            : null,
+        published: json['published'] == true,
+      );
+}
+
+/// A compact wiki page summary for list views.
+class WikiPageSummary {
+  final String id;
+  final String title;
+  final String kind;
+
+  WikiPageSummary({required this.id, required this.title, required this.kind});
+
+  factory WikiPageSummary.fromJson(Map<String, dynamic> json, String kind) =>
+      WikiPageSummary(
+        id: json['id'] ?? '',
+        title: json['title'] ?? json['display_name'] ?? json['id'] ?? '',
+        kind: kind,
+      );
+}
+
+/// Full entity page from GET /api/entities/:kind/:id (R17-1).
+class EntityPage {
+  final String kind;
+  final String id;
+  final String title;
+  final String body;
+  final Map<String, dynamic> frontmatter;
+
+  EntityPage({
+    required this.kind,
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.frontmatter,
+  });
+
+  factory EntityPage.fromJson(Map<String, dynamic> json) => EntityPage(
+        kind: json['kind'] ?? '',
+        id: json['id'] ?? '',
+        title: json['title'] ?? '',
+        body: json['body'] ?? '',
+        frontmatter: (json['frontmatter'] as Map<String, dynamic>?) ?? {},
+      );
+}
+
+/// WebSocket message envelope matching the Rust server's WSMessage.
 class WSMessage {
   final String type;
   final String? content;
