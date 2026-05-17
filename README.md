@@ -1,5 +1,7 @@
 # QueryKey
 
+**Website · [querykey.emmaleonhart.com](https://querykey.emmaleonhart.com)**
+
 **A rationalist social network you run locally from your own desktop** — and,
 underneath, a personal relationship manager (PRM), a lightweight CRM, and a
 JIRA-style task tracker for your own life. QueryKey uses a local AI agent to
