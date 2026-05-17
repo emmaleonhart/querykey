@@ -66,6 +66,21 @@ record is in `git log` + README Status. Pull the next item from
   rendering. Next time the app is run via `run-UI.bat`, confirm the
   card renders and Wiki→Contacts lists people; file anything off as a
   new round.
+- **Events are not surfaced anywhere in the current UI.** Two
+  independent gaps, both found 2026-05-16 while seeding test data:
+  (1) the Wiki **Events** tab is a hardcoded `return []` stub
+  (`app/lib/screens/wiki_screen.dart`, R17 minimal choice — no event
+  list endpoint), and (2) `parse_dt` (`vault/mod.rs`) only accepts
+  RFC3339 *with offset*, so a schema-shaped naive `start:
+  2026-05-20T18:00:00` (the form the schema's own Event example uses)
+  falls back to the **epoch** and the event drops out of
+  `GET /api/calendar`'s window. Net: a valid `events/<uuid>.md` parses
+  as an entity but cannot appear in any current screen. Fix is a
+  round: make `parse_dt` accept naive datetimes (assume local/UTC) —
+  same bug family as the R18-3 CRLF fix — and either add an events
+  list endpoint + unstub the tab or build a calendar screen. A
+  schema-correct placeholder event is committed in the
+  `life-planning/prm` vault for when this lands.
 - **Loka Studio graph-viz reuse (deferred, user-flagged).** The user
   wants knowledge-graph visualization à la `SutraDB/loka-studio`
   (force-directed `graph_canvas.dart`). Deferred from R18: only the
