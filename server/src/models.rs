@@ -298,6 +298,20 @@ pub struct ExternalSync {
     pub status_in_external: String,
 }
 
+/// A project page (R16-2). Minimal free-form wiki page: frontmatter
+/// carries `id/type/title`; the body is freeform markdown. Wikilinks
+/// in the body are graph-bearing (same as contacts/information pages).
+/// No legacy paths — projects/ is new in R16.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Project {
+    pub id: String,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub body: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 // --- Graph Diff (for WebSocket broadcast) ---
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

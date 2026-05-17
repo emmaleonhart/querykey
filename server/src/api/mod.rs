@@ -13,7 +13,7 @@ use tower_http::cors::{Any, CorsLayer};
 use crate::graph::GraphStore;
 use crate::ingest::{IngestRequest, Pipeline};
 use crate::models::{
-    ConflictResolution, FollowUp, GraphDiff, Person, QuestionStatus, Task, VoiceProfile,
+    ConflictResolution, FollowUp, GraphDiff, Person, Project, QuestionStatus, Task, VoiceProfile,
 };
 use crate::openclaw::Bridge;
 use crate::ws::{ws_handler, Hub};
@@ -79,6 +79,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/identity", get(get_identity))
         .route("/api/peers", get(list_peers_h))
         .route("/api/peers/:handle/card", get(get_peer_card_h))
+        // Projects (wiki page-type, R16-2)
+        .route("/api/projects", get(list_projects).post(create_project))
+        .route("/api/projects/:id", get(get_project_h))
         // Semantic wikilink graph (derived live from the canonical
         // vault — backend-independent, never stale).
         .route("/api/links", get(list_links))
@@ -555,6 +558,47 @@ async fn put_voice_profile(
         return Json(json!({ "error": e.to_string() }));
     }
     Json(serde_json::to_value(vp).unwrap())
+}
+
+// ---- Projects (wiki page-type, R16-2) ----
+//
+// Free-form wiki pages: frontmatter id/type/title + freeform body.
+// Graph-bearing via [[wikilinks]] (same as contacts / information).
+// Vault-canonical, no legacy paths (new page-type in R16).
+
+async fn list_projects(State(s): State<Arc<AppState>>) -> Json<Value> {
+    Json(json!({ "projects": s.vault.list_projects() }))
+}
+
+async fn get_project_h(
+    State(s): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Json<Value> {
+    match s.vault.get_project(&id) {
+        Some(p) => Json(serde_json::to_value(p).unwrap_or_else(|_| json!({}))),
+        None => Json(json!({ "error": "project not found", "id": id })),
+    }
+}
+
+async fn create_project(
+    State(s): State<Arc<AppState>>,
+    Json(mut p): Json<Project>,
+) -> Json<Value> {
+    if p.id.is_empty() {
+        p.id = crate::vault::slug(&p.title);
+        if p.id.is_empty() {
+            p.id = uuid::Uuid::new_v4().to_string();
+        }
+    }
+    let now = chrono::Utc::now();
+    if p.created_at.timestamp() == 0 {
+        p.created_at = now;
+    }
+    p.updated_at = now;
+    if let Err(e) = s.vault.upsert_project(&p) {
+        return Json(json!({ "error": e.to_string() }));
+    }
+    Json(serde_json::to_value(p).unwrap())
 }
 
 // ---- semantic wikilink graph ----

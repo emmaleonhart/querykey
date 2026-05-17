@@ -45,8 +45,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::{
     Conflict, ConflictResolution, ConflictType, DeliveryAttempt, Event, FollowUp, FollowUpStatus,
-    Handle, Instruction, OpenQuestion, Person, QuestionStatus, Task, TaskStatus, TriggerType,
-    Urgency, VoiceProfile,
+    Handle, Instruction, OpenQuestion, Person, Project, QuestionStatus, Task, TaskStatus,
+    TriggerType, Urgency, VoiceProfile,
 };
 
 pub struct Vault {
@@ -213,6 +213,19 @@ struct VoiceProfileFm {
     confidence: f64,
     last_updated: String,
     created: String,
+}
+
+/// Project page frontmatter (R16-2). Minimal: id/type/title + timestamps.
+/// The body is freeform markdown (wikilink-graph-bearing, same as contacts).
+/// No legacy paths — projects/ is a new wiki page-type introduced in R16.
+#[derive(Serialize, Deserialize)]
+struct ProjectFm {
+    id: String,
+    #[serde(rename = "type")]
+    kind: String,
+    title: String,
+    created: String,
+    updated: String,
 }
 
 // ---------- frontmatter (de)serialization ----------
@@ -697,6 +710,7 @@ impl Vault {
         let tasks = self.list_tasks();
         let events = self.list_events();
         let notes = self.list_notes();
+        let projects = self.list_projects();
 
         let resolve = |raw: &str| -> (String, String, bool) {
             let t = raw.trim();
@@ -731,7 +745,13 @@ impl Vault {
                     return ("note".into(), s.clone(), true);
                 }
             }
-            // 6. dangling
+            // 6. project (R16-2)
+            for p in &projects {
+                if slug(&p.id) == key || slug(&p.title) == key {
+                    return ("project".into(), p.id.clone(), true);
+                }
+            }
+            // 7. dangling
             ("thing".into(), key, false)
         };
 
@@ -766,6 +786,9 @@ impl Vault {
         }
         for (s, body) in &notes {
             emit("note", s, body);
+        }
+        for p in &projects {
+            emit("project", &p.id, &p.body);
         }
         out
     }
@@ -1427,6 +1450,53 @@ impl Vault {
         self.list_voice_profiles()
             .into_iter()
             .find(|v| v.person_id == person_id)
+    }
+
+    // ----- Project (R16-2) -----
+    //
+    // Free-form wiki page: frontmatter id/type/title + body.
+    // Graph-bearing via [[wikilinks]] in the body (same mechanism as
+    // contacts/information). No legacy paths — projects/ is new.
+
+    pub fn upsert_project(&self, p: &Project) -> anyhow::Result<()> {
+        let fm = ProjectFm {
+            id: format!("project:{}", p.id),
+            kind: "project".into(),
+            title: p.title.clone(),
+            created: rfc3339(&p.created_at),
+            updated: rfc3339(&p.updated_at),
+        };
+        let yaml = serde_yaml::to_string(&fm)?;
+        self.write("projects", &p.id, yaml, &p.body)
+    }
+
+    fn project_from(&self, slug: &str, content: &str) -> Option<Project> {
+        let (yaml, body) = split(content);
+        let fm: ProjectFm = serde_yaml::from_str(&yaml).ok()?;
+        let id = fm
+            .id
+            .strip_prefix("project:")
+            .unwrap_or(slug)
+            .to_string();
+        Some(Project {
+            id,
+            title: fm.title,
+            body,
+            created_at: parse_dt(&fm.created),
+            updated_at: parse_dt(&fm.updated),
+        })
+    }
+
+    pub fn get_project(&self, id: &str) -> Option<Project> {
+        let s = fs::read_to_string(self.find_entity_file("projects", id)?).ok()?;
+        self.project_from(id, &s)
+    }
+
+    pub fn list_projects(&self) -> Vec<Project> {
+        self.read_files("projects")
+            .into_iter()
+            .filter_map(|(slug, c)| self.project_from(&slug, &c))
+            .collect()
     }
 }
 
@@ -2384,6 +2454,139 @@ mod tests {
 
         assert!(dir.join("wiki").join("projects").is_dir(),
             "wiki/projects/ should be created by Vault::open (R16-1)");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ---- R16-2: projects/ page-type ----
+
+    /// Project round-trip: write → read back with all fields intact.
+    #[test]
+    fn r16_2_project_round_trip() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        let created = DateTime::parse_from_rfc3339("2026-05-17T10:00:00+00:00")
+            .unwrap()
+            .with_timezone(&Utc);
+        let p = Project {
+            id: "querykey-mvp".into(),
+            title: "QueryKey MVP".into(),
+            body: "The first working version.\n\nSee [[contacts:ada-lovelace]] for details."
+                .into(),
+            created_at: created,
+            updated_at: created,
+        };
+
+        v.upsert_project(&p).unwrap();
+
+        // Written to the canonical path.
+        assert!(
+            dir.join("wiki").join("projects").join("querykey-mvp.md").is_file(),
+            "project written to wiki/projects/"
+        );
+
+        let got = v.get_project("querykey-mvp").unwrap();
+        assert_eq!(got.id, "querykey-mvp");
+        assert_eq!(got.title, "QueryKey MVP");
+        assert_eq!(got.body, p.body);
+        assert_eq!(got.created_at, created);
+        assert_eq!(got.updated_at, created);
+
+        // list_projects surfaces it.
+        let all = v.list_projects();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].id, "querykey-mvp");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Multiple projects, listed and independently retrievable.
+    #[test]
+    fn r16_2_list_projects_multiple() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        let now = Utc::now();
+        for title in &["Alpha", "Beta", "Gamma"] {
+            v.upsert_project(&Project {
+                id: crate::vault::slug(title),
+                title: title.to_string(),
+                body: format!("Body for {title}."),
+                created_at: now,
+                updated_at: now,
+            }).unwrap();
+        }
+
+        let all = v.list_projects();
+        assert_eq!(all.len(), 3, "all three projects listed");
+
+        // Specific retrieval.
+        let b = v.get_project("beta").unwrap();
+        assert_eq!(b.title, "Beta");
+
+        // Non-existent returns None.
+        assert!(v.get_project("does-not-exist").is_none());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Projects are wikilink-graph-bearing: wikilinks in the body
+    /// appear in collect_links() and resolve correctly.
+    #[test]
+    fn r16_2_project_wikilinks_are_graph_bearing() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        // Put a person in the vault first so the link can resolve.
+        v.upsert_person(&Person {
+            id: "ada-lovelace".into(),
+            display_name: "Ada Lovelace".into(),
+            handles: vec![],
+            role: String::new(),
+            contact_cascade: vec![],
+            created_at: Utc::now(),
+        }).unwrap();
+
+        let now = Utc::now();
+        v.upsert_project(&Project {
+            id: "engine-project".into(),
+            title: "Analytical Engine".into(),
+            body: "Collaborated with [[Ada Lovelace]] on the [[difference-engine]] spec.".into(),
+            created_at: now,
+            updated_at: now,
+        }).unwrap();
+
+        // Body round-trips losslessly.
+        let proj = v.get_project("engine-project").unwrap();
+        assert!(proj.body.contains("[[Ada Lovelace]]"),
+            "body is round-tripped with wikilinks intact");
+
+        // collect_links() now scans project bodies (R16-2).
+        let edges = v.collect_links();
+
+        // Resolved link from project → person.
+        assert!(edges.iter().any(|e|
+            e.from_kind == "project"
+            && e.from_id == "engine-project"
+            && e.predicate == "references"
+            && e.to_kind == "person"
+            && e.to_id == "ada-lovelace"
+            && e.resolved
+        ), "project → person link resolved");
+
+        // Dangling link preserved.
+        assert!(edges.iter().any(|e|
+            e.from_kind == "project"
+            && e.from_id == "engine-project"
+            && !e.resolved
+            && e.to_id == "difference-engine"
+        ), "dangling project wikilink kept");
+
+        // Backlinks to Ada include the project.
+        let back = v.links_to("person", "ada-lovelace");
+        assert!(back.iter().any(|e| e.from_kind == "project"),
+            "project appears as backlink on ada-lovelace");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
