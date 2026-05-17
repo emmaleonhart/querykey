@@ -173,9 +173,7 @@ class _PageListPageState extends State<_PageListPage> {
       case 'note':
         return widget.api.listNotes();
       case 'event':
-        // Events list via calendar; no standalone list endpoint yet.
-        // Minimal choice: return empty — not a blocker for R17. Noted.
-        return [];
+        return widget.api.listEvents();
       default:
         return [];
     }

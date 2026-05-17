@@ -78,6 +78,12 @@ class ApiService {
     return list.map((p) => WikiPageSummary.fromJson(p, 'project')).toList();
   }
 
+  Future<List<WikiPageSummary>> listEvents() async {
+    final data = await _get('/api/events');
+    final list = data['events'] as List? ?? [];
+    return list.map((e) => WikiPageSummary.fromJson(e, 'event')).toList();
+  }
+
   Future<EntityPage> getEntity(String kind, String id) async {
     final data = await _get('/api/entities/$kind/$id');
     return EntityPage.fromJson(data);
