@@ -1,5 +1,5 @@
-name: secretarybird
-description: "AI secretary that ingests unstructured input and actively follows up with team members."
+name: querykey
+description: "QueryKey — local-first PRM + P2P card. Desktop app: own card + wiki browsing."
 publish_to: 'none'
 version: 0.1.0+1
 

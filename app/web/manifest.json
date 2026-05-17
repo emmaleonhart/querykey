@@ -1,11 +1,11 @@
 {
-    "name": "secretarybird",
-    "short_name": "secretarybird",
+    "name": "QueryKey",
+    "short_name": "QueryKey",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "QueryKey — local-first PRM + P2P card.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

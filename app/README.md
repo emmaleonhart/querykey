@@ -1,6 +1,7 @@
-# secretarybird
+# QueryKey (Flutter app)
 
-A new Flutter project.
+Desktop-first QueryKey client — your own card (key/query) + wiki
+browsing, talking to the local Rust `querykey-server`.
 
 ## Getting Started
 

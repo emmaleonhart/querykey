@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "dev.secretarybird" "\0"
-            VALUE "FileDescription", "secretarybird" "\0"
+            VALUE "CompanyName", "dev.querykey" "\0"
+            VALUE "FileDescription", "QueryKey" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "secretarybird" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 dev.secretarybird. All rights reserved." "\0"
-            VALUE "OriginalFilename", "secretarybird.exe" "\0"
-            VALUE "ProductName", "secretarybird" "\0"
+            VALUE "InternalName", "querykey" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 dev.querykey. All rights reserved." "\0"
+            VALUE "OriginalFilename", "querykey.exe" "\0"
+            VALUE "ProductName", "QueryKey" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

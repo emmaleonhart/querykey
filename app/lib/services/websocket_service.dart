@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/models.dart';
 
-/// WebSocket service for real-time communication with the Secretarybird server.
+/// WebSocket service for real-time communication with the QueryKey server.
 /// Mirrors the old Electron WebSocket client: auto-reconnect with exponential backoff,
 /// stream_start/stream_chunk/stream_end protocol.
 class WebSocketService extends ChangeNotifier {
