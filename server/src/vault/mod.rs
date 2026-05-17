@@ -239,6 +239,20 @@ pub(crate) fn compose(yaml: &str, body: &str) -> String {
 /// frontmatter the whole input is treated as body.
 pub(crate) fn split(content: &str) -> (String, String) {
     let c = content.strip_prefix('\u{feff}').unwrap_or(content);
+    // CRLF tolerance: a vault checked out on Windows has `\r\n` line
+    // endings, so a file starts with `---\r\n`, not `---\n`. Without
+    // this, `strip_prefix("---\n")` fails, the whole file is treated
+    // as body, the frontmatter is lost, and EVERY entity (card,
+    // persons, notes, projects, links) parses to nothing. Normalize
+    // once here — the write path is unaffected (`compose` emits `\n`)
+    // and markdown bodies are line-ending-agnostic.
+    let normalized;
+    let c: &str = if c.contains('\r') {
+        normalized = c.replace("\r\n", "\n").replace('\r', "\n");
+        &normalized
+    } else {
+        c
+    };
     if let Some(rest) = c.strip_prefix("---\n") {
         if let Some(end) = rest.find("\n---") {
             let yaml = rest[..end + 1].to_string();
