@@ -51,35 +51,12 @@ Please keep this section when rebasing with the remote
 
 ## ACTIVE
 
-### Round 19 — Make events real (stay Flutter)
-
-**User decision (2026-05-16):** Flutter is **not** the limitation (the
-R18 bugs were all server-side Rust); no Electron rewrite. Implement the
-real fixes in the existing app. R19-1 (parse_dt naive datetimes),
-R19-2 (`GET /api/events`), R19-3 (unstub the Wiki Events tab) are
-**done** — record in `git log` (each its own commit, live-curl
-evidence in the message). Remaining:
-
-- R19-4. **Correct the false "0 tests" claim (no code fix needed).**
-  *Earlier this session I claimed `cargo test` collects 0 tests and
-  filed it as a bug. That was wrong* — a `tail`-truncation misread: I
-  only saw the `src/main.rs` (0) + doc-test (0) lines and missed
-  `Running unittests src/lib.rs … running 69 tests; 69 passed`. The
-  crate has an auto-discovered `src/lib.rs` lib target where all the
-  `#[cfg(test)]` mods live; the harness was never broken. The honesty
-  rule is to *correct the propagated false claim*, not fix a
-  non-problem: this queue item (done by this edit), and acknowledge it
-  in R19-5 docs + the life-planning devlog (the R18-3 commit message
-  also carries the wrong note; it is pushed/immutable history — flag,
-  do not rewrite). Verified: full suite **69 passed, 0 failed** with
-  the R18-3 CRLF + R19-1 parse_dt changes in place.
-- R19-5. **Docs**: querykey README Status (events now surfaced;
-  parse_dt robust; test suite is 69 green, the "0 tests" note was a
-  misread); this block removed; life-planning `devlog.md` dated line
-  incl. the honest correction.
-- R19-5. **Docs**: querykey README Status (events now surfaced;
-  parse_dt robust; tests run), this block removed; life-planning
-  `devlog.md` dated line.
+*Nothing mid-flight. Round 19 (events made real — `parse_dt` accepts
+naive datetimes so no-offset times stop falling back to 1970;
+`GET /api/events`; Wiki Events tab unstubbed; plus the honest
+correction that the "0 tests" finding was a `tail`-truncation misread —
+the suite is 69 green) shipped on top of R18. Record is in `git log` +
+README Status. Pull the next item from `todo.md` when starting fresh.*
 
 ### Open follow-ups (small, not mid-flight)
 

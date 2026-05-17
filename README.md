@@ -146,16 +146,20 @@ wiki browsing); the rest is scaffolding.
 - **Flutter desktop UI** (`app/`) — two real surfaces: **Profile**
   (your own card — view/edit/draft-with-agent/revert, the 24h
   propagation valve surfaced) and **Wiki** (browse vault page-types;
-  Contacts lists all people; entity detail renders the markdown body
-  with `[[wikilink]]` click-through + backlinks). R18 rebranded the
-  app off the old "Secretary Bird" hackathon shell, dropped the
-  unwired Chat/Ingest/Tasks tabs (return when the local agent is
-  actually integrated), and fixed the load-bearing **CRLF
+  Contacts/Projects/Notes/**Events** list; entity detail renders the
+  markdown body with `[[wikilink]]` click-through + backlinks). R18
+  rebranded the app off the old "Secretary Bird" hackathon shell,
+  dropped the unwired Chat/Ingest/Tasks tabs (return when the local
+  agent is actually integrated), and fixed the load-bearing **CRLF
   frontmatter bug** in `vault::split()` that made a Windows-checked-out
-  vault parse to *nothing* (card + every entity). Verified live
-  against the `life-planning/prm` vault: `/api/card` + 135 contacts
-  served. (Visual GUI pass is the user's on next `run-UI.bat`; the
-  data path is end-to-end verified.)
+  vault parse to *nothing* (card + every entity). R19 made events real:
+  `parse_dt` now accepts naive datetimes (no-offset times no longer
+  fall back to 1970 — fixes the card `updated` date + calendar agenda),
+  added `GET /api/events`, and unstubbed the Wiki Events tab. Verified
+  live against the `life-planning/prm` vault: `/api/card` (+ correct
+  `updated`), 135 contacts, 4 projects, 2 notes, 1 event served; test
+  suite **69 passed / 0 failed**. (Visual GUI pass is the user's on
+  next `run-UI.bat`; the data path is end-to-end verified.)
 
 **Honest limitations / not yet built**
 - **Agent honesty (gateway detection + ingest)** — DONE (Round 13):
