@@ -51,79 +51,33 @@ Please keep this section when rebasing with the remote
 
 ## ACTIVE
 
-### Round 18 — Strip the Secretary Bird shell down to a real QueryKey app
+*Nothing mid-flight. Round 18 (strip the Secretary Bird shell → a real
+QueryKey app: rebrand, nav = Profile + Wiki, the CRLF-frontmatter fix
+that made the whole vault parse, health-polled launcher) shipped —
+record is in `git log` + README Status. Pull the next item from
+`todo.md` when starting fresh.*
 
-**Honest status (2026-05-16):** R17 (server read endpoints +
-ApiService/models + `flutter_markdown` + Profile/Wiki screens) *did*
-land on origin/main, and the Profile/Wiki screen logic is sound — but
-what shipped is a **parasitized Secretary Bird shell**, not a QueryKey
-app. The R17 devlog claim "the UI now builds + runs" was **compile-level
-only**: the app is still `name: secretarybird` (`app/pubspec.yaml`), the
-Windows window title is hardcoded `secretarybird`
-(`app/windows/runner/main.cpp:30` + `Runner.rc`), the nav logo is a
-placeholder `Icons.pets` paw (`app/lib/main.dart:101`), and it shows
-**5 tabs** — Chat/Tasks/Ingest (old Secretary Bird screens, not
-agentically wired) + Profile/Wiki. The user could not see her card or
-the wiki. **The port is fine** (`server/src/config.rs` default
-`127.0.0.1:8000` == `ApiService` default); "nothing loads" is the
-half-baked launcher not reliably bringing the server up against the
-vault, not a port bug.
+### Open follow-ups (small, not mid-flight)
 
-**User decision (2026-05-16):** strip to a real QueryKey app — (a)
-rebrand off Secretary Bird, (b) drop Chat/Ingest/Tasks tabs, keep only
-Profile + Wiki, (c) make those two actually fetch real data against
-`VAULT_DIR=<...>/life-planning/prm`. No graph viz / Loka Studio yet
-(deferred — only the Flutter `SutraDB/loka-studio` exists, RDF/SPARQL
-backend ≠ markdown vault).
-
-**Ordered steps — each its own commit; before each: `cargo build` +
-`--features loca` + `--features discord` green + tests, AND
-`cd app && flutter analyze` clean; `git pull --rebase` + push after
-each. Delete each sub-step from this block in the same commit; when all
-done, remove the Round 18 ACTIVE block (record = git log + docs):**
-
-- R18-1. **Rebrand off Secretary Bird.** `app/pubspec.yaml` `name:
-  secretarybird` → `querykey` (+ fix any `package:secretarybird/`
-  import, e.g. `app/test/widget_test.dart`). `app/windows/runner/
-  main.cpp:30` window title → `QueryKey`. `app/windows/runner/
-  Runner.rc` CompanyName/FileDescription/InternalName/OriginalFilename/
-  ProductName → querykey. `flutter analyze` clean + Windows build green.
-- R18-2. **Strip nav to Profile + Wiki.** `app/lib/main.dart`: remove
-  Chat/Tasks/Ingest destinations + screens (both desktop rail and
-  mobile bottom-nav), default index → Profile; replace the `Icons.pets`
-  paw leading widget with a non-paw QueryKey mark (text "QK" or
-  `Icons.hub`). Delete now-unused `chat_screen.dart` /
-  `tasks_screen.dart` / `ingest_screen.dart` (recoverable from git
-  history). Leave `api_service.dart` methods as-is (unused ≠ harmful;
-  no API change). `flutter analyze` clean.
-- R18-3. **Make Profile + Wiki actually load against the vault.** Run
-  `target/debug/querykey-server.exe` with `VAULT_DIR` pointed at
-  `life-planning/prm`; curl `/api/card`, `/api/notes`, `/api/persons`,
-  `/api/projects`, `/api/links`; confirm they return the vault's real
-  content; fix whatever blocks it (vault resolution / list shape /
-  serialization) — server-side fixes must not change existing API
-  behavior or the card 24h valve. **Paste the actual curl output into
-  the commit message as evidence** (honesty rule: no "works" claim
-  without the artifact).
-- R18-4. **Fix the launcher (life-planning side, own commit there).**
-  Replace `run-UI.bat`'s fixed `timeout /t 5` with a `/health`
-  poll-until-up loop so the Flutter app never starts before the server;
-  mirror into `prm/run-UI.bat`.
-- R18-5. **Docs — honest state.** querykey README Status + CLAUDE.md +
-  todo.md: "UI: QueryKey app — Profile/card + wiki browsing;
-  Chat/Ingest/Tasks deferred until agent integration." Remove the stale
-  R17 "builds + runs" framing. life-planning `devlog.md` gets a dated
-  line correcting the earlier overclaim.
-
-**Hard constraints:** no `git reset` / force-push / history rewrite; do
-not change server API behavior or the card 24h-propagation valve
-(surface it, don't bypass it); markdown stays canonical. R18's *point*
-is to remove Secretarybird refs — deleting the three unused screen
-files + rebranding strings is in scope and is not a "destructive git
-op" (recoverable from history). If a detail is underspecified pick the
-minimal R15/R16-consistent choice, note it in the commit, continue.
-
-*(Rounds 15–17 server/screen work done; record in `git log` + docs.)*
+- **Visual GUI confirmation of the UI.** R18 verified the data path
+  end-to-end (live: `/api/card` + 135 contacts served from
+  `life-planning/prm`) and the screen code by review, but no one has
+  run the actual Flutter Windows window to eyeball Profile/Wiki
+  rendering. Next time the app is run via `run-UI.bat`, confirm the
+  card renders and Wiki→Contacts lists people; file anything off as a
+  new round.
+- **Loka Studio graph-viz reuse (deferred, user-flagged).** The user
+  wants knowledge-graph visualization à la `SutraDB/loka-studio`
+  (force-directed `graph_canvas.dart`). Deferred from R18: only the
+  Flutter loka-studio exists (no Electron one found) and its
+  RDF/SPARQL backend ≠ QueryKey's markdown vault, so reuse = lifting
+  the canvas + a vault→graph adapter, not a drop-in. Revisit as its
+  own round if/when the user reopens it.
+- **Bin-only test harness collects 0 tests.** `cargo test` runs no
+  unit tests though `#[cfg(test)]` mods exist (`src/card/mod.rs:296`,
+  `src/vault/mod.rs:1767`). Pre-existing; surfaced during R18-3. Wiring
+  the harness up (a `[lib]` target or `test = true`) is a clean small
+  round on its own.
 
 ---
 

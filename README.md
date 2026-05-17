@@ -104,7 +104,8 @@ Local endpoints when running: server `http://127.0.0.1:8000`, health
 ## Status — what works today
 
 This is early. Roughly: planning and data models are complete; the AI bridge
-is functional; most product behavior is scaffolding.
+is functional; the desktop UI has a real working slice (Profile/card +
+wiki browsing); the rest is scaffolding.
 
 **Working / functional**
 - **Canonical markdown vault** (`server/src/vault/`): the store of
@@ -142,6 +143,19 @@ is functional; most product behavior is scaffolding.
 - Ingest pipeline: relaxed-schema parse → typed models → store + typed
   GraphDiff broadcast over the WebSocket hub.
 - **MCP server** (`/mcp`): JSON-RPC `initialize`/`tools/list`/`tools/call`.
+- **Flutter desktop UI** (`app/`) — two real surfaces: **Profile**
+  (your own card — view/edit/draft-with-agent/revert, the 24h
+  propagation valve surfaced) and **Wiki** (browse vault page-types;
+  Contacts lists all people; entity detail renders the markdown body
+  with `[[wikilink]]` click-through + backlinks). R18 rebranded the
+  app off the old "Secretary Bird" hackathon shell, dropped the
+  unwired Chat/Ingest/Tasks tabs (return when the local agent is
+  actually integrated), and fixed the load-bearing **CRLF
+  frontmatter bug** in `vault::split()` that made a Windows-checked-out
+  vault parse to *nothing* (card + every entity). Verified live
+  against the `life-planning/prm` vault: `/api/card` + 135 contacts
+  served. (Visual GUI pass is the user's on next `run-UI.bat`; the
+  data path is end-to-end verified.)
 
 **Honest limitations / not yet built**
 - **Agent honesty (gateway detection + ingest)** — DONE (Round 13):
@@ -225,7 +239,7 @@ gateway in WSL, launches the server, and runs the Flutter app on Windows
 
 | Path | What it is |
 |---|---|
-| [`app/`](app/) | Flutter app (Dart) — desktop-first; Chat / Tasks / Ingest screens |
+| [`app/`](app/) | Flutter app (Dart) — desktop-first; **Profile** (card) + **Wiki** (vault browser) screens |
 | [`server/`](server/) | **Rust** server (`querykey-server`) — the only server: ingest, agent bridge, WebSocket, MCP, Loca graph store |
 | [`docs/`](docs/) | `architecture.md`, `data-model.md`, `markdown-schema.md`, `card-format.md`, `versions-comparison.md`, `why-go.md` |
 | [`chat/`](chat/) | Vision corpus (chat-log exports); gitignored except its README — private context, not a spec |
