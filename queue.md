@@ -51,11 +51,45 @@ Please keep this section when rebasing with the remote
 
 ## ACTIVE
 
-*Nothing mid-flight. Round 18 (strip the Secretary Bird shell → a real
-QueryKey app: rebrand, nav = Profile + Wiki, the CRLF-frontmatter fix
-that made the whole vault parse, health-polled launcher) shipped —
-record is in `git log` + README Status. Pull the next item from
-`todo.md` when starting fresh.*
+### Round 19 — Make events real + a runnable test harness (stay Flutter)
+
+**User decision (2026-05-16):** Flutter is **not** the limitation (the
+R18 bugs were all server-side Rust); no Electron rewrite. Implement the
+real fixes in the existing app. Decomposed below; same discipline as
+R18 (each sub-step its own commit; gate before each: `cargo build` +
+`--features loca` + `--features discord` green + `cd app && flutter
+analyze` clean; `git pull --rebase` + push after each; delete the
+sub-step in the same commit; remove this block when all done).
+
+- R19-1. **`parse_dt` accepts naive datetimes** (`server/src/vault/
+  mod.rs`). Today it's `DateTime::parse_from_rfc3339` only, so a
+  no-offset `2026-05-20T18:00:00` (the form the schema's own Event
+  example *and* the live `card.md` `updated:` use) falls back to the
+  **epoch**. Same bug family as the R18-3 CRLF fix. Fix: try RFC3339
+  first, then a naive `NaiveDateTime` parse assumed **UTC**, then
+  date-only, before the epoch fallback. Evidence in the commit: live
+  curl showing the card `updated` and the placeholder event date are
+  no longer 1970.
+- R19-2. **`GET /api/events` list endpoint** (`server/src/api/mod.rs`
+  + `list_events_meta()` in `vault/mod.rs`, mirroring
+  `list_notes_meta`/`list_projects_meta`: `{id,title}` per event).
+  Evidence: live curl returning the placeholder event.
+- R19-3. **Unstub the Wiki Events tab** (`app/lib/services/
+  api_service.dart` `listEvents()` + `app/lib/screens/
+  wiki_screen.dart` `_listForKind()` `case 'event'` → real list;
+  detail already works via `get_entity("event", …)`). `flutter
+  analyze` clean.
+- R19-4. **Make `cargo test` actually run the existing unit tests.**
+  Bin-only crate currently collects 0 (`#[cfg(test)]` mods at
+  `src/card/mod.rs:296`, `src/vault/mod.rs:1767`). Find the real cause
+  (`Cargo.toml` `[[bin]] test=false`/`harness=false`, or needs a
+  `[lib]`); do the **minimal** correct fix; the existing card/vault
+  tests must run and pass (incl. the R18-3 CRLF + R19-1 parse_dt
+  paths). If it's a deep restructure, do the smallest viable thing and
+  note it.
+- R19-5. **Docs**: querykey README Status (events now surfaced;
+  parse_dt robust; tests run), this block removed; life-planning
+  `devlog.md` dated line.
 
 ### Open follow-ups (small, not mid-flight)
 
@@ -66,33 +100,14 @@ record is in `git log` + README Status. Pull the next item from
   rendering. Next time the app is run via `run-UI.bat`, confirm the
   card renders and Wiki→Contacts lists people; file anything off as a
   new round.
-- **Events are not surfaced anywhere in the current UI.** Two
-  independent gaps, both found 2026-05-16 while seeding test data:
-  (1) the Wiki **Events** tab is a hardcoded `return []` stub
-  (`app/lib/screens/wiki_screen.dart`, R17 minimal choice — no event
-  list endpoint), and (2) `parse_dt` (`vault/mod.rs`) only accepts
-  RFC3339 *with offset*, so a schema-shaped naive `start:
-  2026-05-20T18:00:00` (the form the schema's own Event example uses)
-  falls back to the **epoch** and the event drops out of
-  `GET /api/calendar`'s window. Net: a valid `events/<uuid>.md` parses
-  as an entity but cannot appear in any current screen. Fix is a
-  round: make `parse_dt` accept naive datetimes (assume local/UTC) —
-  same bug family as the R18-3 CRLF fix — and either add an events
-  list endpoint + unstub the tab or build a calendar screen. A
-  schema-correct placeholder event is committed in the
-  `life-planning/prm` vault for when this lands.
 - **Loka Studio graph-viz reuse (deferred, user-flagged).** The user
   wants knowledge-graph visualization à la `SutraDB/loka-studio`
-  (force-directed `graph_canvas.dart`). Deferred from R18: only the
-  Flutter loka-studio exists (no Electron one found) and its
-  RDF/SPARQL backend ≠ QueryKey's markdown vault, so reuse = lifting
-  the canvas + a vault→graph adapter, not a drop-in. Revisit as its
-  own round if/when the user reopens it.
-- **Bin-only test harness collects 0 tests.** `cargo test` runs no
-  unit tests though `#[cfg(test)]` mods exist (`src/card/mod.rs:296`,
-  `src/vault/mod.rs:1767`). Pre-existing; surfaced during R18-3. Wiring
-  the harness up (a `[lib]` target or `test = true`) is a clean small
-  round on its own.
+  (force-directed `graph_canvas.dart`). Deferred: only the Flutter
+  loka-studio exists (no Electron one found) and its RDF/SPARQL
+  backend ≠ QueryKey's markdown vault, so reuse = lifting the canvas +
+  a vault→graph adapter, not a drop-in. The 2026-05-16 framework
+  review concluded Flutter is fine for this (loka-studio's canvas is
+  itself Flutter). Revisit as its own round if/when the user reopens.
 
 ---
 
