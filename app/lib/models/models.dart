@@ -188,7 +188,7 @@ class OpenQuestion {
 
 /// Your broadcast card (P2P key/query signal). Matches the Rust Card struct
 /// and the body sections in card.md (docs/card-format.md, R7).
-class Card {
+class QkCard {
   final String handle;
   final String name;
   final String website;
@@ -198,7 +198,7 @@ class Card {
   final DateTime updated;
   final String visibility;
 
-  Card({
+  QkCard({
     required this.handle,
     this.name = '',
     this.website = '',
@@ -209,7 +209,7 @@ class Card {
     this.visibility = 'public',
   });
 
-  factory Card.fromJson(Map<String, dynamic> json) => Card(
+  factory QkCard.fromJson(Map<String, dynamic> json) => QkCard(
         handle: json['handle'] ?? '',
         name: json['name'] ?? '',
         website: json['website'] ?? '',
@@ -232,7 +232,7 @@ class Card {
         'visibility': visibility,
       };
 
-  Card copyWith({
+  QkCard copyWith({
     String? handle,
     String? name,
     String? website,
@@ -241,7 +241,7 @@ class Card {
     List<String>? lookingFor,
     String? visibility,
   }) =>
-      Card(
+      QkCard(
         handle: handle ?? this.handle,
         name: name ?? this.name,
         website: website ?? this.website,

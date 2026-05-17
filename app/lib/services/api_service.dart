@@ -52,7 +52,7 @@ class ApiService {
     return _get('/api/card');
   }
 
-  Future<Map<String, dynamic>> putCard(Card card) async {
+  Future<Map<String, dynamic>> putCard(QkCard card) async {
     return _post('/api/card', card.toJson());
   }
 

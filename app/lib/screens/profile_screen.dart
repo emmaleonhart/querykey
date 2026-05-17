@@ -18,7 +18,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _api = ApiService();
 
-  Card? _card;
+  QkCard? _card;
   CardPropagation? _propagation;
   bool _loading = true;
   String? _error;
@@ -66,7 +66,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final cardJson = data['card'] as Map<String, dynamic>?;
       final propJson = data['propagation'] as Map<String, dynamic>?;
       setState(() {
-        _card = cardJson != null ? Card.fromJson(cardJson) : null;
+        _card = cardJson != null ? QkCard.fromJson(cardJson) : null;
         _propagation = propJson != null ? CardPropagation.fromJson(propJson) : null;
       });
     } catch (e) {
@@ -90,7 +90,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _saveCard() async {
     if (!_formKey.currentState!.validate()) return;
-    final updated = Card(
+    final updated = QkCard(
       handle: _handleCtrl.text.trim(),
       name: _nameCtrl.text.trim(),
       website: _websiteCtrl.text.trim(),
@@ -127,7 +127,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final draft = data['draft'] as Map<String, dynamic>?;
       final source = data['source'] as String? ?? 'unknown';
       if (draft != null && mounted) {
-        final draftCard = Card.fromJson(draft);
+        final draftCard = QkCard.fromJson(draft);
         _handleCtrl.text = draftCard.handle;
         _nameCtrl.text = draftCard.name;
         _websiteCtrl.text = draftCard.website;
