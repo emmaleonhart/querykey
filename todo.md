@@ -2,23 +2,21 @@
 
 ## Current status — START HERE (2026-05-15)
 
-**Working today (Rounds 1–5, all on `main`):**
+**Working today (Rounds 1–16, all on `main`):**
 - **Server:** Rust (`server/`, crate `querykey-server`) — the *only*
   server; the Go implementation was fully ported then deleted
-  (recoverable from git history). Builds clean & warning-free in all
-  three configs: `cargo build`, `--features loca`, `--features
-  discord`.
+  (recoverable from git history). Builds clean & warning-free in the
+  default and discord configs.
 - **Canonical store:** the **markdown vault** (`server/src/vault/`)
-  — Person/Task/Event as YAML frontmatter + body, lossless
-  round-trip (unit-tested), survives restarts. This is the store of
-  record. **Round 15 layout (2026-05-16):** vault root is the dir
-  containing `querykey.toml`; graph entities live under
-  `<root>/wiki/` (people at `wiki/contacts/`). Pre-R15 paths still
-  read; writes migrate-on-write. `VAULT_DIR` env still overrides for
-  explicit cases. **Open semantics (flagged for the user, NOT
-  guessed):** what `wiki/information/` and `wiki/projects/` mean as
-  canonical buckets, and whether non-contact entities (tasks/events/
-  …) are themselves graph-bearing or only `contacts/` is.
+  — all entities as YAML frontmatter + body, lossless round-trip
+  (unit-tested), survives restarts. This is the store of record.
+  **Round 16 layout (2026-05-17):** four headline wiki page-types:
+  `wiki/contacts/` (people — R15-3), `wiki/projects/` (project pages
+  — R16-2), `wiki/information/` (freeform knowledge — R16-1 rename of
+  `wiki/notes/`), `wiki/events/`. Calendar date pages at
+  `wiki/calendar/YYYY-MM-DD.md` (R16-3). Operational entities
+  (tasks/conflicts/etc.) stay at their paths. Pre-R15 paths still
+  read; writes migrate-on-write. `VAULT_DIR` env still overrides.
 - **Derived graph:** Loca/SutraDB, rebuilt from the vault on startup;
   SPARQL query bridge + typed read-backs. **Fuseki is gone.**
 - **Agent:** model-agnostic — the agent is *whoever operates

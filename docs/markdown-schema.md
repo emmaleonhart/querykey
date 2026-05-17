@@ -1,26 +1,25 @@
 # Markdown On-Disk Schema (canonical source of truth)
 
 > **Status: IMPLEMENTED (Round 5, 2026-05-15; layout extended in
-> Round 15, 2026-05-16).** `server/src/vault/` is the canonical store:
-> the API and ingest pipeline write these markdown files first, then
-> project a derived index into Loca; the server rebuilds that index
-> from the vault on startup; `update_task` mutates the markdown.
-> Round-trips are lossless (unit-tested).
+> Rounds 15–16, 2026-05-16/17).** `server/src/vault/` is the
+> canonical store: the API and ingest pipeline write these markdown
+> files first, then project a derived index into Loca; the server
+> rebuilds that index from the vault on startup; `update_task` and
+> friends mutate the markdown. Round-trips are lossless (unit-tested).
 >
 > **Vault-root resolution (R15-1):** a git repo *is* a QueryKey vault
 > when it contains a `querykey.toml`; the directory holding it IS the
-> vault root (so a repo can also hold non-QueryKey data). Precedence:
-> (1) `VAULT_DIR` env override, (2) walk up from cwd to the nearest
-> `querykey.toml`, (3) fallback `./vault`. The toml schema v1 is a
-> `[querykey]` table with `version = 1` and optional `name`; unknown
-> fields are ignored (forward-extensible).
+> vault root. Precedence: (1) `VAULT_DIR` env override, (2) walk up
+> from cwd to nearest `querykey.toml`, (3) fallback `./vault`.
 >
-> **Layout (R15-2/3):** graph entities live under `<root>/wiki/`. The
-> people dir is named `contacts/` on disk (the user's term) — the
-> public API still says "people". Pre-R15 vaults (entities at
-> `<root>/<entity>/`) keep working: reads union the canonical dir
-> with every legacy path; upserts always write to the canonical path
-> AND clear every legacy duplicate so they cannot diverge.
+> **Layout (R16):** graph entities live under `<root>/wiki/`. Four
+> headline wiki page-types: `contacts/` (people — R15-3), `projects/`
+> (project pages — R16-2, new), `information/` (freeform knowledge
+> pages — R16-1 rename of `notes/`; API key still "notes"),
+> `events/`. Calendar date pages at `wiki/calendar/YYYY-MM-DD.md`
+> (R16-3). Operational entities stay at their current `wiki/<name>/`
+> paths. Legacy `wiki/notes/` and pre-R15 root dirs still read; writes
+> go to canonical and clear legacy duplicates.
 >
 > Authoritative alongside `CLAUDE.md` / `queue.md`. The spec below
 > matches the implementation; deviations are noted under
@@ -57,10 +56,14 @@
   .querykey/                # derived/cache (graph snapshots) — GITIGNORED
   .gitignore                # auto-written; enforces the privacy asymmetry
   wiki/                     # the graph subtree (R15-2)
-    contacts/<slug>.md      # one file per person (R15-3 rename)
-    tasks/<uuid>.md         # one file per task
+    contacts/<slug>.md      # one file per person (R15-3; API key: "people")
+    projects/<slug>.md      # project pages (R16-2; new wiki page-type)
+    information/<slug>.md   # freeform knowledge pages (R16-1 rename;
+                            #   API key: "notes"; legacy: wiki/notes/)
     events/<uuid>.md        # one file per event
-    notes/<slug>.md         # freeform notes (may reference entities)
+    tasks/<uuid>.md         # one file per task
+    calendar/YYYY-MM-DD.md  # date pages (R16-3); machine-delimited events
+                            #   section + user-authored content
     conflicts/<uuid>.md   questions/<slug>.md   followups/<slug>.md
     instructions/<uuid>.md   voiceprofiles/<uuid>.md
 ```
@@ -168,11 +171,61 @@ event occurrences (`movable:false`) plus tasks whose `deadline` is in
 the window (`movable:true`) — the Task-vs-Event distinction made
 queryable. Computed live from the canonical vault.
 
-### Note — `notes/<slug>.md`
+### Information (note) — `information/<slug>.md`
+
+Canonical on-disk path is `wiki/information/` (R16-1 rename); the API
+key stays "notes" for back-compat. Legacy `wiki/notes/` and pre-R15
+`notes/` at vault root still read; writes always go to `information/`.
 
 Frontmatter optional beyond `id`/`type` (a note may have *no*
 frontmatter at all — the body is the point). `[[wikilinks]]` in the
 body are how a note attaches to the graph.
+
+### Project — `projects/<slug>.md`
+
+New wiki page-type (R16-2). Free-form project page: frontmatter
+`id`/`type`/`title` + timestamps; body is freeform markdown.
+Graph-bearing via `[[wikilinks]]` in the body (same mechanism as
+contacts/information). No legacy paths — `projects/` is new.
+
+```markdown
+---
+id: project:querykey-mvp
+type: project
+title: QueryKey MVP
+created: 2026-05-17T10:00:00+00:00
+updated: 2026-05-17T10:00:00+00:00
+---
+
+First working version of the PRM.
+
+See [[Ada Lovelace]] and the [[analytical-engine]] spec.
+```
+
+### Calendar date page — `calendar/YYYY-MM-DD.md`
+
+One page per date (R16-3). Generated idempotently by
+`POST /api/calendar/generate` for the rolling `[today−6mo, today+6mo]`
+window. Machine-delimited events section bounded by HTML-comment
+sentinels `<!-- qk:events:start -->` and `<!-- qk:events:end -->`.
+User-authored content outside the sentinels is never modified.
+
+```markdown
+# 2026-05-17
+
+<!-- qk:events:start -->
+- **09:00** Salon meeting
+- **14:00** Weekly Standup
+<!-- qk:events:end -->
+
+## My notes
+
+Reminder: book the climbing gym.
+```
+
+The machine section lists Event entities (recurrence-expanded per
+R11) whose start time falls on that date. Events do not carry a
+back-link to the date page — the calendar page is the index.
 
 ### Semantic wikilinks (IMPLEMENTED, Round 8)
 
@@ -335,15 +388,19 @@ created: 2026-05-16T08:00:00+00:00
 - The time dimension is first-class (git history + `created`/`updated`
   + event times) because relationship history matters.
 
-## Implementation notes (Round 5 — as built)
+## Implementation notes (Rounds 5–16 — as built)
 
 - **Entities implemented:** Person (`wiki/contacts/<id>.md`), Task
   (`wiki/tasks/<uuid>.md`), Event (`wiki/events/<uuid>.md`), Conflict
   (`wiki/conflicts/<uuid>.md`), OpenQuestion
   (`wiki/questions/<slug>.md`), FollowUp
   (`wiki/followups/<slug>.md`) — the last three added in Round 6.
-  `wiki/notes/` exists. Pre-R15 paths (`<root>/<entity>/`) and the
-  R15-2-era `<root>/wiki/people/` path are still readable.
+  Project (`wiki/projects/<slug>.md`) added in R16-2. Information /
+  note pages (`wiki/information/<slug>.md`) — on-disk dir renamed in
+  R16-1 from `wiki/notes/`; API key "notes" unchanged. Calendar date
+  pages (`wiki/calendar/YYYY-MM-DD.md`) added in R16-3. Legacy paths
+  (`wiki/notes/`, `wiki/people/`, pre-R15 `<root>/<entity>/`) are still
+  readable; upserts migrate-on-write.
 - **Round 6 wiring:** ingest writes conflicts vault-first then
   projects to the derived graph; `GET /api/conflicts|questions|
   followups` read the vault at full fidelity; `resolve_conflict`,
