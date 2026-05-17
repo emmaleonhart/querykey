@@ -3,7 +3,7 @@
 //
 // Talks straight to the local Rust server via fetch() (server CORS is
 // allow_origin(Any), verified) — no IPC for data. IPC only for the
-// main-process-managed server-status chip.
+// server-status chip; markdown via window.md (preload-exposed marked).
 //
 // R20-3 API client · R20-4 Profile view · R20-5 Wiki view.
 
@@ -52,8 +52,27 @@ function esc(s) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
-function lines(arr) {
-  return (arr || []).map((x) => `<div class="bullet">• ${esc(x)}</div>`).join('') || '<div class="muted">—</div>';
+function bullets(arr) {
+  return (
+    (arr || []).map((x) => `<div class="bullet">• ${esc(x)}</div>`).join('') ||
+    '<div class="muted">—</div>'
+  );
+}
+// Mirrors server vault::slug + the old Flutter _slug: lowercase,
+// non-alphanumeric runs -> single '-', trailing '-' trimmed.
+function slug(s) {
+  let out = '';
+  let dash = false;
+  for (const ch of String(s == null ? '' : s).toLowerCase().trim()) {
+    if (/[a-z0-9]/.test(ch)) {
+      out += ch;
+      dash = false;
+    } else if (out && !dash) {
+      out += '-';
+      dash = true;
+    }
+  }
+  return out.replace(/-+$/, '');
 }
 
 // ---------- server status chip (R20-2) ----------
@@ -74,17 +93,12 @@ if (window.qk) {
 }
 
 // ---------- Profile view (R20-4) ----------
-// Parity with the retired Flutter profile_screen.dart: view / edit /
-// empty states, draft-with-agent, revert, and the 24h propagation
-// valve SURFACED (never bypassed).
-
 let _card = null;
 let _prop = null;
 
 function propLine(p) {
   if (!p) return '';
   let text;
-  let cls = 'muted';
   if (p.pending) {
     if (p.eligible_at) {
       const ms = new Date(p.eligible_at).getTime() - Date.now();
@@ -103,7 +117,7 @@ function propLine(p) {
   } else {
     text = 'Not yet published';
   }
-  return `<div class="prop ${cls}">${esc(text)}</div>`;
+  return `<div class="prop">${esc(text)}</div>`;
 }
 
 function profileError(msg) {
@@ -129,10 +143,10 @@ function renderProfileView() {
     `<div class="card-box">` +
     `<h1>${esc(c.name || c.handle)}</h1>` +
     `<div class="muted">${esc(c.handle)}${c.visibility ? `<span class="tag">${esc(c.visibility)}</span>` : ''}</div>` +
-    (c.website ? `<div style="margin-top:6px"><a id="p-web">${esc(c.website)}</a></div>` : '') +
+    (c.website ? `<div style="margin-top:6px">${esc(c.website)}</div>` : '') +
     (c.bio ? `<p style="margin-top:12px">${esc(c.bio)}</p>` : '') +
-    `<h2>Offering (key)</h2>${lines(c.offering)}` +
-    `<h2>Looking for (query)</h2>${lines(c.looking_for)}` +
+    `<h2>Offering (key)</h2>${bullets(c.offering)}` +
+    `<h2>Looking for (query)</h2>${bullets(c.looking_for)}` +
     propLine(_prop) +
     (c.updated ? `<div class="muted">updated ${esc(c.updated)}</div>` : '') +
     `<div style="margin-top:18px">` +
@@ -176,16 +190,8 @@ function renderProfileEdit(c) {
       name: document.getElementById('f-name').value.trim(),
       website: document.getElementById('f-web').value.trim(),
       bio: document.getElementById('f-bio').value.trim(),
-      offering: document
-        .getElementById('f-off')
-        .value.split('\n')
-        .map((x) => x.trim())
-        .filter(Boolean),
-      looking_for: document
-        .getElementById('f-look')
-        .value.split('\n')
-        .map((x) => x.trim())
-        .filter(Boolean),
+      offering: document.getElementById('f-off').value.split('\n').map((x) => x.trim()).filter(Boolean),
+      looking_for: document.getElementById('f-look').value.split('\n').map((x) => x.trim()).filter(Boolean),
       visibility: (c && c.visibility) || 'public',
     };
     try {
@@ -239,14 +245,162 @@ async function loadProfile() {
   }
 }
 
-// ---------- Wiki view (real content in R20-5) ----------
-const views = {
-  profile: loadProfile,
-  wiki() {
+// ---------- Wiki view (R20-5) ----------
+// Parity with the retired Flutter wiki_screen.dart: type picker ->
+// list -> entity detail with markdown + [[wikilink]] click-through
+// (resolved via /api/links) + backlinks.
+
+const WIKI_TYPES = [
+  { kind: 'person', label: 'Contacts' },
+  { kind: 'project', label: 'Projects' },
+  { kind: 'note', label: 'Notes' },
+  { kind: 'event', label: 'Events' },
+];
+const KIND_LABEL = { person: 'Contacts', project: 'Projects', note: 'Notes', event: 'Events' };
+
+let _allLinks = []; // cached resolved-edge graph for wikilink resolution
+
+function wikiPicker() {
+  content.innerHTML =
+    `<h1>Wiki</h1>` +
+    WIKI_TYPES.map(
+      (t) => `<div class="list-item" data-kind="${t.kind}"><span>${t.label}</span><span class="muted">›</span></div>`,
+    ).join('');
+  content.querySelectorAll('.list-item').forEach((el) => {
+    el.onclick = () => wikiList(el.dataset.kind);
+  });
+}
+
+async function listForKind(kind) {
+  if (kind === 'person') {
+    const ps = await api.listPersons();
+    return ps.map((p) => ({ id: p.id, title: p.display_name || p.id }));
+  }
+  if (kind === 'project') return api.listProjects();
+  if (kind === 'note') return api.listNotes();
+  if (kind === 'event') return api.listEvents();
+  return [];
+}
+
+async function wikiList(kind) {
+  const label = KIND_LABEL[kind] || kind;
+  content.innerHTML =
+    `<div class="crumbs"><a id="b-wiki">Wiki</a> › ${esc(label)}</div>` +
+    `<div class="placeholder">Loading…</div>`;
+  document.getElementById('b-wiki').onclick = wikiPicker;
+  try {
+    const items = await listForKind(kind);
+    const crumb = `<div class="crumbs"><a id="b-wiki">Wiki</a> › ${esc(label)}</div>`;
+    if (!items.length) {
+      content.innerHTML = crumb + `<div class="empty">No ${esc(label)} yet.</div>`;
+      document.getElementById('b-wiki').onclick = wikiPicker;
+      return;
+    }
     content.innerHTML =
-      '<h1>Wiki</h1><div class="placeholder">Vault browser lands in R20-5.</div>';
-  },
-};
+      crumb +
+      items
+        .map(
+          (it) =>
+            `<div class="list-item" data-id="${esc(it.id)}"><span>${esc(it.title || it.id)}</span>` +
+            `<span class="sub">${esc(it.id)}</span></div>`,
+        )
+        .join('');
+    document.getElementById('b-wiki').onclick = wikiPicker;
+    content.querySelectorAll('.list-item').forEach((el) => {
+      el.onclick = () => wikiDetail(kind, el.dataset.id, el.querySelector('span').textContent);
+    });
+  } catch (e) {
+    content.innerHTML =
+      `<div class="crumbs"><a id="b-wiki">Wiki</a> › ${esc(label)}</div>` +
+      `<div class="err-banner">Could not load ${esc(label)}.</div><div class="muted">${esc(e.message)}</div>`;
+    document.getElementById('b-wiki').onclick = wikiPicker;
+  }
+}
+
+// [[Target]] / [[pred:Target]] -> resolved markdown link or dimmed.
+function resolveWikilink(raw) {
+  const target = raw.includes(':') ? raw.split(':').slice(1).join(':') : raw;
+  const tslug = slug(target.trim());
+  for (const lk of _allLinks) {
+    if (!lk || lk.resolved !== true) continue;
+    if (slug(lk.to_label) === tslug || slug(lk.to_id) === tslug) {
+      return { kind: lk.to_kind, id: lk.to_id };
+    }
+  }
+  return null;
+}
+function preprocessWikilinks(body) {
+  return String(body || '').replace(/\[\[([^\]]+)\]\]/g, (_m, raw) => {
+    const r = resolveWikilink(raw);
+    if (r) return `[${raw}](qkwiki://${r.kind}/${encodeURIComponent(r.id)})`;
+    return `*${raw}*`; // dangling -> emphasis, non-tappable
+  });
+}
+
+async function wikiDetail(kind, id, title) {
+  const label = KIND_LABEL[kind] || kind;
+  content.innerHTML =
+    `<div class="crumbs"><a id="b-wiki">Wiki</a> › <a id="b-list">${esc(label)}</a> › ${esc(title || id)}</div>` +
+    `<div class="placeholder">Loading…</div>`;
+  document.getElementById('b-wiki').onclick = wikiPicker;
+  document.getElementById('b-list').onclick = () => wikiList(kind);
+  try {
+    const [page, links, allLinks] = await Promise.all([
+      api.getEntity(kind, id),
+      api.entityLinks(kind, id).catch(() => ({ to: [] })),
+      api.listLinks().catch(() => []),
+    ]);
+    _allLinks = allLinks || [];
+    const bodyHtml = window.md
+      ? window.md.parse(preprocessWikilinks(page.body || ''))
+      : esc(page.body || '');
+    const backlinks = (links && links.to) || [];
+    const crumb =
+      `<div class="crumbs"><a id="b-wiki">Wiki</a> › <a id="b-list">${esc(label)}</a> › ${esc(page.title || title || id)}</div>`;
+    content.innerHTML =
+      crumb +
+      `<div class="detail"><h1>${esc(page.title || title || id)}</h1>` +
+      `<div class="markdown">${bodyHtml}</div>` +
+      (backlinks.length
+        ? `<h2>Backlinks</h2>` +
+          backlinks
+            .map((b) => {
+              const fk = b.from_kind || '';
+              const fi = b.from_id || '';
+              const pr = b.predicate || 'references';
+              return `<div class="list-item" data-k="${esc(fk)}" data-i="${esc(fi)}"><span>${esc(fk)}:${esc(fi)}</span><span class="sub">${esc(pr)}</span></div>`;
+            })
+            .join('')
+        : '') +
+      `</div>`;
+    document.getElementById('b-wiki').onclick = wikiPicker;
+    document.getElementById('b-list').onclick = () => wikiList(kind);
+    // in-app wikilink navigation
+    content.querySelectorAll('a[href^="qkwiki://"]').forEach((a) => {
+      a.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const rest = a.getAttribute('href').replace('qkwiki://', '');
+        const slash = rest.indexOf('/');
+        if (slash < 0) return;
+        const k = rest.slice(0, slash);
+        const i = decodeURIComponent(rest.slice(slash + 1));
+        wikiDetail(k, i, i);
+      });
+    });
+    content.querySelectorAll('.list-item[data-k]').forEach((el) => {
+      el.onclick = () => wikiDetail(el.dataset.k, el.dataset.i, el.dataset.i);
+    });
+  } catch (e) {
+    content.innerHTML =
+      `<div class="crumbs"><a id="b-wiki">Wiki</a> › <a id="b-list">${esc(label)}</a></div>` +
+      `<div class="err-banner">Could not load page.</div><div class="muted">${esc(e.message)}</div>`;
+    document.getElementById('b-wiki').onclick = wikiPicker;
+    document.getElementById('b-list').onclick = () => wikiList(kind);
+  }
+}
+
+// ---------- nav ----------
+const views = { profile: loadProfile, wiki: wikiPicker };
 
 function show(view) {
   document.querySelectorAll('.navbtn').forEach((b) => {
