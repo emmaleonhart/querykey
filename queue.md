@@ -75,13 +75,22 @@ generating the full year).
   full current year on demand (idempotent: never clobber a date page
   that already has user content; only create missing ones).
 
-**Flagged for the user — do NOT guess (decompose only, don't build blind):**
-- Exact **date-page schema** (frontmatter? what body sections?) and how
-  Events **bind** to a date page (a semantic `[[date:YYYY-MM-DD]]`
-  link from the event, or the date page listing its events, or both).
-- Whether `projects/` / `information/` need typed frontmatter or are
-  pure free-form markdown + wikilinks.
-- Backfill scope: only the run-year, a rolling window, or on-access.
+**RESOLVED by the user (2026-05-16) — no longer open:**
+- **Date page** = `wiki/calendar/YYYY-MM-DD.md` (the confirmed form).
+- **Binding direction:** the **date page lists the events** occurring
+  that day (derived from Event entities, recurrence-expanded per R11).
+  Events are *not* required to carry a back-link; the calendar page is
+  the index.
+- **Window/backfill:** on run, ensure a page exists for **every date in
+  `[today − 6 months, today + 6 months]`** (~±6mo rolling window).
+  Backfill each in-window date page with that date's events from the
+  vault if present; create the missing date pages so the whole window
+  exists. **Idempotent:** never clobber user-authored content on a date
+  page — only (re)generate the machine "Events" section and create
+  pages that don't exist yet.
+- `projects/` / `information/`: minimal frontmatter (`id/type/title`) +
+  free-form body + wikilinks, same shape as `contacts/` (sensible
+  default; user did not require typed schemas).
 
 **Ordered steps (each its own commit; `cargo build` + `--features
 loca` + `--features discord` green + tests before each; push after
@@ -94,11 +103,13 @@ each):**
 - R16-2. `projects/` page-type: minimal free-form page model
   (frontmatter `id/type/title` + body, wikilink-graph-bearing like
   contacts), vault read/write/list + API. Tests.
-- R16-3. `wiki/calendar/` date pages: idempotent generator for the
-  run-year (`YYYY-MM-DD.md`, never clobber user content), exposed via
-  an API/CLI entrypoint. **Blocked on the flagged date-page schema +
-  event-binding decision — stop here and surface to the user rather
-  than guess the schema.**
+- R16-3. `wiki/calendar/` date pages (spec now resolved, unblocked):
+  idempotent generator over `[today−6mo, today+6mo]` — for each date,
+  create `wiki/calendar/YYYY-MM-DD.md` if missing and (re)write only a
+  machine-delimited "## Events" section listing that date's events
+  (Event entities, recurrence-expanded per R11), preserving any
+  user-authored content outside that section. Exposed via an
+  API/entrypoint. Tests: window bounds, idempotency, no-clobber.
 - R16-4. Docs: README/CLAUDE/`docs/markdown-schema.md`/todo updated.
 
 *(Round 15 done; record is in `git log` R15-1..R15-4 + the docs.)*
