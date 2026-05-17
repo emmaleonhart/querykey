@@ -40,7 +40,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, Duration, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
@@ -274,9 +274,34 @@ pub(crate) fn rfc3339(dt: &DateTime<Utc>) -> String {
     dt.to_rfc3339()
 }
 pub(crate) fn parse_dt(s: &str) -> DateTime<Utc> {
-    DateTime::parse_from_rfc3339(s)
-        .map(|d| d.with_timezone(&Utc))
-        .unwrap_or_else(|_| DateTime::<Utc>::from_timestamp(0, 0).unwrap_or_else(Utc::now))
+    let s = s.trim();
+    // 1. RFC3339 with offset (`...+00:00` / `...Z`).
+    if let Ok(d) = DateTime::parse_from_rfc3339(s) {
+        return d.with_timezone(&Utc);
+    }
+    // 2. Naive datetime, no offset — assume UTC. This is the form the
+    //    schema's own Event example *and* the live `card.md` `updated:`
+    //    actually use; rejecting it (silent epoch fallback) is the same
+    //    class of bug as the R18-3 CRLF split: parse the shape files
+    //    really have on disk, don't quietly zero it to 1970.
+    for fmt in [
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M",
+        "%Y-%m-%d %H:%M",
+    ] {
+        if let Ok(ndt) = NaiveDateTime::parse_from_str(s, fmt) {
+            return Utc.from_utc_datetime(&ndt);
+        }
+    }
+    // 3. Date only — assume midnight UTC.
+    if let Ok(nd) = NaiveDate::parse_from_str(s, "%Y-%m-%d") {
+        if let Some(ndt) = nd.and_hms_opt(0, 0, 0) {
+            return Utc.from_utc_datetime(&ndt);
+        }
+    }
+    // 4. Genuinely unparseable — epoch (unchanged last-resort).
+    DateTime::<Utc>::from_timestamp(0, 0).unwrap_or_else(Utc::now)
 }
 
 /// A derived relationship edge extracted from a `[[wikilink]]` in an
