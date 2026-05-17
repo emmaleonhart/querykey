@@ -81,20 +81,6 @@ each. Plan-first/delete-when-done: delete each sub-step from this block
 in the same commit; when all done, remove the Round 17 ACTIVE block
 (record = git log + docs):**
 
-- R17-3. **Profile/Card screen** — view the card (bio, Offering(key),
-  Looking-for(query), handle/website, propagation status: pending +
-  eligible_at) and **edit** it (form → `PUT /api/card`), with
-  "Draft with agent" (`POST /api/card/draft`) and "Revert"
-  (`POST /api/card/revert`). New nav destination "Profile".
-- R17-4. **Wiki browser screen** — pick a page-type (Contacts/People,
-  Projects, Notes, Events), list pages, open one → render its markdown
-  body with `flutter_markdown`. New nav destination "Wiki".
-- R17-5. **Wikilink click-through** — in the rendered body, make
-  `[[target]]` / `[[pred:target]]` tappable; on tap resolve via
-  `GET /api/links` (match `to_label`/slug → `to_kind`,`to_id`) and
-  push the entity's Wiki page; show backlinks
-  (`GET /api/entities/:kind/:id/links` → `to`) on the detail view.
-  Dangling links render non-tappable/dimmed.
 - R17-6. **Docs**: README (Status → "UI: card + wiki browsing"),
   CLAUDE.md, todo.md.
 

@@ -4,20 +4,22 @@ import 'services/websocket_service.dart';
 import 'screens/chat_screen.dart';
 import 'screens/tasks_screen.dart';
 import 'screens/ingest_screen.dart';
+import 'screens/profile_screen.dart';
+import 'screens/wiki_screen.dart';
 
 void main() {
-  runApp(const SecretarybirdApp());
+  runApp(const QueryKeyApp());
 }
 
-class SecretarybirdApp extends StatelessWidget {
-  const SecretarybirdApp({super.key});
+class QueryKeyApp extends StatelessWidget {
+  const QueryKeyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => WebSocketService()..connect(),
       child: MaterialApp(
-        title: 'Secretarybird',
+        title: 'QueryKey',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
@@ -59,12 +61,24 @@ class _MainShellState extends State<MainShell> {
       selectedIcon: Icon(Icons.upload),
       label: Text('Ingest'),
     ),
+    NavigationRailDestination(
+      icon: Icon(Icons.person_outline),
+      selectedIcon: Icon(Icons.person),
+      label: Text('Profile'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.book_outlined),
+      selectedIcon: Icon(Icons.book),
+      label: Text('Wiki'),
+    ),
   ];
 
   static const _screens = [
     ChatScreen(),
     TasksScreen(),
     IngestScreen(),
+    ProfileScreen(),
+    WikiScreen(),
   ];
 
   @override
@@ -87,7 +101,7 @@ class _MainShellState extends State<MainShell> {
                     Icon(Icons.pets, size: 32,
                         color: Theme.of(context).colorScheme.primary),
                     const SizedBox(height: 4),
-                    Text('Secretarybird',
+                    Text('QueryKey',
                         style: Theme.of(context).textTheme.labelSmall),
                   ],
                 ),
@@ -111,6 +125,8 @@ class _MainShellState extends State<MainShell> {
           NavigationDestination(icon: Icon(Icons.chat_outlined), selectedIcon: Icon(Icons.chat), label: 'Chat'),
           NavigationDestination(icon: Icon(Icons.task_outlined), selectedIcon: Icon(Icons.task), label: 'Tasks'),
           NavigationDestination(icon: Icon(Icons.upload_outlined), selectedIcon: Icon(Icons.upload), label: 'Ingest'),
+          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
+          NavigationDestination(icon: Icon(Icons.book_outlined), selectedIcon: Icon(Icons.book), label: 'Wiki'),
         ],
       ),
     );
