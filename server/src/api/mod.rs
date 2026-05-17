@@ -91,6 +91,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // Generic wiki page reader (R17-1): notes list + entity detail.
         // Notes kept under API key "notes" (maps to information/ on disk).
         .route("/api/notes", get(list_notes_h))
+        .route("/api/events", get(list_events_h))
         .route("/api/entities/:kind/:id", get(get_entity_h))
         // Local-agent management
         .route("/api/openclaw/kill", post(openclaw_kill))
@@ -656,6 +657,10 @@ async fn entity_links(
 
 async fn list_notes_h(State(s): State<Arc<AppState>>) -> Json<Value> {
     Json(json!({ "notes": s.vault.list_notes_meta() }))
+}
+
+async fn list_events_h(State(s): State<Arc<AppState>>) -> Json<Value> {
+    Json(json!({ "events": s.vault.list_events_meta() }))
 }
 
 async fn get_entity_h(

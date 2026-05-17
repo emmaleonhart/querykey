@@ -1711,6 +1711,26 @@ impl Vault {
             .collect()
     }
 
+    /// `{id,title}` per event for `GET /api/events`. Mirrors
+    /// `list_notes_meta`/`list_projects` shape so the Flutter
+    /// `WikiPageSummary` parses it the same way. `id` is the event
+    /// UUID string (events are UUID-keyed — see `event_from`); it
+    /// routes straight back into `get_entity("event", id)`.
+    pub fn list_events_meta(&self) -> Vec<JsonValue> {
+        self.list_events()
+            .into_iter()
+            .map(|e| {
+                let id = e.id.to_string();
+                let title = if e.title.trim().is_empty() {
+                    id.clone()
+                } else {
+                    e.title.clone()
+                };
+                serde_json::json!({"id": id, "title": title})
+            })
+            .collect()
+    }
+
     /// Generic entity page for `GET /api/entities/:kind/:id`.
     /// Supported kinds: person, note, event, project, task.
     pub fn get_entity(&self, kind: &str, id: &str) -> Option<EntityPage> {
