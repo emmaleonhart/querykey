@@ -51,12 +51,70 @@ Please keep this section when rebasing with the remote
 
 ## ACTIVE
 
-*Nothing mid-flight. Round 19 (events made real — `parse_dt` accepts
-naive datetimes so no-offset times stop falling back to 1970;
-`GET /api/events`; Wiki Events tab unstubbed; plus the honest
-correction that the "0 tests" finding was a `tail`-truncation misread —
-the suite is 69 green) shipped on top of R18. Record is in `git log` +
-README Status. Pull the next item from `todo.md` when starting fresh.*
+### Round 20 — Rewrite the desktop UI in Electron (user-directed, firm)
+
+**User decision (2026-05-17), explicit and repeated:** rewrite the
+entire desktop UI in **Electron**. This *overrides* the prior
+"UI = Flutter, locked, do not relitigate" architecture entry — the
+project owner changed it after sustained real friction (a broken
+launcher, multi-session pain). Counsel was given twice and heard; the
+decision is final. **Do not re-litigate, do not ask the user to
+reconsider, do not "correct" back to Flutter** — update CLAUDE.md so
+future sessions don't.
+
+Honest framing (not an argument — context): the server is Rust and
+**unchanged**; Electron talks to the same `http://127.0.0.1:8000`
+REST API, which now works (R18 CRLF + R19 parse_dt). So Electron
+starts from a working backend; the rewrite is the *view layer* +
+making the server launch robust (Electron manages it — no `.bat`).
+Verifiable in this env: builds + API calls vs the live server (curl-
+parity). NOT verifiable here: the visual GUI pass — that stays the
+user's, stated honestly, never claimed.
+
+Stack kept deliberately minimal (the user's pain is "stuff doesn't
+run" → fewest moving parts): Electron + `marked` for markdown; renderer
+`fetch()`s the local server directly (no bundler, no framework, no
+IPC for data). New app in `app-electron/`; Flutter `app/` is left in
+place (git history + fallback) and retired only at R20-7 parity.
+
+Steps — each its own commit; gate before each: `cargo build` +
+`--features loca` + `--features discord` green (server untouched but
+keep the discipline) + `cd app-electron && npm run lint`/build clean
+where applicable; `git pull --rebase` + push after each; delete the
+sub-step here in the same commit; remove this block when all done:
+
+- R20-1. **Scaffold** `app-electron/`: `package.json` (electron +
+  marked, pinned), `main.js` (window), `preload.js`, `index.html`,
+  `renderer.js`, `styles.css`, `.gitignore` (node_modules). `npm
+  install` resolves; `electron .` opens a window (blank shell OK).
+- R20-2. **Server lifecycle in main.js**: locate sibling
+  `../querykey/server`, `cargo build` if needed, spawn
+  `querykey-server.exe` with `VAULT_DIR` = the vault root (resolve
+  like `run-UI.bat` did), health-poll `/health`, surface status to the
+  renderer, kill the child on quit. This is the launcher problem
+  solved properly.
+- R20-3. **API client** (`renderer.js`): typed-ish wrappers for
+  `/api/card` (GET/PUT/draft/revert), `/api/persons|projects|notes|
+  events`, `/api/entities/:kind/:id`, `/api/links`,
+  `/api/entities/:kind/:id/links`. Curl-parity verified.
+- R20-4. **Profile view**: card view + edit form + draft-with-agent +
+  revert + the 24h propagation status (surface the valve, never
+  bypass it) — parity with the Flutter `profile_screen.dart`.
+- R20-5. **Wiki view**: type picker (Contacts/Projects/Notes/Events),
+  list per kind, entity detail rendering the markdown body via
+  `marked` with `[[wikilink]]` → resolve through `/api/links` →
+  in-app navigation + backlinks. Parity with `wiki_screen.dart`.
+- R20-6. **Launcher + rename**: new `!run-UI.bat` (the user asked for
+  the `!` prefix — their convention, matches `!runclaude.bat`) that
+  just runs the Electron app (which now manages the server itself);
+  `git mv` the old `run-UI.bat`/`prm/run-UI.bat`; fix the `prm/`
+  forwarder; update doc references in both repos.
+- R20-7. **Retire Flutter + docs**: once R20-1..6 are at parity,
+  `git rm` the Flutter `app/` (recoverable from history), update
+  querykey CLAUDE.md (UI = **Electron**, the Flutter era is history),
+  README Status, todo.md; life-planning `devlog.md` dated line.
+
+(R18/R19 shipped; record in `git log` + README.)
 
 ### Open follow-ups (small, not mid-flight)
 
