@@ -49,7 +49,74 @@ Please keep this section when rebasing with the remote
 
 ---
 
-*(Rounds 15–16 done; record is in `git log` R15-1..R15-4 + R16-1..R16-4 + the docs.)*
+## ACTIVE
+
+### Round 17 — Flutter UI: own profile/card + wiki browsing + edit card
+
+**User ask (2026-05-17):** there is no working UI yet. Get one working.
+The Flutter app (`app/`) is a tab shell (NavigationRail/NavigationBar;
+Provider for WS; `ApiService` REST client at `http://127.0.0.1:8000`;
+screens Chat/Tasks/Ingest) but isn't wired into anything significant.
+Make it: (1) **display your own profile/card**, (2) **browse the wiki
+pages and click through `[[wikilinks]]`**, (3) **edit + save your card**.
+
+**Grounding (verified by survey — file:line in git log of this commit):**
+Card is fully served already: `GET /api/identity`, `GET /api/card`
+(`{card,propagation}`), `PUT /api/card` (`CardInput`: handle/name/
+website/bio/offering[]/looking_for[]/visibility), `POST /api/card/draft`,
+`POST /api/card/revert`. Wiki: `GET /api/persons`, `GET /api/projects` +
+`GET /api/projects/:id` (has `body`), `GET /api/links`,
+`GET /api/entities/:kind/:id/links` exist; **missing**: a generic
+`GET /api/entities/:kind/:id` (body+meta for person/note/event), a
+`GET /api/notes` list, a calendar-pages GET, and Flutter has **no**
+markdown renderer. Decisions taken (minimal, R15/R16-consistent; don't
+re-litigate): add the small read endpoints; add `flutter_markdown`;
+client-side `[[link]]` parse + resolve via `GET /api/links`
+(to_label match → to_kind/to_id) for click-through.
+
+**Ordered steps — each its own commit; before each: `cargo build` +
+`--features loca` + `--features discord` green (zero warnings) + tests,
+AND `cd app && flutter analyze` clean; `git pull --rebase` + push after
+each. Plan-first/delete-when-done: delete each sub-step from this block
+in the same commit; when all done, remove the Round 17 ACTIVE block
+(record = git log + docs):**
+
+- R17-1. **Server read endpoints** (small, vault methods mostly exist):
+  `GET /api/notes` (list) and a generic `GET /api/entities/:kind/:id`
+  returning `{kind,id,title,body,frontmatter}` for
+  person|note|event|project|task (reuse existing vault reads; persons
+  read from the contacts dir per R15). Unit/smoke tests. No behavior
+  change to existing routes.
+- R17-2. **ApiService + models** (`app/lib`): add `getIdentity()`,
+  `getCard()`, `putCard()`, `draftCard()`, `revertCard()`,
+  `listNotes()`, `listProjects()`, `getEntity(kind,id)`, `listLinks()`;
+  `Card` model (handle/name/website/bio/offering/looking_for/updated/
+  visibility) + propagation; match the existing `_get/_post` house
+  style + snake_case JSON. Add `flutter_markdown` to `pubspec.yaml`.
+- R17-3. **Profile/Card screen** — view the card (bio, Offering(key),
+  Looking-for(query), handle/website, propagation status: pending +
+  eligible_at) and **edit** it (form → `PUT /api/card`), with
+  "Draft with agent" (`POST /api/card/draft`) and "Revert"
+  (`POST /api/card/revert`). New nav destination "Profile".
+- R17-4. **Wiki browser screen** — pick a page-type (Contacts/People,
+  Projects, Notes, Events), list pages, open one → render its markdown
+  body with `flutter_markdown`. New nav destination "Wiki".
+- R17-5. **Wikilink click-through** — in the rendered body, make
+  `[[target]]` / `[[pred:target]]` tappable; on tap resolve via
+  `GET /api/links` (match `to_label`/slug → `to_kind`,`to_id`) and
+  push the entity's Wiki page; show backlinks
+  (`GET /api/entities/:kind/:id/links` → `to`) on the detail view.
+  Dangling links render non-tappable/dimmed.
+- R17-6. **Docs**: README (Status → "UI: card + wiki browsing"),
+  CLAUDE.md, todo.md.
+
+**Hard constraints:** additive only — never delete/reset/force-push;
+do not change existing API behavior or the card 24h-propagation valve
+(surface it, don't bypass it); markdown stays canonical; no
+Secretarybird/hackathon refs; if a detail is underspecified pick the
+minimal R15/R16-consistent choice, note it in the commit, continue.
+
+*(Rounds 15–16 done; record in `git log` + docs.)*
 
 ---
 
