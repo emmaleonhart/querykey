@@ -3,7 +3,7 @@
 //!
 //! Markdown files on disk ARE the store of record. The Loca graph is a
 //! derived, rebuildable index *projected from* this vault, never the
-//! other way round. Layout (R15 onward):
+//! other way round. Layout (R16 onward):
 //!
 //! ```text
 //! <root>/                       (vault root — contains `querykey.toml`)
@@ -12,7 +12,11 @@
 //!   peers/                      others' cards (READ-ONLY, git-ignored)
 //!   .querykey/                  derived cache + propagation state (ignored)
 //!   wiki/                       the graph subtree
-//!     people/   tasks/   events/   notes/
+//!     contacts/                 people (R15-3 rename; API key: "people")
+//!     projects/                 project pages (R16-2; new)
+//!     information/              freeform knowledge pages (R16-1 rename; API key: "notes")
+//!     events/   tasks/
+//!     calendar/                 date pages YYYY-MM-DD.md (R16-3)
 //!     conflicts/ questions/ followups/
 //!     instructions/ voiceprofiles/
 //! ```
@@ -23,7 +27,9 @@
 //! after a successful write the legacy `<root>/<entity>/<slug>.md` is
 //! removed so the two paths never diverge. `card.md`, `agents.md`,
 //! `peers/`, `.querykey/`, and the privacy `.gitignore` stay at the
-//! vault root (they are not graph entities).
+//! vault root (they are not graph entities). `wiki/notes/` (R15 era)
+//! is a legacy read path for `information/`; `notes/` at the vault
+//! root is a pre-R15 legacy read path.
 //!
 //! Each file is `--- <yaml frontmatter> ---` + a freeform markdown
 //! body. Round-trips are lossless: every model field is either in the
@@ -311,12 +317,14 @@ pub struct AgendaItem {
 /// a single `-`, trimmed. So `John  Smith`, `john-smith`, and
 /// `John-Smith` all compare equal.
 /// Map an API-side entity key to its canonical on-disk dir name.
-/// Most entities use the same name in both forms; "people" is the
-/// exception — it lives at `wiki/contacts/` on disk (R15-3, the
-/// user's term). Code outside this module still says "people".
+/// Most entities use the same name in both forms; renamed dirs:
+///   "people" → "contacts"  (R15-3, the user's term)
+///   "notes"  → "information" (R16-1, wiki page-type rename)
+/// Code outside this module still uses the API keys.
 fn canonical_dir_name(sub: &str) -> &str {
     match sub {
         "people" => "contacts",
+        "notes" => "information",
         other => other,
     }
 }
@@ -363,11 +371,15 @@ pub(crate) fn slug(s: &str) -> String {
 // Graph entity subdirs. These move under `<root>/wiki/` in R15 (with a
 // back-compat read fallback at `<root>/<entity>/`). Defined in one
 // place so the resolver helpers stay honest.
+// R16-1: `projects` (new wiki page-type) and `notes` (renamed to
+// `information` on disk) are added. The API key for notes stays "notes";
+// `canonical_dir_name` maps it to the on-disk name "information".
 const ENTITY_SUBDIRS: &[&str] = &[
     "people",
     "tasks",
     "events",
     "notes",
+    "projects",
     "conflicts",
     "questions",
     "followups",
@@ -386,10 +398,13 @@ impl Vault {
         let root = PathBuf::from(root);
         // Graph entity dirs live under <root>/wiki/<canonical_name>/
         // from R15 onward. Some subs have a canonical on-disk name
-        // different from the API key (e.g. "people" → "contacts").
+        // different from the API key (e.g. "people" → "contacts",
+        // "notes" → "information").
         for sub in ENTITY_SUBDIRS {
             fs::create_dir_all(root.join("wiki").join(canonical_dir_name(sub)))?;
         }
+        // R16-3: calendar date pages live at wiki/calendar/YYYY-MM-DD.md
+        fs::create_dir_all(root.join("wiki").join("calendar"))?;
         for sub in ROOT_ONLY_SUBDIRS {
             fs::create_dir_all(root.join(sub))?;
         }
@@ -1708,10 +1723,10 @@ mod tests {
         .unwrap();
 
         // A note: explicit kind:id ref takes precedence (rule 1).
-        // Notes live under wiki/notes/ from R15 onward; Vault::open
-        // created the dir already.
+        // Notes live under wiki/information/ from R16-1 onward (on-disk
+        // rename); Vault::open creates the dir already.
         fs::write(
-            dir.join("wiki").join("notes").join("salon.md"),
+            dir.join("wiki").join("information").join("salon.md"),
             "# Salon\n\nIntroduced [[knows:person:ada-lovelace]] to the group.\n",
         )
         .unwrap();
@@ -1959,19 +1974,20 @@ mod tests {
     // ---- R15-2: wiki/ subtree + legacy back-compat ----
 
     /// New writes land under wiki/<entity>/, not at the legacy root.
-    /// People specifically live at `wiki/contacts/` (R15-3 rename) —
-    /// that path-specific assertion is covered in the R15-3 tests
-    /// below; here we use a non-renamed entity (notes) to exercise
-    /// the generic wiki/-vs-root behavior.
+    /// People specifically live at `wiki/contacts/` (R15-3 rename) and
+    /// notes live at `wiki/information/` (R16-1 rename) — path-specific
+    /// assertions for those are in the R15-3/R16-1 tests below; here we
+    /// exercise the generic wiki/-vs-root layout.
     #[test]
     fn r15_writes_go_under_wiki() {
         let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
         let _v = Vault::open(dir.to_str().unwrap()).unwrap();
 
         // Vault::open creates the canonical entity dirs under wiki/.
+        // R16-1: notes are now at wiki/information/ (on-disk rename).
         assert!(
-            dir.join("wiki").join("notes").is_dir(),
-            "wiki/notes/ should be created on open"
+            dir.join("wiki").join("information").is_dir(),
+            "wiki/information/ should be created on open (R16-1 rename of notes)"
         );
         assert!(
             dir.join("wiki").join("tasks").is_dir(),
@@ -1981,12 +1997,24 @@ mod tests {
             dir.join("wiki").join("events").is_dir(),
             "wiki/events/ should be created on open"
         );
+        // R16-2: projects/ dir created on open.
+        assert!(
+            dir.join("wiki").join("projects").is_dir(),
+            "wiki/projects/ should be created on open (R16-2)"
+        );
+        // R16-3: calendar/ dir created on open.
+        assert!(
+            dir.join("wiki").join("calendar").is_dir(),
+            "wiki/calendar/ should be created on open (R16-3)"
+        );
         // Non-graph dirs stay at the root.
         assert!(dir.join("peers").is_dir(), "peers/ stays at root");
         assert!(dir.join(".querykey").is_dir(), ".querykey/ stays at root");
         // Legacy non-wiki entity dirs are NOT pre-created.
         assert!(!dir.join("notes").is_dir(), "no legacy notes/ at root");
         assert!(!dir.join("tasks").is_dir(), "no legacy tasks/ at root");
+        // wiki/notes/ (R15 era) is NOT pre-created — it's a legacy read path.
+        assert!(!dir.join("wiki").join("notes").is_dir(), "wiki/notes/ is legacy, not pre-created");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -2276,6 +2304,88 @@ mod tests {
             .join("tasks")
             .join(format!("{tid}.md"))
             .is_file());
+    }
+
+    // ---- R16-1: notes → information rename + projects/ added ----
+
+    /// list_notes() reads from wiki/information/ (canonical, R16-1).
+    /// A note hand-placed at the old wiki/notes/ path (legacy) is still
+    /// surfaced via the legacy-fallback mechanism.
+    #[test]
+    fn r16_1_notes_canonical_dir_is_information() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        // Canonical: wiki/information/ (created by open).
+        assert!(dir.join("wiki").join("information").is_dir(),
+            "wiki/information/ should exist after Vault::open");
+
+        // Write a note via the filesystem at the canonical path.
+        fs::write(
+            dir.join("wiki").join("information").join("my-note.md"),
+            "# My Note\n\nSome content here.\n",
+        ).unwrap();
+
+        let notes = v.list_notes();
+        assert_eq!(notes.len(), 1, "canonical information/ note is listed");
+        assert_eq!(notes[0].0, "my-note");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A note at wiki/notes/ (R15-era legacy path) is still readable
+    /// after the R16-1 rename.
+    #[test]
+    fn r16_1_legacy_wiki_notes_still_readable() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        // Place a note in the R15-era legacy dir.
+        std::fs::create_dir_all(dir.join("wiki").join("notes")).unwrap();
+        fs::write(
+            dir.join("wiki").join("notes").join("legacy-note.md"),
+            "# Legacy\n\nOld path content.\n",
+        ).unwrap();
+
+        // list_notes() unions canonical (wiki/information/) + legacy (wiki/notes/ + notes/).
+        let notes = v.list_notes();
+        assert_eq!(notes.len(), 1, "legacy wiki/notes/ note is surfaced via fallback");
+        assert_eq!(notes[0].0, "legacy-note");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A note at the pre-R15 root notes/ dir is still readable.
+    #[test]
+    fn r16_1_pre_r15_notes_at_root_still_readable() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        // Place a note in the pre-R15 root-level legacy dir.
+        std::fs::create_dir_all(dir.join("notes")).unwrap();
+        fs::write(
+            dir.join("notes").join("old-note.md"),
+            "Pre-R15 note content.\n",
+        ).unwrap();
+
+        let notes = v.list_notes();
+        assert_eq!(notes.len(), 1, "pre-R15 root notes/ note is surfaced via fallback");
+        assert_eq!(notes[0].0, "old-note");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Projects are a new page-type in wiki/projects/ (R16-2).
+    /// Vault::open must create the dir.
+    #[test]
+    fn r16_1_projects_dir_created_on_open() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let _v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        assert!(dir.join("wiki").join("projects").is_dir(),
+            "wiki/projects/ should be created by Vault::open (R16-1)");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
 
