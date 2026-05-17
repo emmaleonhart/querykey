@@ -82,6 +82,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // Projects (wiki page-type, R16-2)
         .route("/api/projects", get(list_projects).post(create_project))
         .route("/api/projects/:id", get(get_project_h))
+        // Calendar date pages (wiki/calendar/YYYY-MM-DD.md, R16-3)
+        .route("/api/calendar/generate", post(calendar_generate))
         // Semantic wikilink graph (derived live from the canonical
         // vault — backend-independent, never stale).
         .route("/api/links", get(list_links))
@@ -599,6 +601,27 @@ async fn create_project(
         return Json(json!({ "error": e.to_string() }));
     }
     Json(serde_json::to_value(p).unwrap())
+}
+
+// ---- Calendar date pages (R16-3) ----
+//
+// POST /api/calendar/generate: idempotent, runs the generator over
+// [today−6mo, today+6mo], returns counts. Safe to call repeatedly.
+
+async fn calendar_generate(State(s): State<Arc<AppState>>) -> Json<Value> {
+    let today = chrono::Utc::now().date_naive();
+    match s.vault.generate_calendar_pages(today) {
+        Ok((created, updated)) => Json(json!({
+            "ok": true,
+            "pages_created": created,
+            "pages_updated": updated,
+            "window": {
+                "start": (today - chrono::Duration::days(183)).to_string(),
+                "end": (today + chrono::Duration::days(183)).to_string(),
+            }
+        })),
+        Err(e) => Json(json!({ "ok": false, "error": e.to_string() })),
+    }
 }
 
 // ---- semantic wikilink graph ----

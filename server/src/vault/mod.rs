@@ -40,7 +40,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, NaiveDate, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::models::{
@@ -1149,6 +1149,139 @@ impl Vault {
 
         items.sort_by(|a, b| a.0.cmp(&b.0));
         items.into_iter().map(|(_, it)| it).collect()
+    }
+
+    // ----- Calendar date pages (R16-3) -----
+    //
+    // One page per date: `wiki/calendar/YYYY-MM-DD.md`. The page has
+    // a machine-delimited "## Events" section that is (re)generated
+    // on every call to `generate_calendar_pages`; any user-authored
+    // content OUTSIDE that section is left untouched (no-clobber).
+    //
+    // Sentinel pair (HTML comments so they are invisible in renderers):
+    //   <!-- qk:events:start -->
+    //   <!-- qk:events:end -->
+    //
+    // On each run the content between the sentinels is replaced with
+    // the event occurrences for that date (from `agenda`). The
+    // sentinels themselves are always present (they are written on
+    // page creation and the replace step preserves them). If the file
+    // does not yet exist it is created from scratch; the user body
+    // is empty and only the events section is present.
+
+    const CAL_START: &'static str = "<!-- qk:events:start -->";
+    const CAL_END: &'static str = "<!-- qk:events:end -->";
+
+    fn calendar_dir(&self) -> PathBuf {
+        self.root.join("wiki").join("calendar")
+    }
+
+    fn calendar_page_path(&self, date: NaiveDate) -> PathBuf {
+        self.calendar_dir()
+            .join(format!("{}.md", date.format("%Y-%m-%d")))
+    }
+
+    /// Build the events section body for `date` from the vault's
+    /// current events (recurrence-expanded). The result is the text
+    /// that goes BETWEEN the sentinels (not including them).
+    fn events_section_for_date(&self, date: NaiveDate) -> String {
+        // Query a [00:00, 23:59:59] window for the date in UTC.
+        let from = Utc
+            .from_utc_datetime(&date.and_hms_opt(0, 0, 0).unwrap());
+        let to = Utc
+            .from_utc_datetime(&date.and_hms_opt(23, 59, 59).unwrap());
+        let items = self.agenda(from, to);
+        if items.is_empty() {
+            return String::from("\n*(no events)*\n");
+        }
+        let mut lines = String::new();
+        for item in &items {
+            let marker = if item.movable { "- [ ]" } else { "-" };
+            let time = item
+                .start
+                .parse::<DateTime<Utc>>()
+                .map(|dt| dt.format("%H:%M").to_string())
+                .unwrap_or_default();
+            lines.push_str(&format!("{marker} **{time}** {}\n", item.title));
+        }
+        format!("\n{lines}")
+    }
+
+    /// (Re)write the machine-delimited events section of a date page,
+    /// preserving any user-authored content outside the sentinels.
+    /// Returns true iff the file was modified (created or changed).
+    fn update_date_page(&self, date: NaiveDate) -> anyhow::Result<bool> {
+        let path = self.calendar_page_path(date);
+        let date_str = date.format("%Y-%m-%d").to_string();
+        let events_body = self.events_section_for_date(date);
+        let events_block = format!(
+            "{start}{body}{end}",
+            start = Self::CAL_START,
+            body = events_body,
+            end = Self::CAL_END,
+        );
+
+        let existing = fs::read_to_string(&path).unwrap_or_default();
+        let new_content = if existing.is_empty() {
+            // New page: heading + empty user section + events block.
+            format!(
+                "# {date_str}\n\n{events_block}\n"
+            )
+        } else {
+            // Existing page: replace only the section between sentinels.
+            if let (Some(s), Some(e)) = (
+                existing.find(Self::CAL_START),
+                existing.find(Self::CAL_END),
+            ) {
+                let e_end = e + Self::CAL_END.len();
+                format!("{}{}{}", &existing[..s], events_block, &existing[e_end..])
+            } else {
+                // Sentinels missing (user removed them?) — append at end.
+                format!("{existing}\n{events_block}\n")
+            }
+        };
+
+        if new_content == existing {
+            return Ok(false); // truly idempotent
+        }
+        fs::write(&path, &new_content)?;
+        Ok(true)
+    }
+
+    /// Idempotent generator: ensure every date in [today−6mo, today+6mo]
+    /// has a `wiki/calendar/YYYY-MM-DD.md` page with an up-to-date
+    /// machine-generated events section. User content outside the
+    /// sentinels is never touched.
+    ///
+    /// Returns (pages_created, pages_updated) counts.
+    pub fn generate_calendar_pages(
+        &self,
+        today: NaiveDate,
+    ) -> anyhow::Result<(usize, usize)> {
+        // ~6 calendar months ≈ 183 days; 366 total pages.
+        let start = today - Duration::days(183);
+        let end = today + Duration::days(183);
+
+        let cal_dir = self.calendar_dir();
+        fs::create_dir_all(&cal_dir)?;
+
+        let mut created = 0usize;
+        let mut updated = 0usize;
+        let mut cur = start;
+        while cur <= end {
+            let path = self.calendar_page_path(cur);
+            let existed = path.is_file();
+            let changed = self.update_date_page(cur)?;
+            if changed {
+                if existed {
+                    updated += 1;
+                } else {
+                    created += 1;
+                }
+            }
+            cur += Duration::days(1);
+        }
+        Ok((created, updated))
     }
 
     // ----- Conflict -----
@@ -2587,6 +2720,161 @@ mod tests {
         let back = v.links_to("person", "ada-lovelace");
         assert!(back.iter().any(|e| e.from_kind == "project"),
             "project appears as backlink on ada-lovelace");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ---- R16-3: wiki/calendar/ date pages ----
+
+    fn naive(s: &str) -> NaiveDate {
+        NaiveDate::parse_from_str(s, "%Y-%m-%d").unwrap()
+    }
+
+    /// Generator produces pages for the full ~±6mo window.
+    #[test]
+    fn r16_3_window_bounds() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        let today = naive("2026-05-17");
+        let (created, updated) = v.generate_calendar_pages(today).unwrap();
+        assert_eq!(updated, 0, "nothing updated on first run");
+        // 183 days before + today + 183 days after = 367 pages.
+        assert_eq!(created, 367, "367 pages created for ±183-day window");
+
+        // Start and end of window exist.
+        let start = today - Duration::days(183);
+        let end = today + Duration::days(183);
+        assert!(v.calendar_page_path(start).is_file(), "start of window exists");
+        assert!(v.calendar_page_path(end).is_file(), "end of window exists");
+        assert!(v.calendar_page_path(today).is_file(), "today's page exists");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Generator is idempotent: running it twice produces no changes.
+    #[test]
+    fn r16_3_idempotent_run() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        let today = naive("2026-05-17");
+        let (c1, u1) = v.generate_calendar_pages(today).unwrap();
+        assert!(c1 > 0, "first run creates pages");
+        assert_eq!(u1, 0, "first run has no updates");
+
+        // Second run with no vault changes: truly idempotent.
+        let (c2, u2) = v.generate_calendar_pages(today).unwrap();
+        assert_eq!(c2, 0, "second run creates nothing");
+        assert_eq!(u2, 0, "second run updates nothing");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// User-authored content outside the sentinels is never clobbered.
+    #[test]
+    fn r16_3_no_clobber_of_user_content() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+        let today = naive("2026-05-17");
+
+        // First run: generate the page.
+        v.generate_calendar_pages(today).unwrap();
+
+        let page_path = v.calendar_page_path(today);
+        let original = fs::read_to_string(&page_path).unwrap();
+
+        // User appends content after the events block.
+        let user_note = "\n## My notes\n\nRemember to buy milk.\n";
+        fs::write(&page_path, format!("{original}{user_note}")).unwrap();
+
+        // Second run: events section regenerated but user content kept.
+        let (c2, _u2) = v.generate_calendar_pages(today).unwrap();
+        assert_eq!(c2, 0, "no new pages created on second run");
+
+        let after = fs::read_to_string(&page_path).unwrap();
+        assert!(after.contains("## My notes"), "user content preserved");
+        assert!(after.contains(Vault::CAL_START), "sentinel still present");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Events in the vault appear in the date page for their date.
+    #[test]
+    fn r16_3_events_listed_in_date_page() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        // Create a one-off event on 2026-05-17 at 09:00 UTC.
+        let start = DateTime::parse_from_rfc3339("2026-05-17T09:00:00+00:00")
+            .unwrap()
+            .with_timezone(&Utc);
+        v.upsert_event(&Event {
+            id: uuid::Uuid::new_v4(),
+            title: "Salon meeting".into(),
+            description: String::new(),
+            start_time: start,
+            end_time: start + Duration::hours(1),
+            participants: vec![],
+            recurrence: None,
+            confidence: 1.0,
+            source_messages: vec![],
+            created_at: Utc::now(),
+        }).unwrap();
+
+        let today = naive("2026-05-17");
+        v.generate_calendar_pages(today).unwrap();
+
+        let page = fs::read_to_string(v.calendar_page_path(today)).unwrap();
+        assert!(page.contains("Salon meeting"),
+            "event title appears in the date page");
+        assert!(page.contains("09:00"),
+            "event time appears in the date page");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A recurring event appears on every occurrence date in the window.
+    #[test]
+    fn r16_3_recurring_event_in_date_pages() {
+        let dir = std::env::temp_dir().join(format!("qk-vault-{}", uuid::Uuid::new_v4()));
+        let v = Vault::open(dir.to_str().unwrap()).unwrap();
+
+        // Weekly standup starting Mon 2026-05-18.
+        let start = DateTime::parse_from_rfc3339("2026-05-18T10:00:00+00:00")
+            .unwrap()
+            .with_timezone(&Utc);
+        v.upsert_event(&Event {
+            id: uuid::Uuid::new_v4(),
+            title: "Weekly Standup".into(),
+            description: String::new(),
+            start_time: start,
+            end_time: start + Duration::minutes(30),
+            participants: vec![],
+            recurrence: Some("FREQ=WEEKLY;COUNT=3".into()),
+            confidence: 1.0,
+            source_messages: vec![],
+            created_at: Utc::now(),
+        }).unwrap();
+
+        let today = naive("2026-05-17");
+        v.generate_calendar_pages(today).unwrap();
+
+        // The event has 3 occurrences: May 18, 25, Jun 1.
+        for date_str in &["2026-05-18", "2026-05-25", "2026-06-01"] {
+            let page = fs::read_to_string(
+                v.calendar_page_path(naive(date_str))
+            ).unwrap();
+            assert!(page.contains("Weekly Standup"),
+                "{date_str} page contains the recurring event");
+        }
+
+        // Unrelated date should NOT contain the event.
+        let page_other = fs::read_to_string(
+            v.calendar_page_path(naive("2026-05-19"))
+        ).unwrap();
+        assert!(!page_other.contains("Weekly Standup"),
+            "non-occurrence date does not list the event");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
