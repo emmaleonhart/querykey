@@ -87,7 +87,7 @@ today versus planned.
 
 | Component | Stack | Where |
 |---|---|---|
-| Desktop/mobile app | Flutter (Dart `sdk ^3.10.8`); `provider`, `web_socket_channel`, `http`, `uuid`, `intl` | [`app/`](app/) |
+| Desktop app | **Electron** (`electron` + `marked`; renderer `fetch()`s the local server; no bundler/framework/IPC-for-data) | [`app-electron/`](app-electron/) |
 | Server | **Rust** (crate `querykey-server`: `axum`, `tokio`, `reqwest`) — compiles & runs; structural port with TODOs | [`server/`](server/) |
 | Source of truth | **Markdown files + git** — implemented; YAML frontmatter + body, the graph is derived & rebuilt from it. R16 vault layout: `<root>/querykey.toml` marks the root; four headline page-types under `wiki/`: `contacts/` (people), `projects/`, `information/` (notes), `events/`; calendar date pages at `wiki/calendar/YYYY-MM-DD.md`. Legacy paths still read; writes migrate on first upsert. | `server/src/vault/` → `<vault root>` |
 | AI engine | **Model-agnostic** — the agent is *whoever operates QueryKey*: **Claude (e.g. via Claude Code) is a first-class agent today**; the default local **Gemma** is for the GUI path and is **not built yet**; Hermes/GPT optional. Exposed via an **MCP server**. *One optional backend:* OpenClaw via a local WSL gateway (port `18789`). `detect()` verifies the real chat API, so a non-agent port is never reported connected (R13). | `server/src/openclaw/` |
@@ -143,9 +143,9 @@ wiki browsing); the rest is scaffolding.
 - Ingest pipeline: relaxed-schema parse → typed models → store + typed
   GraphDiff broadcast over the WebSocket hub.
 - **MCP server** (`/mcp`): JSON-RPC `initialize`/`tools/list`/`tools/call`.
-- **Flutter desktop UI** (`app/`) — two real surfaces: **Profile**
-  (your own card — view/edit/draft-with-agent/revert, the 24h
-  propagation valve surfaced) and **Wiki** (browse vault page-types;
+- **Electron desktop UI** (`app-electron/`) — two real surfaces:
+  **Profile** (your own card — view/edit/draft-with-agent/revert, the
+  24h propagation valve surfaced) and **Wiki** (browse vault page-types;
   Contacts/Projects/Notes/**Events** list; entity detail renders the
   markdown body with `[[wikilink]]` click-through + backlinks). R18
   rebranded the app off the old "Secretary Bird" hackathon shell,
@@ -155,11 +155,17 @@ wiki browsing); the rest is scaffolding.
   vault parse to *nothing* (card + every entity). R19 made events real:
   `parse_dt` now accepts naive datetimes (no-offset times no longer
   fall back to 1970 — fixes the card `updated` date + calendar agenda),
-  added `GET /api/events`, and unstubbed the Wiki Events tab. Verified
-  live against the `life-planning/prm` vault: `/api/card` (+ correct
-  `updated`), 135 contacts, 4 projects, 2 notes, 1 event served; test
-  suite **69 passed / 0 failed**. (Visual GUI pass is the user's on
-  next `!run-UI.bat`; the data path is end-to-end verified.)
+  added `GET /api/events`, and unstubbed the Wiki Events tab. **R20
+  rewrote the desktop UI from Flutter to Electron** (user-directed
+  2026-05-17 after sustained launcher friction): same two surfaces,
+  same Rust server/API, but the Electron main process now *manages*
+  the server (build + spawn + health-poll + teardown) so there is no
+  fragile `.bat` launcher. Verified live against the `life-planning/
+  prm` vault: `/api/card` (+ correct `updated`), 135 contacts, 4
+  projects, 2 notes, 1 event served; test suite **69 passed / 0
+  failed**; renderer API contracts curl-checked. (Visual GUI pass is
+  the user's on next `!run-UI.bat`; the data path is end-to-end
+  verified.)
 
 **Honest limitations / not yet built**
 - **Agent honesty (gateway detection + ingest)** — DONE (Round 13):
@@ -220,7 +226,7 @@ See [`queue.md`](queue.md) for the authoritative near-term plan and
 Windows + WSL is the current target. Prerequisites:
 
 - **Rust** (stable, via [rustup](https://rustup.rs)) — `cargo` on `PATH`
-- **Flutter** (Dart SDK 3.10.8+) on `PATH`
+- **Node.js / npm** on `PATH` (for the Electron desktop app)
 - **WSL Ubuntu** with **OpenClaw** installed (for AI features; the server runs
   without it, but AI chat/extraction needs the gateway)
 - *Optional:* the sibling **`../SutraDB`** checkout for the Loca graph store
@@ -233,9 +239,13 @@ Then, from the repo root:
 ```
 
 That script builds the Rust server (`cargo build --features loca`, falling
-back to the in-memory build), runs `flutter pub get`, starts the OpenClaw
-gateway in WSL, launches the server, and runs the Flutter app on Windows
-(`flutter run -d windows`). Closing the app window tears everything back down.
+back to the in-memory build), `npm install`s the Electron app, starts the
+OpenClaw gateway in WSL, and launches the Electron app (`npm start`). The
+Electron app itself spawns + health-polls + tears down the Rust server, so
+there is no separate server window. Closing the app window stops everything.
+
+(`life-planning/!run-UI.bat` is the simpler path for the prototype vault —
+it just launches the Electron app, which manages the server.)
 
 `!runClaude.bat` just opens Claude Code at the repo root.
 
@@ -243,7 +253,7 @@ gateway in WSL, launches the server, and runs the Flutter app on Windows
 
 | Path | What it is |
 |---|---|
-| [`app/`](app/) | Flutter app (Dart) — desktop-first; **Profile** (card) + **Wiki** (vault browser) screens |
+| [`app-electron/`](app-electron/) | **Electron** desktop app — **Profile** (card) + **Wiki** (vault browser); manages the Rust server. (The retired Flutter `app/` is in git history.) |
 | [`server/`](server/) | **Rust** server (`querykey-server`) — the only server: ingest, agent bridge, WebSocket, MCP, Loca graph store |
 | [`docs/`](docs/) | `architecture.md`, `data-model.md`, `markdown-schema.md`, `card-format.md`, `versions-comparison.md`, `why-go.md` |
 | [`chat/`](chat/) | Vision corpus (chat-log exports); gitignored except its README — private context, not a spec |

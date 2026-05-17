@@ -56,7 +56,8 @@ explicitly *not* near-term. See the audio items further down.
 **How to work here:** [`queue.md`](queue.md) is the barrel-through
 queue — do work from there. This `todo.md` is the long roadmap
 (reference, not a worklist). **Discord is deprioritized** → Phase Z.
-**Flutter** is the frontend (firm).
+**Electron** is the desktop frontend (user-directed 2026-05-17,
+replaced Flutter; firm — do not revert).
 
 ---
 
@@ -71,7 +72,8 @@ queue — do work from there. This `todo.md` is the long roadmap
 > people in your contact graph."
 >
 > Authoritative near-term plan: [`queue.md`](queue.md). Settled
-> decisions (do not relitigate): **Flutter** UI; **Rust** is the
+> decisions (do not relitigate): **Electron** UI (replaced Flutter
+> 2026-05-17, user-directed); **Rust** is the
 > server (Go fully removed in Round 4); **model-agnostic local agent,
 > Gemma default** via MCP (OpenClaw is today's bridge, an
 > implementation detail).
@@ -126,7 +128,8 @@ resolved — contradictions, ambiguities, unconfirmed commitments.
 
 ## Platform Targets
 
-Primary framework: **Flutter** (single codebase, locked in).
+Primary framework: **Electron** (user-directed 2026-05-17, replaced
+Flutter — `app-electron/`). The Flutter era is in git history.
 Current focus: **Windows Desktop**.
 
 | Platform | Priority | Status |
@@ -483,5 +486,6 @@ See `queue.md` for the canonical list. Highlights:
 - **Task vs Event**: tasks are time-flexible (optional deadline); events
   are time-fixed (start + end). If you can move it without asking
   permission, it's a task.
-- **Settled, do not relitigate**: Flutter UI; Rust server target;
+- **Settled, do not relitigate**: Electron UI (replaced Flutter
+  2026-05-17, user-directed); Rust server target;
   model-agnostic local agent with Gemma default.

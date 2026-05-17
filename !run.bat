@@ -20,15 +20,16 @@ if errorlevel 1 (
 echo [OK] Cargo found:
 cargo --version
 
-REM --- Check for Flutter ---
-where flutter >NUL 2>NUL
+REM --- Check for Node/npm (Electron desktop UI) ---
+where npm >NUL 2>NUL
 if errorlevel 1 (
-    echo [ERROR] Flutter is not installed or not in PATH.
+    echo [ERROR] Node.js / npm is not installed or not in PATH.
+    echo Install it from: https://nodejs.org
     pause
     exit /b 1
 )
-echo [OK] Flutter found:
-flutter --version 2>NUL | findstr /C:"Flutter"
+echo [OK] npm found:
+npm --version
 
 REM --- Check for WSL + Ubuntu (local AI agent gateway) ---
 wsl -d Ubuntu -- echo "WSL OK" >NUL 2>NUL
@@ -40,6 +41,9 @@ if errorlevel 1 (
 echo.
 
 REM --- Build the Rust server (with Loca/SutraDB graph store) ---
+REM Pre-build so the Electron app's first-run is instant; the app
+REM itself also builds it if missing (server lifecycle lives in
+REM app-electron/main.js now).
 echo [1/4] Building Rust server (--features loca)...
 cd /d "%~dp0server"
 cargo build --features loca
@@ -55,11 +59,18 @@ if errorlevel 1 (
 )
 echo [OK] Built server\target\debug\querykey-server.exe
 
-REM --- Get Flutter dependencies ---
-echo [2/4] Getting Flutter dependencies...
-cd /d "%~dp0app"
-call flutter pub get >NUL 2>NUL
-echo [OK] Flutter dependencies ready
+REM --- Electron app dependencies ---
+echo [2/4] Installing Electron app dependencies...
+cd /d "%~dp0app-electron"
+if not exist "node_modules" (
+    call npm install --no-audit --no-fund
+    if errorlevel 1 (
+        echo [ERROR] npm install failed.
+        pause
+        exit /b 1
+    )
+)
+echo [OK] app-electron dependencies ready
 echo.
 
 REM --- Start the local agent gateway in WSL (OpenClaw bridge today) ---
@@ -98,8 +109,10 @@ echo        Try manually in WSL: openclaw gateway
 :gateway_done
 echo.
 
-REM --- Start the Rust server ---
-echo [4/4] Starting QueryKey server...
+REM --- Launch the Electron app (it spawns + health-polls + tears
+REM down the Rust server itself; do NOT start the server here too,
+REM or two instances would fight over port 8000). ---
+echo [4/4] Launching QueryKey desktop (Electron manages the server)...
 echo.
 echo   Server:    http://127.0.0.1:8000
 echo   Health:    http://127.0.0.1:8000/health
@@ -107,22 +120,14 @@ echo   Agent:     http://127.0.0.1:18789
 echo   WebSocket: ws://127.0.0.1:8000/ws/chat
 echo ========================================
 echo.
-
-cd /d "%~dp0server"
-start "QueryKey Server" /min target\debug\querykey-server.exe
-timeout /t 2 /nobreak >NUL
-
-REM --- Launch Flutter app ---
-echo Launching Flutter app...
 echo Close the app window to stop everything.
 echo.
-cd /d "%~dp0app"
-call flutter run -d windows
+cd /d "%~dp0app-electron"
+call npm start
 
 REM --- Cleanup: kill everything on exit ---
 echo.
 echo Stopping all processes...
-taskkill /fi "WINDOWTITLE eq QueryKey Server" >NUL 2>NUL
 taskkill /im querykey-server.exe /f >NUL 2>NUL
 wsl -d Ubuntu -- bash -c "pkill -f openclaw-gateway 2>/dev/null; pkill -f 'openclaw gateway' 2>/dev/null; rm -f /tmp/openclaw-*/gateway.*.lock; true" >NUL 2>NUL
 taskkill /fi "WINDOWTITLE eq Agent Gateway" >NUL 2>NUL
