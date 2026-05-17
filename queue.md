@@ -51,17 +51,57 @@ Please keep this section when rebasing with the remote
 
 ## ACTIVE
 
-(Round 15 — `querykey.toml` vault-root marker + `wiki/` layout +
-people→contacts rename — DONE 2026-05-16; details in `git log`
-R15-1..R15-4, semantics in `README.md` / `CLAUDE.md` /
-`docs/markdown-schema.md`.)
+### Round 16 — `wiki/` canonical page-types + calendar date pages
 
-**Flagged for the user — NEXT decision, do NOT guess:** the
-*semantics* of the `wiki/information/` and `wiki/projects/`
-canonical buckets, and whether non-contact entities (tasks / events
-/ …) are themselves graph-bearing or only `contacts/` is. The toml
-marker + wiki/ subtree + contacts/ rename are in; the open buckets
-are the user-defined-open part.
+**User decision (2026-05-16) — resolves the R15-flagged question.**
+QueryKey runs in `wiki/` with **wiki pages**. Canonical page-types:
+**`projects/`, `information/`, `contacts/` (people, done R15),
+`events/`**. Events extend to **calendar days**: a page per date,
+at minimum every date within the year QueryKey is run (consider
+generating the full year).
+
+**Decisions taken (sensible defaults; commit them, don't re-litigate):**
+- Canonical graph-bearing `wiki/` subdirs become:
+  `contacts/` (R15), `projects/`, `information/`, `events/`. These four
+  are *the* wiki page-types. Operational entities that already exist
+  (`tasks/ conflicts/ questions/ followups/ instructions/
+  voiceprofiles/`) stay under `wiki/` as-is — they are machinery, not
+  the four headline page-types; not in scope to rename here.
+- `events/` is backed by the existing Event entity (R11 recurrence
+  still applies). `information/` ← today's `notes/` concept (free-form
+  knowledge pages). `projects/` is a **new** page-type (no prior
+  entity): free-form project pages, graph-bearing via wikilinks.
+- Calendar pages live at `wiki/calendar/YYYY-MM-DD.md`. Generate the
+  full current year on demand (idempotent: never clobber a date page
+  that already has user content; only create missing ones).
+
+**Flagged for the user — do NOT guess (decompose only, don't build blind):**
+- Exact **date-page schema** (frontmatter? what body sections?) and how
+  Events **bind** to a date page (a semantic `[[date:YYYY-MM-DD]]`
+  link from the event, or the date page listing its events, or both).
+- Whether `projects/` / `information/` need typed frontmatter or are
+  pure free-form markdown + wikilinks.
+- Backfill scope: only the run-year, a rolling window, or on-access.
+
+**Ordered steps (each its own commit; `cargo build` + `--features
+loca` + `--features discord` green + tests before each; push after
+each):**
+- R16-1. Register `projects/`, `information/`, `events/` as canonical
+  `wiki/` subdirs in `src/vault/` alongside `contacts/` (create on
+  `Vault::open`; legacy back-compat reads like R15). Wire
+  `information/` to the existing notes path; keep `events/` reading
+  Event entities. Round-trip tests.
+- R16-2. `projects/` page-type: minimal free-form page model
+  (frontmatter `id/type/title` + body, wikilink-graph-bearing like
+  contacts), vault read/write/list + API. Tests.
+- R16-3. `wiki/calendar/` date pages: idempotent generator for the
+  run-year (`YYYY-MM-DD.md`, never clobber user content), exposed via
+  an API/CLI entrypoint. **Blocked on the flagged date-page schema +
+  event-binding decision — stop here and surface to the user rather
+  than guess the schema.**
+- R16-4. Docs: README/CLAUDE/`docs/markdown-schema.md`/todo updated.
+
+*(Round 15 done; record is in `git log` R15-1..R15-4 + the docs.)*
 
 ---
 
