@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; connect-src http://127.0.0.1:8000; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>QueryKey</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <nav id="rail">
+      <div class="brand"><span class="qk">QK</span><span class="brand-label">QueryKey</span></div>
+      <button class="navbtn active" data-view="profile">Profile</button>
+      <button class="navbtn" data-view="wiki">Wiki</button>
+      <div class="rail-spacer"></div>
+      <div id="server-status" class="server-status" title="server status">● starting…</div>
+    </nav>
+    <main id="content">
+      <div class="placeholder">Loading…</div>
+    </main>
+  </div>
+  <script src="renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "querykey-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "QueryKey desktop UI (Electron). Profile/card + wiki browsing; manages the local Rust querykey-server.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "lint": "node -c main.js && node -c preload.js && node -c renderer.js && echo lint-ok"
+  },
+  "dependencies": {
+    "marked": "^12.0.2"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7"
+  }
+}
