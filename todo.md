@@ -143,15 +143,15 @@ Current focus: **Windows Desktop**.
 
 ---
 
-## Phase 0 — Project Scaffolding
+## Phase 0 — Project Scaffolding — **DONE (do not redo)**
 
-- [ ] Initialize Flutter project (`flutter create`)
-- [ ] Set up project structure (feature-based folder layout)
-- [ ] Configure Windows desktop target
-- [ ] Set up testing infrastructure (unit, widget, integration)
-- [ ] Set up CI (GitHub Actions — lint, test, build)
-- [ ] Choose and configure state management (Riverpod, Bloc, etc.)
-- [ ] Choose local store (see Phase 1 — graph store is an open decision)
+Project is far past scaffolding (Rounds 1–20, in `git log`). The UI is
+**Electron** (`app-electron/`), user-directed 2026-05-17 — the old
+Flutter app was retired (`git rm`, recoverable from history).
+**Do NOT "initialize a Flutter project" or re-scaffold** — that would
+contradict the settled UI decision and the shipped state. CI/tests,
+project structure, and the local store (Loca, derived from the
+markdown vault — see Phase 1) are all decided and in place.
 
 ## Phase 1 — Account & Core Data Model
 
