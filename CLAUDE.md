@@ -78,3 +78,6 @@ Provisional directory for agent data during development. Committed to the repo s
 
 # currentDate
 Today's date is 2026-05-15.
+
+## Writing
+- Do not use the word "honest", "honesty", or "honestly". It is aggressively overused. Choose a more precise word that says what you actually mean (e.g. "accurate", "frank", "plainly", "truly").
