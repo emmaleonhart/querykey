@@ -42,6 +42,9 @@ const api = {
   listLinks: () => jget('/api/links').then((d) => d.links || []),
   entityLinks: (k, id) =>
     jget(`/api/entities/${encodeURIComponent(k)}/${encodeURIComponent(id)}/links`),
+  calendarAgenda: (fromISO, toISO) =>
+    jget(`/api/calendar?from=${encodeURIComponent(fromISO)}&to=${encodeURIComponent(toISO)}`),
+  calendarDates: () => jget('/api/calendar/dates').then((d) => d.dates || []),
 };
 
 // ---------- helpers ----------
@@ -399,8 +402,178 @@ async function wikiDetail(kind, id, title) {
   }
 }
 
+// ---------- Calendar view (R21) ----------
+// Month grid backed by /api/calendar (Event/Task agenda) + the
+// wiki/calendar/<date>.md date pages (/api/calendar/dates marks which
+// days have a page; getEntity('calendar', ymd) renders it). Local-date
+// bucketing — single-user PRM, the wall-clock date is what matters.
+
+let _calY = null; // visible year
+let _calM = null; // visible month (0-based)
+let _calDates = null; // Set<"YYYY-MM-DD"> with a date page (cached)
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function ymdLocal(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const da = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${da}`;
+}
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return isNaN(d.getTime())
+    ? ''
+    : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+async function calendarView() {
+  const now = new Date();
+  if (_calY == null) {
+    _calY = now.getFullYear();
+    _calM = now.getMonth();
+  }
+  content.innerHTML = `<h1>Calendar</h1><div class="placeholder">Loading…</div>`;
+
+  const first = new Date(_calY, _calM, 1);
+  const gridStart = new Date(_calY, _calM, 1 - first.getDay()); // back to Sunday
+  const gridEnd = new Date(gridStart);
+  gridEnd.setDate(gridEnd.getDate() + 42); // 6 weeks, exclusive end
+
+  try {
+    const [cal, dates] = await Promise.all([
+      api.calendarAgenda(gridStart.toISOString(), gridEnd.toISOString()),
+      _calDates ? Promise.resolve(null) : api.calendarDates(),
+    ]);
+    if (dates) _calDates = new Set(dates);
+
+    const byDay = {};
+    for (const it of (cal && cal.agenda) || []) {
+      const k = ymdLocal(new Date(it.start));
+      (byDay[k] || (byDay[k] = [])).push(it);
+    }
+
+    const todayKey = ymdLocal(now);
+    let cells = '';
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(gridStart);
+      d.setDate(d.getDate() + i);
+      const key = ymdLocal(d);
+      const inMonth = d.getMonth() === _calM;
+      const items = byDay[key] || [];
+      const hasPage = _calDates && _calDates.has(key);
+      const cls =
+        'cal-cell' +
+        (inMonth ? '' : ' cal-out') +
+        (key === todayKey ? ' cal-today' : '');
+      const peek = items
+        .slice(0, 2)
+        .map((it) => `<div class="cal-ev" title="${esc(it.title)}">${esc(it.title)}</div>`)
+        .join('');
+      const more = items.length > 2 ? `<div class="cal-more">+${items.length - 2} more</div>` : '';
+      const badge = items.length ? `<span class="cal-badge">${items.length}</span>` : '';
+      const dot = hasPage ? `<span class="cal-dot" title="has a day page">•</span>` : '';
+      cells +=
+        `<div class="${cls}" data-ymd="${key}">` +
+        `<div class="cal-daynum">${d.getDate()}${dot}${badge}</div>` +
+        peek + more +
+        `</div>`;
+    }
+
+    content.innerHTML =
+      `<div class="cal-head">` +
+      `<button class="action" id="cal-prev">‹</button>` +
+      `<h1 style="margin:0">${MONTHS[_calM]} ${_calY}</h1>` +
+      `<button class="action" id="cal-next">›</button>` +
+      `<button class="action" id="cal-today">Today</button>` +
+      `</div>` +
+      `<div class="cal-grid cal-dow">` +
+      DOW.map((w) => `<div class="cal-dowcell">${w}</div>`).join('') +
+      `</div>` +
+      `<div class="cal-grid">${cells}</div>` +
+      `<div class="muted" style="margin-top:12px">• = has a day page · number badge = agenda items (events / task deadlines)</div>`;
+
+    document.getElementById('cal-prev').onclick = () => {
+      _calM--; if (_calM < 0) { _calM = 11; _calY--; }
+      calendarView();
+    };
+    document.getElementById('cal-next').onclick = () => {
+      _calM++; if (_calM > 11) { _calM = 0; _calY++; }
+      calendarView();
+    };
+    document.getElementById('cal-today').onclick = () => {
+      _calY = now.getFullYear(); _calM = now.getMonth();
+      calendarView();
+    };
+    content.querySelectorAll('.cal-cell').forEach((el) => {
+      el.onclick = () => calendarDay(el.dataset.ymd);
+    });
+  } catch (e) {
+    content.innerHTML =
+      `<h1>Calendar</h1><div class="err-banner">Could not load the calendar.</div>` +
+      `<div class="muted">${esc(e.message)}</div>` +
+      `<button class="action" id="cal-retry">Retry</button>`;
+    document.getElementById('cal-retry').onclick = calendarView;
+  }
+}
+
+async function calendarDay(ymd) {
+  content.innerHTML =
+    `<div class="crumbs"><a id="b-cal">Calendar</a> › ${esc(ymd)}</div>` +
+    `<div class="placeholder">Loading…</div>`;
+  document.getElementById('b-cal').onclick = calendarView;
+
+  const [y, m, d] = ymd.split('-').map(Number);
+  const from = new Date(y, m - 1, d, 0, 0, 0);
+  const to = new Date(y, m - 1, d, 23, 59, 59);
+  try {
+    const [cal, page] = await Promise.all([
+      api.calendarAgenda(from.toISOString(), to.toISOString()),
+      api.getEntity('calendar', ymd).catch(() => null),
+    ]);
+    const items = (cal && cal.agenda) || [];
+    const crumb = `<div class="crumbs"><a id="b-cal">Calendar</a> › ${esc(ymd)}</div>`;
+    const agendaHtml = items.length
+      ? items
+          .map(
+            (it) =>
+              `<div class="list-item" data-k="${esc(it.kind)}" data-i="${esc(it.id)}">` +
+              `<span>${esc(it.title)}</span>` +
+              `<span class="sub">${esc(fmtTime(it.start))} · ${esc(it.movable ? 'task' : 'event')}` +
+              `${it.recurring ? ' · recurring' : ''}</span></div>`,
+          )
+          .join('')
+      : `<div class="muted">Nothing on the agenda.</div>`;
+    const pageHtml =
+      page && page.body
+        ? `<h2>Day page</h2><div class="markdown detail">` +
+          (window.md ? window.md.parse(page.body) : esc(page.body)) +
+          `</div>`
+        : '';
+    content.innerHTML =
+      crumb +
+      `<h1>${esc(ymd)}</h1>` +
+      `<h2>Agenda</h2>${agendaHtml}` +
+      pageHtml;
+    document.getElementById('b-cal').onclick = calendarView;
+    content.querySelectorAll('.list-item[data-k]').forEach((el) => {
+      el.onclick = () => wikiDetail(el.dataset.k, el.dataset.i, el.dataset.i);
+    });
+  } catch (e) {
+    content.innerHTML =
+      `<div class="crumbs"><a id="b-cal">Calendar</a> › ${esc(ymd)}</div>` +
+      `<div class="err-banner">Could not load this day.</div>` +
+      `<div class="muted">${esc(e.message)}</div>`;
+    document.getElementById('b-cal').onclick = calendarView;
+  }
+}
+
 // ---------- nav ----------
-const views = { profile: loadProfile, wiki: wikiPicker };
+const views = { profile: loadProfile, calendar: calendarView, wiki: wikiPicker };
 
 function show(view) {
   document.querySelectorAll('.navbtn').forEach((b) => {

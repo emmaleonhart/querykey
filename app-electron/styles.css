@@ -99,3 +99,39 @@ label { font-size: 12px; color: var(--text-dim); }
 .markdown h2 { font-size: 15px; }
 .dangling { color: var(--text-dim); font-style: italic; }
 .err-banner { color: var(--error); }
+
+/* ---- calendar (R21) ---- */
+.cal-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.cal-head h1 { flex: 0 0 auto; min-width: 190px; }
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
+}
+.cal-dow { margin-bottom: 6px; }
+.cal-dowcell {
+  text-align: center; font-size: 11px; color: var(--text-dim);
+  padding: 4px 0; text-transform: uppercase; letter-spacing: .04em;
+}
+.cal-cell {
+  min-height: 92px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px 7px; cursor: pointer; overflow: hidden;
+}
+.cal-cell:hover { background: var(--surface-2); }
+.cal-out { opacity: .42; }
+.cal-today { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+.cal-daynum {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; color: var(--text-dim); margin-bottom: 4px;
+}
+.cal-dot { color: var(--primary); font-size: 15px; line-height: 1; }
+.cal-badge {
+  margin-left: auto; background: var(--primary); color: var(--on-primary);
+  font-size: 10px; font-weight: 700; border-radius: 9px; padding: 0 6px;
+}
+.cal-ev {
+  font-size: 11px; color: var(--text);
+  background: var(--surface-2); border-radius: 4px;
+  padding: 1px 5px; margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cal-more { font-size: 10px; color: var(--text-dim); margin-top: 3px; }

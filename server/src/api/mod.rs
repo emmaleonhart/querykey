@@ -84,6 +84,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/projects/:id", get(get_project_h))
         // Calendar date pages (wiki/calendar/YYYY-MM-DD.md, R16-3)
         .route("/api/calendar/generate", post(calendar_generate))
+        // Which dates have a date page (desktop Calendar grid, R21-1)
+        .route("/api/calendar/dates", get(calendar_dates))
         // Semantic wikilink graph (derived live from the canonical
         // vault — backend-independent, never stale).
         .route("/api/links", get(list_links))
@@ -627,6 +629,13 @@ async fn calendar_generate(State(s): State<Arc<AppState>>) -> Json<Value> {
         })),
         Err(e) => Json(json!({ "ok": false, "error": e.to_string() })),
     }
+}
+
+// R21-1: the set of dates that have a wiki/calendar/<date>.md page,
+// so the desktop Calendar grid can mark them. Read-only, additive —
+// no behavior change to any existing route.
+async fn calendar_dates(State(s): State<Arc<AppState>>) -> Json<Value> {
+    Json(json!({ "dates": s.vault.calendar_date_ids() }))
 }
 
 // ---- semantic wikilink graph ----

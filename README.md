@@ -143,9 +143,12 @@ wiki browsing); the rest is scaffolding.
 - Ingest pipeline: relaxed-schema parse → typed models → store + typed
   GraphDiff broadcast over the WebSocket hub.
 - **MCP server** (`/mcp`): JSON-RPC `initialize`/`tools/list`/`tools/call`.
-- **Electron desktop UI** (`app-electron/`) — two real surfaces:
+- **Electron desktop UI** (`app-electron/`) — three real surfaces:
   **Profile** (your own card — view/edit/draft-with-agent/revert, the
-  24h propagation valve surfaced) and **Wiki** (browse vault page-types;
+  24h propagation valve surfaced), **Calendar** (month grid over the
+  `wiki/calendar/<date>.md` date pages + the `/api/calendar` agenda;
+  prev/Today/next nav; click a day → its agenda items + the rendered
+  day page), and **Wiki** (browse vault page-types;
   Contacts/Projects/Notes/**Events** list; entity detail renders the
   markdown body with `[[wikilink]]` click-through + backlinks). R18
   rebranded the app off the old "Secretary Bird" hackathon shell,
@@ -165,7 +168,13 @@ wiki browsing); the rest is scaffolding.
   projects, 2 notes, 1 event served; test suite **69 passed / 0
   failed**; renderer API contracts curl-checked. (Visual GUI pass is
   the user's on next `!run-UI.bat`; the data path is end-to-end
-  verified.)
+  verified.) **R21 added the Calendar surface**, backed by one
+  additive read endpoint `GET /api/calendar/dates` + a `calendar`
+  kind on `GET /api/entities/:kind/:id` (reads
+  `wiki/calendar/<date>.md`); no existing route changed. Data path
+  curl-verified against `life-planning/prm` (1,084 date pages served,
+  agenda, a real date page rendered); visual GUI pass is the user's
+  via `!run-UI.bat`.
 
 **Honest limitations / not yet built**
 - **Agent honesty (gateway detection + ingest)** — DONE (Round 13):
@@ -253,7 +262,7 @@ it just launches the Electron app, which manages the server.)
 
 | Path | What it is |
 |---|---|
-| [`app-electron/`](app-electron/) | **Electron** desktop app — **Profile** (card) + **Wiki** (vault browser); manages the Rust server. (The retired Flutter `app/` is in git history.) |
+| [`app-electron/`](app-electron/) | **Electron** desktop app — **Profile** (card) + **Calendar** (month grid) + **Wiki** (vault browser); manages the Rust server. (The retired Flutter `app/` is in git history.) |
 | [`server/`](server/) | **Rust** server (`querykey-server`) — the only server: ingest, agent bridge, WebSocket, MCP, Loca graph store |
 | [`docs/`](docs/) | `architecture.md`, `data-model.md`, `markdown-schema.md`, `card-format.md`, `versions-comparison.md`, `why-go.md` |
 | [`chat/`](chat/) | Vision corpus (chat-log exports); gitignored except its README — private context, not a spec |

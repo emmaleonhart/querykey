@@ -51,35 +51,9 @@ Please keep this section when rebasing with the remote
 
 ## ACTIVE
 
-### Round 21 — Calendar view (user-directed 2026-05-19)
-
-User wants the desktop app to actually open and show a working
-calendar. The agenda API only covers Event/Task entities; the real
-calendar data is the 1,084 `wiki/calendar/YYYY-MM-DD.md` pages, which
-no API surface exposes yet. Renderer-only + one additive read endpoint
-(server stays settled — same additive pattern as R17/R19, no behavior
-change to existing routes; UI = Electron, not revisited).
-
-- **R21-1 server:** `vault.calendar_date_ids()` + `GET
-  /api/calendar/dates` → sorted `YYYY-MM-DD` ids that have a
-  `wiki/calendar/<date>.md` page.
-- **R21-2 server:** `get_entity` gains a `"calendar"` kind (id =
-  `YYYY-MM-DD`) reading `wiki/calendar/<date>.md` → `EntityPage`
-  (mirrors the `note` arm; reuses the detail/markdown render path).
-- **R21-3 renderer:** `Calendar` nav button + month-grid view. Cells
-  mark days that have a date page and/or `/api/calendar` agenda items
-  (today highlighted, adjacent-month days dimmed); ‹ prev / Today /
-  next › navigation.
-- **R21-4 renderer:** day view — that date's agenda items (click →
-  existing wiki detail for event/task) + the rendered
-  `wiki/calendar/<date>.md` page body.
-- **R21-5:** grid styles (existing palette vars); README Status +
-  CLAUDE API list updated; data path verified live against
-  `life-planning/prm` (cargo build + curl). Visual GUI pass is the
-  user's via `!run-UI.bat` (no display in the working environment).
-
-Delete this whole block in the same commit as the work (CLAUDE.md
-rule). **UI = Electron is settled (CLAUDE.md/todo.md), do not revert.**
+*Nothing mid-flight. Pull the next item from `todo.md` when starting
+fresh. **UI = Electron is settled (CLAUDE.md/todo.md), do not
+revert.***
 
 ### Open follow-ups (small, not mid-flight)
 
