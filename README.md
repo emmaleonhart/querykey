@@ -176,7 +176,7 @@ wiki browsing); the rest is scaffolding.
   agenda, a real date page rendered); visual GUI pass is the user's
   via `!run-UI.bat`.
 
-**Honest limitations / not yet built**
+**Limitations / not yet built**
 - **Agent honesty (gateway detection + ingest)** — DONE (Round 13):
   `detect()` verifies the real OpenAI-compatible chat endpoint, not
   just `/health` (the OpenClaw Control UI answers `/health` too);
