@@ -290,6 +290,44 @@ The core differentiator. Accept anything, normalize it.
 - [ ] **Deadline extraction** — dates/times from unstructured input
 - [ ] **Context-aware scheduling** — infer the project/context
 
+## Phase 5b — Dashboards (applications, plans)
+
+User direction 2026-05-28: a dashboard view in QueryKey showing all
+applications/opportunities ordered by date, plus reading/watching
+plans. Per-item text-box editing with auto-commit to the vault on save.
+
+**Data already exists in the vault** at the life-planning QueryKey
+vault (`C:\Users\Immanuelle\Documents\Github\life-planning`):
+- `applications.md` — Active / Awaiting / Closed sections, each item
+  with `next-action-date`, `status`, `draft`, blockers, and a `notes:`
+  field the edit-flow appends to.
+- `plans.md` — Watching + Reading sections, each item with a `notes:`
+  field, plus pointers to structured sources (e.g.
+  `docs/applications/80k-hours-watched-videos.json`).
+
+These files are the authoritative source. The Dashboard reader should
+not duplicate or rewrite their structure.
+
+- [ ] **Applications dashboard view (Electron):** new view alongside
+  Profile / Calendar / Wiki, rendering `applications.md` as a date-
+  sorted timeline. Each item shows: title, next-action date, status,
+  draft path link, notes textarea. Soonest-action item at the top.
+- [ ] **Plans dashboard view (Electron):** same shape, rendering
+  `plans.md`. Each item has a notes textarea.
+- [ ] **Read-side API endpoints (Rust):** `/api/dashboard/applications`
+  and `/api/dashboard/plans` that parse the markdown structure into
+  JSON (item title, fields, notes content). Reuse existing
+  vault-reader patterns from the Wiki view.
+- [ ] **Notes-write API endpoint (Rust):** accept a per-item notes
+  update, write back to the markdown file, `git commit` locally
+  (same edit-flow design already specified for the Profile view's
+  card editing).
+- [ ] **Navigation:** add Dashboard entries to whatever navigation
+  surface Profile / Calendar / Wiki use today.
+
+Cross-repo: data in life-planning vault (life-planning commit
+`3b203f8c`); UI + server work here.
+
 ## Phase 6 — Conversational Agent (The Secretary)
 
 - [ ] **Proactive daily check-in** — a single daily prompt to *you*
