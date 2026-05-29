@@ -51,60 +51,25 @@ Please keep this section when rebasing with the remote
 
 ## ACTIVE
 
-### R22 — Dashboards (applications + plans) — PLAN
-
-User direction 2026-05-28 (in life-planning chat): a Dashboard view in
-QueryKey rendering all her applications/opportunities ordered by date
-+ reading/watching plans, with per-item notes textareas that
-auto-commit to the vault on save. Phase 5b in `todo.md` has the full
-breakdown.
-
-**Data already lives in the life-planning vault** (life-planning
-commit `3b203f8c`):
-- `applications.md` — three sections (Active / Awaiting / Closed),
-  each item structured with `next-action-date`, `status`, `draft`,
-  blockers, and `notes:` fields.
-- `plans.md` — Watching + Reading sections, same shape.
-
-**R22 scope is read-side only.** Defer notes-write + Electron UI to
-R23 and R24.
-
-Concrete sequential steps:
-
-1. Add `server/src/dashboard/` module. Implement a markdown parser
-   that walks the H2/H3 structure of `applications.md` and
-   `plans.md` and returns a list of items where each item has: title
-   (H3 heading), section (parent H2), and a map of field-name →
-   field-value pulled from the `**field-name:** value` bold-key
-   lines.
-2. Add Rust API endpoints `/api/dashboard/applications` and
-   `/api/dashboard/plans` returning the parsed JSON. Reuse the
-   existing vault-reader pattern from the Wiki view
-   (`server/src/vault/`).
-3. Integration test against the actual vault content: verify SOAR
-   appears at the top of `applications.md` Active section, that the
-   watched-80k count comes back correct in `plans.md`, etc.
-4. Curl-verify the endpoints before claiming done.
-
-Out of scope for R22 (queued for next Rounds):
-- Notes-write endpoint (R23).
-- Electron Dashboard view (R24).
-- Navigation entries alongside Profile / Calendar / Wiki (R24).
-- Per-item edit valve mirroring the Profile card's 24-hour rule (R23
-  decision).
-
-*Otherwise nothing mid-flight. **UI = Electron is settled
+*Nothing mid-flight. **UI = Electron is settled
 (CLAUDE.md/todo.md), do not revert.***
 
 ### Open follow-ups (small, not mid-flight)
 
-- **Visual GUI confirmation of the UI.** R18 verified the data path
-  end-to-end (live: `/api/card` + 135 contacts served from
-  `life-planning/prm`) and the screen code by review, but no one has
-  run the actual desktop window to eyeball Profile/Wiki rendering.
-  Next time the app is run via `!run-UI.bat`, confirm the card
-  renders and Wiki→Contacts lists people; file anything off as a
-  new round.
+- **Visual GUI confirmation of Profile / Wiki / Calendar.** The
+  Dashboard view (R24) was run and eyeballed live on 2026-05-28
+  (server spawned, all 7 application cards + notes save verified via
+  CDP). Profile / Wiki / Calendar render code is reviewed but has not
+  been eyeballed in the running window — confirm next time the app is
+  up and file anything off as a new round.
+- **Dashboard notes auto-git-commit (deferred from R23).** R23 writes
+  the note to the vault markdown but does NOT git-commit (matches every
+  other vault write in the server; the vault is committed out of band).
+  `plans.md`/`applications.md` headers still say "auto-committed on
+  save." Decide whether the server should commit (and how it avoids
+  racing the user's own git / the autonomous loop) or whether the
+  header wording should change. The UI already reports the truth
+  ("Saved to vault", not "committed").
 - **Loka Studio graph-viz reuse (deferred, user-flagged).** The user
   wants knowledge-graph visualization à la `SutraDB/loka-studio`
   (force-directed `graph_canvas.dart`). Deferred: only the Flutter
