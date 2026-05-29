@@ -95,6 +95,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/notes", get(list_notes_h))
         .route("/api/events", get(list_events_h))
         .route("/api/entities/:kind/:id", get(get_entity_h))
+        // R22 dashboards (read-side: applications + plans markdown at
+        // the vault root — see querykey/queue.md and life-planning's
+        // applications.md / plans.md)
+        .route("/api/dashboard/applications", get(dashboard_applications))
+        .route("/api/dashboard/plans", get(dashboard_plans))
         // Local-agent management
         .route("/api/openclaw/kill", post(openclaw_kill))
         .route("/api/openclaw/restart", post(openclaw_restart))
@@ -704,5 +709,21 @@ async fn graph_query(
     match s.graph.query(&q.query).await {
         Ok(r) => Json(serde_json::to_value(r).unwrap_or_else(|_| json!({}))),
         Err(e) => Json(json!({ "error": e.to_string() })),
+    }
+}
+
+async fn dashboard_applications(State(s): State<Arc<AppState>>) -> Json<Value> {
+    let board = crate::dashboard::parse(s.vault.root(), "applications.md");
+    match board {
+        Some(b) => Json(serde_json::to_value(b).unwrap_or_else(|_| json!({}))),
+        None => Json(json!({ "error": "applications.md not found in vault root" })),
+    }
+}
+
+async fn dashboard_plans(State(s): State<Arc<AppState>>) -> Json<Value> {
+    let board = crate::dashboard::parse(s.vault.root(), "plans.md");
+    match board {
+        Some(b) => Json(serde_json::to_value(b).unwrap_or_else(|_| json!({}))),
+        None => Json(json!({ "error": "plans.md not found in vault root" })),
     }
 }

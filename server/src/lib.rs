@@ -6,6 +6,7 @@ pub mod api;
 pub mod calendar;
 pub mod card;
 pub mod config;
+pub mod dashboard;
 pub mod discord;
 pub mod graph;
 pub mod identity;
