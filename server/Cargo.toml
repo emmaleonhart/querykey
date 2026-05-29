@@ -32,11 +32,13 @@ thiserror = "1"
 async-trait = "0.1"
 toml = { version = "0.8", default-features = false, features = ["parse"] }
 
-# Loca / SutraDB graph store. Optional so the crate always builds even
-# without the sibling SutraDB checkout. Enable with: --features loca
-# (production build). Path dep: secretarybird-pivot/server -> Github/SutraDB.
-loka-core = { path = "../../SutraDB/loka-core", optional = true }
-loka-sparql = { path = "../../SutraDB/loka-sparql", optional = true }
+# Loca graph store. Optional so the crate always builds even without the
+# sibling Loka checkout. Enable with: --features loca (production build).
+# Path dep: querykey/server -> Github/Loka (renamed from the old SutraDB).
+# NB: cargo validates path deps at manifest load even when the feature is
+# off, so this path must resolve for ANY build, not just --features loca.
+loka-core = { path = "../../Loka/loka-core", optional = true }
+loka-sparql = { path = "../../Loka/loka-sparql", optional = true }
 
 # Discord bot (heavy). Optional so the default build never pulls it.
 # Enable with --features discord.

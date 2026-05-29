@@ -842,7 +842,7 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "loka-core"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "memmap2",
@@ -856,7 +856,7 @@ dependencies = [
 
 [[package]]
 name = "loka-hnsw"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "loka-core",
@@ -870,7 +870,7 @@ dependencies = [
 
 [[package]]
 name = "loka-sparql"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "loka-core",
