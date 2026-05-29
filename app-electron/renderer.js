@@ -45,6 +45,10 @@ const api = {
   calendarAgenda: (fromISO, toISO) =>
     jget(`/api/calendar?from=${encodeURIComponent(fromISO)}&to=${encodeURIComponent(toISO)}`),
   calendarDates: () => jget('/api/calendar/dates').then((d) => d.dates || []),
+  dashboardApplications: () => jget('/api/dashboard/applications'),
+  dashboardPlans: () => jget('/api/dashboard/plans'),
+  saveDashboardNote: (file, title, notes) =>
+    jsend('/api/dashboard/notes', 'POST', { file, title, notes }),
 };
 
 // ---------- helpers ----------
@@ -572,8 +576,133 @@ async function calendarDay(ymd) {
   }
 }
 
+// ---------- Dashboard view (R24) ----------
+// Renders the vault's prm/applications.md + prm/plans.md (parsed
+// server-side by /api/dashboard/*) as sectioned item cards. Each item's
+// `notes` field is an editable textarea that saves back to the vault
+// markdown via /api/dashboard/notes (R23 notes-write).
+
+const DASH_TABS = [
+  { key: 'applications', label: 'Applications', file: 'applications.md', load: () => api.dashboardApplications() },
+  { key: 'plans', label: 'Plans', file: 'plans.md', load: () => api.dashboardPlans() },
+];
+let _dashTab = 'applications';
+
+// Render a field value as inline markdown (handles `code`, **bold**,
+// links) when marked is available, else escaped text.
+function fieldValueHtml(v) {
+  if (!v) return '<span class="muted">—</span>';
+  return window.md ? window.md.parseInline(String(v)) : esc(v);
+}
+
+function dashTabBar() {
+  return (
+    `<div class="dash-tabs">` +
+    DASH_TABS.map(
+      (t) =>
+        `<button class="dash-tab${t.key === _dashTab ? ' active' : ''}" data-dtab="${t.key}">${esc(t.label)}</button>`,
+    ).join('') +
+    `</div>`
+  );
+}
+
+function itemCardHtml(item, file, idx) {
+  const fields = item.fields || [];
+  const rows = fields
+    .filter(([k]) => k.toLowerCase() !== 'notes')
+    .map(
+      ([k, v]) =>
+        `<div class="dash-field"><span class="dash-key">${esc(k)}</span>` +
+        `<span class="dash-val">${fieldValueHtml(v)}</span></div>`,
+    )
+    .join('');
+  const noteField = fields.find(([k]) => k.toLowerCase() === 'notes');
+  const noteVal = noteField ? noteField[1] : '';
+  const ta = `dash-note-${idx}`;
+  return (
+    `<div class="dash-card" data-title="${esc(item.title)}">` +
+    `<h3>${esc(item.title)}</h3>` +
+    rows +
+    `<div class="dash-note-wrap">` +
+    `<label class="dash-key">notes</label>` +
+    `<textarea class="dash-note" id="${ta}" rows="3" placeholder="Add a note… (saved to the vault markdown)">${esc(noteVal)}</textarea>` +
+    `<div class="dash-note-actions">` +
+    `<button class="action dash-save" data-file="${esc(file)}" data-title="${esc(item.title)}" data-ta="${ta}">Save note</button>` +
+    `<span class="dash-save-status muted" id="${ta}-status"></span>` +
+    `</div></div></div>`
+  );
+}
+
+async function dashboardView() {
+  const tab = DASH_TABS.find((t) => t.key === _dashTab) || DASH_TABS[0];
+  content.innerHTML = `<h1>Dashboard</h1>` + dashTabBar() + `<div class="placeholder">Loading…</div>`;
+  wireDashTabs();
+  try {
+    const board = await tab.load();
+    if (board && board.error) {
+      content.innerHTML =
+        `<h1>Dashboard</h1>` + dashTabBar() + `<div class="err-banner">${esc(board.error)}</div>`;
+      wireDashTabs();
+      return;
+    }
+    const items = (board && board.items) || [];
+    // Group items under their section header, preserving order.
+    let html = `<h1>Dashboard</h1>` + dashTabBar();
+    if (!items.length) {
+      html += `<div class="empty">Nothing in ${esc(tab.label)} yet.</div>`;
+    } else {
+      let curSection = null;
+      items.forEach((it, idx) => {
+        if (it.section !== curSection) {
+          curSection = it.section;
+          if (curSection) html += `<h2 class="dash-section">${esc(curSection)}</h2>`;
+        }
+        html += itemCardHtml(it, tab.file, idx);
+      });
+    }
+    content.innerHTML = html;
+    wireDashTabs();
+    wireDashSaves();
+  } catch (e) {
+    content.innerHTML =
+      `<h1>Dashboard</h1>` + dashTabBar() +
+      `<div class="err-banner">Could not load ${esc(tab.label)}.</div>` +
+      `<div class="muted">${esc(e.message)}</div>`;
+    wireDashTabs();
+  }
+}
+
+function wireDashTabs() {
+  content.querySelectorAll('.dash-tab').forEach((b) => {
+    b.onclick = () => {
+      _dashTab = b.dataset.dtab;
+      dashboardView();
+    };
+  });
+}
+
+function wireDashSaves() {
+  content.querySelectorAll('.dash-save').forEach((b) => {
+    b.onclick = async () => {
+      const ta = document.getElementById(b.dataset.ta);
+      const statusEl2 = document.getElementById(b.dataset.ta + '-status');
+      const notes = ta ? ta.value : '';
+      b.disabled = true;
+      if (statusEl2) statusEl2.textContent = 'Saving…';
+      try {
+        const r = await api.saveDashboardNote(b.dataset.file, b.dataset.title, notes);
+        if (statusEl2) statusEl2.textContent = r && r.committed ? 'Saved + committed' : 'Saved to vault';
+      } catch (e) {
+        if (statusEl2) statusEl2.textContent = 'Save failed: ' + e.message;
+      } finally {
+        b.disabled = false;
+      }
+    };
+  });
+}
+
 // ---------- nav ----------
-const views = { profile: loadProfile, calendar: calendarView, wiki: wikiPicker };
+const views = { dashboard: dashboardView, profile: loadProfile, calendar: calendarView, wiki: wikiPicker };
 
 function show(view) {
   document.querySelectorAll('.navbtn').forEach((b) => {
@@ -585,4 +714,4 @@ document.querySelectorAll('.navbtn').forEach((b) => {
   b.addEventListener('click', () => show(b.dataset.view));
 });
 
-show('profile');
+show('dashboard');

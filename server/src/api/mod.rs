@@ -100,6 +100,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // applications.md / plans.md)
         .route("/api/dashboard/applications", get(dashboard_applications))
         .route("/api/dashboard/plans", get(dashboard_plans))
+        // R23 notes-write: set an item's `notes` field in the dashboard
+        // markdown (writes the vault file; no server-side git commit).
+        .route("/api/dashboard/notes", post(dashboard_set_note))
         // Local-agent management
         .route("/api/openclaw/kill", post(openclaw_kill))
         .route("/api/openclaw/restart", post(openclaw_restart))
@@ -725,5 +728,24 @@ async fn dashboard_plans(State(s): State<Arc<AppState>>) -> Json<Value> {
     match board {
         Some(b) => Json(serde_json::to_value(b).unwrap_or_else(|_| json!({}))),
         None => Json(json!({ "error": "plans.md not found in vault root" })),
+    }
+}
+
+#[derive(Deserialize)]
+struct NoteWrite {
+    file: String,
+    title: String,
+    notes: String,
+}
+
+async fn dashboard_set_note(
+    State(s): State<Arc<AppState>>,
+    Json(req): Json<NoteWrite>,
+) -> Json<Value> {
+    match crate::dashboard::set_note(s.vault.root(), &req.file, &req.title, &req.notes) {
+        // committed:false is the truth — the server writes the vault file
+        // but does not git-commit (matches every other vault write here).
+        Ok(bytes) => Json(json!({ "ok": true, "committed": false, "bytes": bytes })),
+        Err(e) => Json(json!({ "ok": false, "error": e })),
     }
 }

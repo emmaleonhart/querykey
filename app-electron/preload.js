@@ -21,4 +21,6 @@ contextBridge.exposeInMainWorld('md', {
   // Render markdown to HTML. Bodies are the user's own local vault
   // files (trusted, local-first); marked's default output is fine.
   parse: (s) => marked.parse(String(s || ''), { breaks: true }),
+  // Inline render (no <p> wrapper) — used for dashboard field values.
+  parseInline: (s) => marked.parseInline(String(s || '')),
 });
